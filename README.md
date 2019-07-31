@@ -12,9 +12,28 @@ THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS.
 
 ## Documentation
 
-See the [wiki](**need_to_edit**) pages.
+See the [wiki](https://github.com/yumorishita/LiCSBAS/wiki) pages.
 
 ## Sample Products
 
-Sample products of LiCSBAS are available [here](need_to_edit).
+in preparation
 
+## Citation
+
+in preparation
+
+## Acknowledgements
+
+This work has been accomplished during Y. Morishita’s visit at University of Leeds, supported by JSPS Overseas Research Fellowship.
+
+
+
+Yu Morishita
+
+JSPS Overseas Research Fellow
+
+Visiting Researcher, COMET, School of Earth and Environment, University of Leeds
+
+Chief Researcher, Geography and Crustal Dynamics Research Center, Geospatial Information Authority of Japan (GSI)
+
+Figs
