@@ -28,10 +28,10 @@ This work has been accomplished during Y. Morishita’s visit at University of L
 
 
 
-Yu Morishita
-JSPS Overseas Research Fellow
-Visiting Researcher, COMET, School of Earth and Environment, University of Leeds
-Chief Researcher, Geography and Crustal Dynamics Research Center, Geospatial Information Authority of Japan (GSI)
+*Yu Morishita\
+JSPS Overseas Research Fellow\
+Visiting Researcher, COMET, School of Earth and Environment, University of Leeds\
+Chief Researcher, Geography and Crustal Dynamics Research Center, Geospatial Information Authority of Japan (GSI)\*
 
 [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/COMET_logo.png"  height="60">](https://comet.nerc.ac.uk/)   [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/LiCS_logo.jpg"  height="60">](https://comet.nerc.ac.uk/COMET-LiCS-portal/)   [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/GSI_logo.png"  height="60">](https://www.gsi.go.jp/)
 
