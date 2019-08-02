@@ -346,7 +346,7 @@ def main(argv=None):
     print('# of removed ifgs      : {}'.format(n_ifg_bad))
     print('Threshold of used unw  : {}'.format(n_unw_thre))
     print('')
-    print('Reference area (X/Y    : {}:{}/{}:{}'.format(refx1, refx2, refy1, refy2))
+    print('Reference area (X/Y)   : {}:{}/{}:{}'.format(refx1, refx2, refy1, refy2))
     print('Allowed memory size    : {} MB'.format(memory_size))
     print('Number of patches      : {}'.format(n_patch))
     print('Inversion algorism     : {}'.format(inv_alg))

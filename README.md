@@ -6,7 +6,7 @@ LiCSBAS is an open-source package in Python and bash to conduct InSAR time serie
 
 Users can easily derive the time series and velocity of the displacement if sufficient LiCS products are available for the area of interest. LiCSBAS also contains visualization tools to interactively display the time series of displacement to help investigation and interpretation of the results.
 
-Fig
+<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/sample_vel.png"  height="350">  <img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/sample_ts.png"  height="350">
 
 THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS. USE AT YOUR OWN RISK.
 
@@ -16,7 +16,12 @@ See the [**wiki**](https://github.com/yumorishita/LiCSBAS/wiki) pages.
 
 ## Sample Products
 
-in preparation
+[LiCSBAS_sample.tar.gz (33.6MB)](https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/sample/LiCSBAS_sample.tar.gz)
+
+- Frame ID: 039A_05373_131313 (Kanto, Japan)
+- Time: 2015/04/30-2019/03/22 (~4 years, 85 images, 249 interferograms)
+- Downsampled by a factor of 10 (~1 km resolution)
+- Only [Kujyukuri region](https://goo.gl/maps/KqS1V9De3V6zZViQ7) by clipping (139.95/140.60/35.15/35.95)
 
 ## Citation
 
