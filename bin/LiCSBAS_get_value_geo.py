@@ -28,11 +28,9 @@ LiCSBAS_get_value_geo.py -i infile -p dempar -l locfile [-o outfile]
 
 #%% Import
 import getopt
-import shutil
 import os
 import sys
 import time
-import subprocess as subp
 import numpy as np
 import LiCSBAS_io_lib as io_lib
 
@@ -121,16 +119,17 @@ def main(argv=None):
     data = io_lib.read_img(infile, length, width, endian=endian)
     
     
-    #%% 
+    #%% Make txt file
     f = open(outfile, 'w')
     print('# lat lon x y value value_avg', file=f)
     for lat, lon in latlon_list:
+        ### Identify x/y from lat/lon
         x = int(np.round((lon-lon_w)/dlon))
         y = int(np.round((lat-lat_n)/dlat))
         
-        if x >= width or x < 0 or y >= length or y < 0:
+        if x >= width or x < 0 or y >= length or y < 0: ### If outside of area
             x = y = value = value_avg = np.nan
-        else:
+        else: ### Inside
             value = data[y, x]
             
             ### Average
