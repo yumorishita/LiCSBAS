@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+"""
+========
+Overview
+========
+Python3 library of time series analysis tools for LiCSBAS.
+
+=========
+Changelog
+=========
+v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
+ - Original implementation
+"""
+import os
+import sys
+import re
+import requests
+import numpy as np
+import statsmodels.api as sm
+import warnings
+
+#%%
+def bl2xy(lon, lat, width, length, lat1, postlat, lon1, postlon):
+    """
+    lat1 is north edge and postlat is negative value.
+    lat lon values are in grid registration
+    x/y index start from 0, end with width-1
+    """
+    x = int(np.round((lon - lon1)/postlon))
+    y = int(np.round((lat - lat1)/postlat))
+    
+    return [x, y]
+
+
+#%%
+def cmap_insar():
+    """
+    How to use cmap_insar:
+        cdict = cmap_insar()
+        plt.register_cmap(name='insar', data=cdict)
+        plt.imshow(array, cmap='insar', vmin=-np.pi, vmax=np.pi)
+        
+    Note:
+        - Input array should be wrapped and in radian
+        - To wrap unwrapped phase, np.angle(np.exp(1j*unw/cycle)*cycle)
+    """
+
+#    These are for 0-2pi, not -pi to pi
+    red = [255,255,255,255,240,203,165,127,90,55,92,130,167,205,243,255,255,255]
+    green = [118,156,193,231,255,255,255,255,255,255,217,179,142,104,66,80,118,156]
+    blue = [191,153,116,78,69,106,144,182,219,255,255,255,255,255,255,229,191,153]
+    phase = [k/32 for k in range(1,33,2)]
+    phase = [0] + phase + [1]
+
+    red_norm = [ k/255 for k in red ] + [ red[0]/255 ]
+    green_norm = [ k/255 for k in green ] + [ green[0]/255 ]
+    blue_norm = [ k/255 for k in blue ] + [ blue[0]/255 ]
+
+    redtuple=[]
+    greentuple=[]
+    bluetuple=[]    
+    for j in range(18):
+        redtuple.append((phase[j],red_norm[j],red_norm[j+1]))
+        greentuple.append((phase[j],green_norm[j],green_norm[j+1]))
+        bluetuple.append((phase[j],blue_norm[j],blue_norm[j+1]))
+   
+    redtuple=tuple(redtuple)
+    greentuple=tuple(greentuple)    
+    bluetuple=tuple(bluetuple)
+        
+    cdict = { 'red': redtuple, 'green': greentuple, 'blue': bluetuple }
+    
+    return cdict
+
+
+#%% 
+def download_data(url, file):
+    response = requests.get(url)
+    if response.status_code != 200:
+        return False    
+    
+    with open(file, "wb") as f:
+        f.write(response.content)
+    
+    return True
+
+
+#%%
+def fit2d(A,w=None,deg="1"):
+    """
+    Estimate best fit plain with indicated degree of polynomial.
+    
+    Inputs:
+        A : Input ndarray (can include nan)
+        w : Wieight (1/std**2) for each element of A (with the same dimention as A)
+        deg : degree of polynomial of fitting plain
+         - 1   -> a+bx+cy (ramp)
+         - bl -> a+bx+cy+dxy (biliner)
+         - 2   -> a+bx+cy+dxy+ex**2_fy**2 (2d polynomial)
+     
+    Returns:
+        Afit : Best fit plain with the same demention as A
+        m    : set of parameters of best fit plain (a,b,c...)
+    
+    """
+
+    ### Make design matrix G
+    length,width = A.shape #read dimension
+    Xgrid,Ygrid = np.meshgrid(np.arange(width),np.arange(length)) #mesh grid
+    
+    if str(deg) == "1":
+        G = np.stack((np.ones((length*width)), Xgrid.flatten(), Ygrid.flatten())).T
+    elif str(deg) == "bl":
+        G = np.stack((np.ones((length*width)), Xgrid.flatten(), Ygrid.flatten(), Xgrid.flatten()*Ygrid.flatten())).T
+    elif str(deg) == "2":
+        G = np.stack((np.ones((length*width)), Xgrid.flatten(), Ygrid.flatten(), Xgrid.flatten()*Ygrid.flatten(), Xgrid.flatten()**2, Ygrid.flatten()**2)).T
+    else:
+        print('\nERROR: Not proper deg ({}) is used\n'.format(deg), file=sys.stderr)
+        return False
+        
+    ### Handle nan by 0 padding and 0 weight
+    # Not drop in sm because cannot return Afit
+    if np.any(np.isnan(A)):
+        bool_nan = np.isnan(A)
+        A = A.copy() # to avoid change original value in main
+        A[bool_nan] = 0
+        if w is None:
+            w = np.ones_like(A)
+        w = w.copy() # to avoid change original value in main
+        w[bool_nan] = 0
+
+    ### Invert
+    if w is None: ## Ordinary LS
+        results = sm.OLS(A.ravel(), G).fit()
+    else: ## Weighted LS
+        results = sm.WLS(A.ravel(), G, weights=w.ravel()).fit()
+       
+    m = results.params
+    Afit = np.float32(results.predict().reshape((length,width)))
+
+    return Afit,m
+
+
+#%%
+def get_ifgdates(ifgdir):
+    """
+    Get ifgdates and imdates in ifgdir.
+    
+    Returns:
+        ifgdates : List of dates of ifgs 
+        imdates  : List of dates of images
+    """
+    ifgdates = [str(k) for k in sorted(os.listdir(ifgdir))
+                if len(k) == 17
+                and k[0] =='2'
+                and k[8] =='_'
+                and k[9] =='2'
+                and os.path.isdir(os.path.join(ifgdir, k))]
+
+    return ifgdates
+
+
+#%%
+def get_patchrow(width, length, n_data, memory_size):
+    """
+    Get patch number of rows for memory size (in MB).
+    
+    Returns:
+        n_patch : Number of patches (int)
+        patchrow : List of the number of rows for each patch.
+                ex) [[0, 1234], [1235, 2469],... ]
+    """
+    data_size = width*length*n_data*4/2**20  #in MiB, 4byte float
+    n_patch = int(np.ceil(data_size/memory_size))
+    ### Devide only row direction
+
+    patchrow= []
+    for i in range(n_patch):
+        rowspacing = int(np.ceil(length/n_patch))
+        patchrow.append([i*rowspacing,(i+1)*rowspacing])
+        if i == n_patch-1:
+            patchrow[-1][-1] = length
+
+    return n_patch, patchrow
+
+
+
+#%%
+def ifgdates2imdates(ifgdates):
+    masterlist = []
+    slavelist = []
+    for ifgd in ifgdates:
+        masterlist.append(ifgd[:8])
+        slavelist.append(ifgd[-8:])
+
+    imdates = list(set(masterlist+slavelist)) # set is a unique operator
+    imdates.sort()
+
+    return imdates
+
+
+#%%
+def multilook(array, nlook_r, nlook_c, n_valid_thre=0.5):
+    """
+    Nodata in input array must be filled with nan beforehand.
+    if the number of valid data is less than n_valid_thre*nlook_r*nlook_c, return nan.
+    """
+    length, width = array.shape
+    length_ml = int(np.floor(length/nlook_r))
+    width_ml = int(np.floor(width/nlook_c))
+
+    array_reshape = array[:length_ml*nlook_r,:width_ml*nlook_c].reshape(length_ml, nlook_r, width_ml, nlook_c)
+
+    with warnings.catch_warnings(): ## To silence RuntimeWarning: Mean of empty slice
+        warnings.simplefilter('ignore', RuntimeWarning)
+        array_ml = np.nanmean(array_reshape, axis=(1, 3))
+
+    n_valid = np.sum(~np.isnan(array_reshape), axis=(1, 3))
+    bool_invalid = n_valid < n_valid_thre*nlook_r*nlook_c
+    array_ml[bool_invalid] = np.nan
+    
+    return array_ml
+
+
+#%%
+def read_range(range_str, width, length):
+    if re.match('[0-9]*:[0-9]*/[0-9]*:[0-9]', range_str):
+        x1, x2, y1, y2 = [int(s) for s in re.split('[:/]', range_str)]
+        if x2 == 0:
+            x2 = width
+        if y2 == 0:
+            y2 = length
+        if x1 > width-1 or x2 > width or y1 > length-1 or y2 > length:
+            print("\nERROR:", file=sys.stderr)
+            print("Index exceed input dimension ({0},{1})!".format(width,length), file=sys.stderr)
+            return False
+        if x1 >= x2 or y1 >= y2:
+            print("\nERROR: x2/y2 must be larger than x1/y1", file=sys.stderr)
+            return False
+    else:
+        print("\nERROR:", file=sys.stderr)
+        print("Range format seems to be wrong (should be x1:x2/y1:y2)", file=sys.stderr)
+        return False
+    
+    return [x1, x2, y1, y2]
+
+
+#%%
+def read_range_geo(range_str, width, length, lat1, postlat, lon1, postlon):
+    """
+    lat1 is north edge and postlat is negative value.
+    lat lon values are in grid registration
+    Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
+    """
+    lat2 = lat1+postlat*(length-1)
+    lon2 = lon1+postlon*(width-1)
+    
+    if re.match('[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?', range_str):
+        lon_w, lon_e, lat_s, lat_n = [float(s) for s in range_str.split('/')]
+        x1 = int(np.floor((lon_w - lon1)/postlon)) if lon_w > lon1 else 0
+        x2 = int(np.ceil((lon_e - lon1)/postlon))+1 if lon_e < lon2 else width
+        y1 = int(np.floor((lat_n - lat1)/postlat)) if lat_n < lat1 else 0
+        y2 = int(np.ceil((lat_s - lat1)/postlat))+1 if lat_s > lat2 else length
+    else:
+        print("\nERROR:", file=sys.stderr)
+        print("Range format seems to be wrong (should be lat1/lat2/lon1/lon2)", file=sys.stderr)
+        return False
+    
+    return [x1, x2, y1, y2]
+
+
+#%%
+def xy2bl(x, y, lat1, dlat, lon1, dlon):
+    """
+    xy index starts from 0, end with width/length-1
+    """
+    lat = lat1+dlat*y
+    lon = lon1+dlon*x
+    
+    return lat, lon
