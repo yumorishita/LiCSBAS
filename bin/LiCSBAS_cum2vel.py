@@ -8,13 +8,15 @@ This script calculates velocity and its standard deviation from cum*.h5 and outp
 =========
 Changelog
 =========
+v1.1 20190802 Yu Morishita, Uni of Leeds and GSI
+ - Make vstd optional
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementationf
 
 =====
 Usage
 =====
-LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x2/y1:y2] [--mask maskfile] [--png] 
+LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x2/y1:y2] [--mask maskfile] [--png] [--vstd]
 
  -s  Start date of period to calculate velocity (Default: first date)
  -e  End date of period to calculate velocity (Default: last date)
@@ -22,6 +24,7 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
  -o  Output vel file (Default: yyyymmdd_yyyymmdd.vel[.mskd])
  -r  Reference area (Default: same as info/ref.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
+ --vstd  Calculate vstd (Default: No)
  --mask  Path to maskfile (Default: No mask)
  --png   Make png file (Default: No)
 
@@ -64,12 +67,13 @@ def main(argv=None):
     outfile = []
     refarea = []
     maskfile = []
+    vstdflag = False
     pngflag = False
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hs:e:i:o:r:", ["help", "png", "mask="])
+            opts, args = getopt.getopt(argv[1:], "hs:e:i:o:r:", ["help", "vstd", "png", "mask="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -86,6 +90,8 @@ def main(argv=None):
                 outfile = a
             elif o == '-r':
                 refarea = a
+            elif o == '--vstd':
+                vstdflag = True
             elif o == '--mask':
                 maskfile = a
             elif o == '--png':
@@ -160,7 +166,6 @@ def main(argv=None):
     if not outfile:
         outfile = '{}_{}.vel{}'.format(imd_s, imd_e, suffix_mask)
         
-    vstdfile = outfile.replace('vel', 'vstd')
 
     #%% Display info
     print('')
@@ -174,7 +179,6 @@ def main(argv=None):
     #%% Calc velocity and vstd
     vconst = np.zeros((length, width), dtype=np.float32)*np.nan
     vel = np.zeros((length, width), dtype=np.float32)*np.nan
-    vstd = np.zeros((length, width), dtype=np.float32)*np.nan
 
     ### Read cum data
     cum_tmp = cum[ix_s:ix_e, :, :]*mask
@@ -194,9 +198,13 @@ def main(argv=None):
     vel[~bool_allnan], vconst[~bool_allnan] = inv_lib.calc_vel(cum_tmp, dt_cum)
     vel.tofile(outfile)
 
-    print('Calc vstd...')
-    vstd[~bool_allnan] = inv_lib.calc_velstd_withnan(cum_tmp, dt_cum)
-    vstd.tofile(vstdfile)
+    if vstdflag:
+        vstdfile = outfile.replace('vel', 'vstd')
+        vstd = np.zeros((length, width), dtype=np.float32)*np.nan
+
+        print('Calc vstd...')
+        vstd[~bool_allnan] = inv_lib.calc_velstd_withnan(cum_tmp, dt_cum)
+        vstd.tofile(vstdfile)
 
     
     #%% Make png if specified
@@ -205,9 +213,10 @@ def main(argv=None):
         title = 'n_im: {}, Ref X/Y {}:{}/{}:{}'.format(n_im, refx1, refx2, refy1, refy2)
         plot_lib.make_im_png(vel, pngfile, 'jet', title)
 
-        pngfile = vstdfile+'.png'
-        title = 'n_im: {}, Ref X/Y {}:{}/{}:{}'.format(ix_e-ix_s, refx1, refx2, refy1, refy2)
-        plot_lib.make_im_png(vstd, pngfile, 'jet', title)
+        if vstdflag:
+            pngfile = vstdfile+'.png'
+            title = 'n_im: {}, Ref X/Y {}:{}/{}:{}'.format(ix_e-ix_s, refx1, refx2, refy1, refy2)
+            plot_lib.make_im_png(vstd, pngfile, 'jet', title)
     
 
     #%% Finish
@@ -218,7 +227,10 @@ def main(argv=None):
     print("\nElapsed time: {0:02}h {1:02}m {2:02}s".format(hour,minite,sec))
 
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
-    print('Output: {}, {}\n'.format(outfile, vstdfile), flush=True)
+    print('Output: {}'.format(outfile), flush=True)
+    if vstdflag:
+        print('       {}'.format(vstdfile), flush=True)
+    print('')
 
 
 #%% main
