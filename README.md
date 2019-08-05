@@ -29,7 +29,7 @@ in preparation
 
 ## Acknowledgements
 
-This work has been accomplished during Y. Morishita’s visit at University of Leeds, supported by JSPS Overseas Research Fellowship.
+This work has been accomplished during Y. Morishita’s visit at University of Leeds, supported by JSPS Overseas Research Fellowship. COMET is the UK Natural Environment Research Council's Centre for the Observation and Modelling of Earthquakes, Volcanoes and Tectonics. LiCSAR is developed as part of the NERC large grant, "Looking inside the continents from Space" (NE/K010867/1)
 
 
 
