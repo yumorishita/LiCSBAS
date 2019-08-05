@@ -8,6 +8,8 @@ This script calculates the standard deviation of the velocity by bootstrap and S
 =========
 Changelog
 =========
+v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
+ - Bag fix of stc calculation with overlapping
 v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -122,18 +124,18 @@ def main(argv=None):
         print('\nProcess {0}/{1}th line ({2}/{3}th patch)...'.format(rows[1], patchrow[-1][-1], i+1, n_patch), flush=True)
         start2 = time.time()
 
+        lengththis = rows[1] - rows[0]
+
         #%% Calc STC
         print('  Calculating STC...', flush=True)
-        ### Read data including +1 line
-        row1 = rows[0]-1
-        row2 = rows[1]+1
-        if i == 0: row1 = row1 + 1 ## first patch
-        if i == len(patchrow)-1: row2 = row2 - 1 ## last patch
+        ### Read data with extra 1 line for overlapping
+        row_ex1 = 0 if i == 0 else 1 ## first patch
+        row_ex2 = 0 if i == len(patchrow)-1 else 1 ## last patch
 
-        _cum = cum[:, row1:row2, :].reshape((n_im, row2-row1, width))
+        _cum = cum[:, rows[0]-row_ex1:rows[1]+row_ex2, :].reshape(n_im, lengththis+row_ex1+row_ex2, width)
 
         ### Calc STC
-        stc = inv_lib.calc_stc(_cum)
+        stc = inv_lib.calc_stc(_cum)[row_ex1:lengththis+row_ex1, :] ## original length
         del _cum
 
         ### Output data and image
@@ -146,9 +148,7 @@ def main(argv=None):
         
         #%% Calc vstd
         ### Read data for vstd
-        lengththis = rows[1] - rows[0]
         n_pt_all = lengththis*width
-        
         cum_patch = cum[:, rows[0]:rows[1], :].reshape((n_im, n_pt_all)).transpose() #(n_pt_all, n_im)
 
         ### Remove invalid points
