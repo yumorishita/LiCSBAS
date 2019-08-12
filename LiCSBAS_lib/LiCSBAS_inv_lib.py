@@ -8,12 +8,15 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.1 20190807 Yu Morioshita, Uni of Leeds and GSI
+ - Add calc_velsin
 v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
 """
 
 import warnings
 import numpy as np
+import datetime as dt
 import multiprocessing as multi
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
@@ -266,6 +269,68 @@ def calc_vel(cum, dt_cum):
     vel = result[1, :]
 
     return vel, vconst
+
+
+#%%
+def calc_velsin(cum, dt_cum, imd0):
+    """
+    Calculate velocity and coeffcients of sin (annual) function.
+
+    Inputs:
+      cum    : cumulative phase block for each point (n_pt, n_im)
+      dt_cum : Cumulative days for each image (n_im)
+      imd0   : Date of first acquistion (str, yyyymmdd)
+
+    Returns:
+      vel    : Velocity (n_pt)
+      vconst : Constant part of linear velocity (c of vt+c) (n_pt)
+      amp    : Amplitude of sin function
+      dt     : Time difference of sin function wrt Jan 1 (day)
+    """
+    doy0 = (dt.datetime.strptime(imd0, '%Y%m%d')-dt.datetime.strptime(imd0[0:4]+'0101', '%Y%m%d')).days
+    
+    n_pt, n_im = cum.shape
+    result = np.zeros((4, n_pt), dtype=np.float32)*np.nan #[vconst, vel, coef_s, coef_c]
+   
+    
+    sin = np.sin(2*np.pi*dt_cum)
+    cos = np.cos(2*np.pi*dt_cum)
+    G = np.stack((np.ones_like(dt_cum), dt_cum, sin, cos), axis=1)
+
+    vconst = np.zeros((n_pt), dtype=np.float32)*np.nan
+    vel = np.zeros((n_pt), dtype=np.float32)*np.nan
+    amp = np.zeros((n_pt), dtype=np.float32)*np.nan
+    delta_t = np.zeros((n_pt), dtype=np.float32)*np.nan
+
+    bool_pt_full = np.all(~np.isnan(cum), axis=1)
+    n_pt_full = bool_pt_full.sum()
+
+    if n_pt_full!=0:
+        print('  Solving {0:6}/{1:6}th points with full cum at a time...'.format(n_pt_full, n_pt), flush=True)
+    
+        ## Sovle
+        result[:, bool_pt_full] = np.linalg.lstsq(G, cum[bool_pt_full, :].transpose(), rcond=None)[0]
+
+    ### Solve other points with nan point by point.
+    cum_tmp = cum[~bool_pt_full, :].transpose()
+    mask = (~np.isnan(cum_tmp))
+    cum_tmp[np.isnan(cum_tmp)] = 0
+    print('  Next, solve {0} points including nan point-by-point...'.format(n_pt-n_pt_full), flush=True)
+    
+    result[:, ~bool_pt_full] = censored_lstsq_slow(G, cum_tmp, mask) #(n_im+1, n_pt) 
+        
+    vconst = result[0, :]
+    vel = result[1, :]
+    coef_s = result[2, :]
+    coef_c = result[3, :]
+
+    amp = np.sqrt(coef_s**2+coef_c**2)
+    delta_t = np.arctan2(-coef_c, coef_s)/2/np.pi*365.25 ## wrt 1st img
+    delta_t = delta_t+doy0 ## wrt Jan 1
+    delta_t[delta_t < 0] = delta_t[delta_t < 0]+365.25 #0-365.25
+    delta_t[delta_t > 365.25] = delta_t[delta_t > 365.25]-365.25
+
+    return vel, vconst, amp, delta_t
 
 
 #%%

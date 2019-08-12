@@ -8,6 +8,8 @@ This script calculates velocity and its standard deviation from cum*.h5 and outp
 =========
 Changelog
 =========
+v1.2 20190807 Yu Morishita, Uni of Leeds and GSI
+ - Add sin option
 v1.1 20190802 Yu Morishita, Uni of Leeds and GSI
  - Make vstd optional
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -16,7 +18,7 @@ v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
 =====
 Usage
 =====
-LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x2/y1:y2] [--mask maskfile] [--png] [--vstd]
+LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x2/y1:y2] [--vstd] [--sin] [--mask maskfile] [--png] 
 
  -s  Start date of period to calculate velocity (Default: first date)
  -e  End date of period to calculate velocity (Default: last date)
@@ -25,6 +27,8 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
  -r  Reference area (Default: same as info/ref.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
  --vstd  Calculate vstd (Default: No)
+ --sin   Add sin (annual) funcsion to linear model (Default: No)
+         *.amp and *.dt (time difference wrt Jan 1) are output
  --mask  Path to maskfile (Default: No mask)
  --png   Make png file (Default: No)
 
@@ -68,12 +72,14 @@ def main(argv=None):
     refarea = []
     maskfile = []
     vstdflag = False
+    sinflag = False
     pngflag = False
+
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hs:e:i:o:r:", ["help", "vstd", "png", "mask="])
+            opts, args = getopt.getopt(argv[1:], "hs:e:i:o:r:", ["help", "vstd", "sin", "png", "mask="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -92,6 +98,8 @@ def main(argv=None):
                 refarea = a
             elif o == '--vstd':
                 vstdflag = True
+            elif o == '--sin':
+                sinflag = True
             elif o == '--mask':
                 maskfile = a
             elif o == '--png':
@@ -194,10 +202,24 @@ def main(argv=None):
     bool_allnan = np.all(np.isnan(cum_tmp), axis=0)
     cum_tmp = cum_tmp.reshape(n_im, length*width)[:, ~bool_allnan.ravel()].transpose()
         
-    print('Calc velocity...')
-    vel[~bool_allnan], vconst[~bool_allnan] = inv_lib.calc_vel(cum_tmp, dt_cum)
-    vel.tofile(outfile)
-
+    
+    if not sinflag: ## Linear function
+        print('Calc velocity...')
+        vel[~bool_allnan], vconst[~bool_allnan] = inv_lib.calc_vel(cum_tmp, dt_cum)
+        vel.tofile(outfile)
+    else: ## Linear+sin function
+        print('Calc velocity and annual components...')
+        amp = np.zeros((length, width), dtype=np.float32)*np.nan
+        delta_t = np.zeros((length, width), dtype=np.float32)*np.nan
+        ampfile = outfile.replace('vel', 'amp')
+        dtfile = outfile.replace('vel', 'dt')
+        
+        vel[~bool_allnan], vconst[~bool_allnan], amp[~bool_allnan], delta_t[~bool_allnan] = inv_lib.calc_velsin(cum_tmp, dt_cum, imdates[0])
+        vel.tofile(outfile)
+        amp.tofile(ampfile)
+        delta_t.tofile(dtfile)
+    
+    ### vstd
     if vstdflag:
         vstdfile = outfile.replace('vel', 'vstd')
         vstd = np.zeros((length, width), dtype=np.float32)*np.nan
@@ -206,17 +228,20 @@ def main(argv=None):
         vstd[~bool_allnan] = inv_lib.calc_velstd_withnan(cum_tmp, dt_cum)
         vstd.tofile(vstdfile)
 
-    
+
     #%% Make png if specified
     if pngflag:
         pngfile = outfile+'.png'
         title = 'n_im: {}, Ref X/Y {}:{}/{}:{}'.format(n_im, refx1, refx2, refy1, refy2)
         plot_lib.make_im_png(vel, pngfile, 'jet', title)
 
+        if sinflag:
+            amp_max = np.nanpercentile(amp, 99)
+            plot_lib.make_im_png(amp, ampfile+'.png', 'viridis', title, vmax=amp_max)
+            plot_lib.make_im_png(delta_t, dtfile+'.png', 'hsv', title)
+
         if vstdflag:
-            pngfile = vstdfile+'.png'
-            title = 'n_im: {}, Ref X/Y {}:{}/{}:{}'.format(ix_e-ix_s, refx1, refx2, refy1, refy2)
-            plot_lib.make_im_png(vstd, pngfile, 'jet', title)
+            plot_lib.make_im_png(vstd, vstdfile+'.png', 'jet', title)
     
 
     #%% Finish
