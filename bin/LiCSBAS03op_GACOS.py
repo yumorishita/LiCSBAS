@@ -8,6 +8,8 @@ This script applies a tropospheric correction to unw data using GACOS data. GACO
 =========
 Changelog
 =========
+v1.1 20190812 Yu Morishita, Uni of Leeds and GSI
+ - Add fillhole option
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -36,12 +38,13 @@ Outputs in GEOCml*GACOS directory
 =====
 Usage
 =====
-LiCSBAS03op_GACOS.py -i in_dir -o out_dir -z ztddir
+LiCSBAS03op_GACOS.py -i in_dir -o out_dir -z ztddir [--fillhole]
 
  -i  Path to the GEOCml* dir containing stack of unw data.
  -o  Path to the output dir.
  -z  Path to the dir containing ztd files.
- 
+ --fillhole  Fill holes of GACOS data at hgt=0 in SRTM3 by averaging surrounding pixels (Default: no filling)
+
 """
 
 
@@ -63,6 +66,37 @@ class Usage(Exception):
     def __init__(self, msg):
         self.msg = msg
 
+#%% fill hole function
+def fillhole(ztd):
+    """
+    Fill holes (no data) surrounded by valid data by averaging surrounding pixels.
+    0 in ztd means no data.
+    """
+    length, width = ztd.shape
+    
+    ### Add 1 pixel margin to ztd data filled with 0
+    ztd1 = np.zeros((length+2, width+2), dtype=np.float32)
+    ztd1[1:length+1, 1:width+1] = ztd
+    n_ztd1 = np.int16(ztd1!=0) # 1 if exist, 0 if no data
+
+    ### Average 8 srrounding pixels. [1, 1] is center
+    pixels = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 2], [2, 0], [2, 1], [2, 2]]
+    _ztd = np.zeros_like(ztd)
+    _n_ztd = np.zeros_like(ztd)
+
+    for pixel in pixels:
+        ### Adding data and number of data
+        _ztd = _ztd + ztd1[pixel[0]:length+pixel[0],pixel[1]:width+pixel[1]]
+        _n_ztd = _n_ztd + n_ztd1[pixel[0]:length+pixel[0],pixel[1]:width+pixel[1]]
+
+    _n_ztd[_n_ztd==0] = 1 # avoid 0 division
+    _ztd = _ztd/_n_ztd
+
+    ### Fill hole 
+    ztd[ztd==0] = _ztd[ztd==0]
+    
+    return ztd
+
 
 #%% Main
 def main(argv=None):
@@ -80,12 +114,13 @@ def main(argv=None):
     out_dir = []
     ztddir = []
     resampleAlg = 'cubicspline'# None # 'cubic' 
+    fillholeflag = False
 
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:z:", ["version", "help"])
+            opts, args = getopt.getopt(argv[1:], "hi:o:z:", ["fillhole", "help"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -98,6 +133,8 @@ def main(argv=None):
                 out_dir = a
             elif o == '-z':
                 ztddir = a
+            elif o == "--fillhole":
+                fillholeflag = True
 
         if not in_dir:
             raise Usage('No input directory given, -i is not optional!')
@@ -237,6 +274,10 @@ def main(argv=None):
 
         ### Meter to rad, slantrange
         sltd_geo = ztd_geo*m2r_coef/LOSu ## LOSu=cos(inc)
+
+        ### Fill hole is specified
+        if fillholeflag:
+            sltd_geo = fillhole(sltd_geo)
         
         ### Output as sltd.geo
         sltd_geofile = os.path.join(sltddir, imd+'.sltd.geo')
@@ -272,7 +313,7 @@ def main(argv=None):
 
     ### Correct
     for i, ifgd in enumerate(ifgdates2):
-        if np.mod(i, 100)==0:
+        if np.mod(i, 10)==0:
             print('  Finished {0:4}/{1:4}th unw...'.format(i, n_ifg2), flush=True)
 
         md = ifgd[:8]

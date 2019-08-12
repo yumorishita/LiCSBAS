@@ -63,6 +63,7 @@ p02_GEOCmldir=""	# default: GEOCml$nlook
 p02_frame=""	# e.g. 021D_04972_131213
 p03_inGEOCmldir=""	# default: $GEOCmldir
 p03_outGEOCmldir_suffix="" # default: GACOS
+p03_fillhole="n"	# y/n. default: n
 p04_inGEOCmldir=""	# default: $GEOCmldir
 p04_outGEOCmldir_suffix="" # default: mask
 p05_inGEOCmldir=""      # default: $GEOCmldir
@@ -140,6 +141,7 @@ if [ $start_step -le 03 -a $end_step -ge 03 ];then
       else outGEOCmldir="${inGEOCmldir}GACOS"; fi
     p03_op="$p03_op -o $outGEOCmldir"
     if [ ! -z $p03_ztddir ];then p03_op="$p03_op -z $p03_ztddir"; fi
+    if [ $p03_fillhole == "y" ];then p03_op="$p03_op --fillhole"; fi
 
     if [ $check_only == "y" ];then
       echo "LiCSBAS03op_GACOS.py $p03_op"
