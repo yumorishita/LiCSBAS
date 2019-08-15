@@ -8,6 +8,8 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
+v1.1 20190814 Yu Morishita, Uni of Leeds and GSI
+ - Add -r option
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Created, originating from GIAnT
 
@@ -20,7 +22,7 @@ Inputs
 =====
 Usage
 =====
-LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymmdd] [--nomask] [--cmap cmap] [--vmin vmin] [--vmax vmax] [--auto_crange auto_crange] [--dmin dmin] [--dmax dmax] [--ylen ylen]
+LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymmdd] [-r x1:x2/y1:y2] [--nomask] [--cmap cmap] [--vmin vmin] [--vmax vmax] [--auto_crange auto_crange] [--dmin dmin] [--dmax dmax] [--ylen ylen]
 
  -i    Input cum hdf5 file (Default: ./cum_filt.h5 or ./cum.h5)
  --i2  Input 2nd cum hdf5 file
@@ -28,6 +30,7 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
  -m    Master (reference) date for time-seires (Default: first date)
  -d    Directory containing noise indices (e.g., mask, coh_avg, etc.)
        (Default: "results" at the same dir as cum[_filt].h5)
+ -r    Reference area (Default: same as info/ref.txt)
  --nomask     Not mask (Default: use mask)
  --cmap       Color map for velocity and cumulative displacement
               - https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
@@ -117,8 +120,8 @@ if __name__ == "__main__":
     cumfile2 = []
     resultsdir = []
     mdate = []
+    refarea = []
     maskflag = True
-    zerofirst = False
     dmin = None
     dmax = None
     ylen = []
@@ -130,7 +133,7 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:d:m:z", ["help", "i2=", "nomask",  "cmap=", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
+            opts, args = getopt.getopt(argv[1:], "hi:d:m:r:", ["help", "i2=", "nomask",  "cmap=", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -145,12 +148,12 @@ if __name__ == "__main__":
                 cumfile2 = a
             elif o == '-m':
                 mdate = a
+            elif o == '-r':
+                refarea = a
             elif o == '--nomask':
                 maskflag = False
             elif o == '--cmap':
                 cmap = a
-            elif o == '-z':
-                zerofirst = True
             elif o == '--vmin':
                 vmin = float(a)
             elif o == '--vmax':
@@ -249,11 +252,25 @@ if __name__ == "__main__":
     except:
         geocod_flag = False
         print('No latlon field found in {}. Skip.'.format(cumfile))
+
+    cum = cumh5['cum']
+    n_im, length, width = cum.shape
             
-    refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', cumh5['refarea'][()])] 
+    ### Set ref area
+    if not refarea:
+        refarea = cumh5['refarea'][()]
+        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
+    else:
+        if not tools_lib.read_range(refarea, width, length):
+            print('\nERROR in {}\n'.format(refarea), file=sys.stderr)
+            sys.exit(2)
+        else:
+            refx1, refx2, refy1, refy2 = tools_lib.read_range(refarea, width, length)
+    
     refx1h = refx1-0.5; refx2h = refx2-0.5 ## Shift half for plot
     refy1h = refy1-0.5; refy2h = refy2-0.5
 
+    ### Filter info
     try:
         deramp_flag = cumh5['deramp_flag'][()]
         if deramp_flag.size == 0: # no deramp
@@ -279,9 +296,7 @@ if __name__ == "__main__":
         print('Reference date set to {}'.format(mdate))
         ix_m = imdates.index(mdate)
     
-    cum = cumh5['cum']
     cum_ref = cum[ix_m, :, :]
-    n_im, length, width = cum.shape
 
     ### cumfile2
     if cumfile2:
@@ -333,23 +348,29 @@ if __name__ == "__main__":
     
 
     #%% Set color range for displacement and vel
+    refvalue_lastcum = np.nanmean((cum[-1, refy1:refy2, refx1:refx2]-cum_ref[refy1:refy2, refx1:refx2])*mask[refy1:refy2, refx1:refx2])
+    dmin_auto = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, 100-auto_crange)
+    dmax_auto = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, auto_crange)
     if dmin is None and dmax is None: ## auto
         climauto = True
-        dmin = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, 100-auto_crange)
-        dmax = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, auto_crange)
+        dmin = dmin_auto - refvalue_lastcum
+        dmax = dmax_auto - refvalue_lastcum
     else:
         climauto = False
-        if dmin is None: dmin = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, 100-auto_crange)
-        if dmax is None: dmax = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, auto_crange)
-        
+        if dmin is None: dmin = dmin_auto - refvalue_lastcum
+        if dmax is None: dmax = dmax_auto - refvalue_lastcum
+
+    refvalue_vel = np.nanmean((vel*mask)[refy1:refy2+1, refx1:refx2+1])
+    vmin_auto = np.nanpercentile(vel*mask, 100-auto_crange)
+    vmax_auto = np.nanpercentile(vel*mask, auto_crange)
     if vmin is None and vmax is None: ## auto
         vlimauto = True
-        vmin = np.nanpercentile(vel*mask, 100-auto_crange)
-        vmax = np.nanpercentile(vel*mask, auto_crange)
+        vmin = vmin_auto - refvalue_vel
+        vmax = vmax_auto - refvalue_vel
     else:
         vlimauto = False
-        if vmin is None: vmin = np.nanpercentile(vel*mask, 100-auto_crange)
-        if vmax is None: vmax = np.nanpercentile(vel*mask, auto_crange)
+        if vmin is None: vmin_auto - refvalue_vel
+        if vmax is None: vmax_auto - refvalue_vel
 
 
     #%% Plot figure of cumulative displacement and velocity
@@ -394,8 +415,8 @@ if __name__ == "__main__":
         ### Change clim
         if climauto: ## auto
             refvalue_lastcum = np.nanmean((cum[-1, refy1:refy2, refx1:refx2]-cum_ref[refy1:refy2, refx1:refx2])*mask[refy1:refy2, refx1:refx2])
-            dmin = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, 100-auto_crange) - refvalue_lastcum
-            dmax = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, auto_crange) - refvalue_lastcum
+            dmin = dmin_auto - refvalue_lastcum
+            dmax = dmax_auto - refvalue_lastcum
     
     
     RS = RectangleSelector(axv, line_select_callback, drawtype='box', useblit=True, button=[3], spancoords='pixels', interactive=False)
