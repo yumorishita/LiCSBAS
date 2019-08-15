@@ -8,6 +8,8 @@ This script outputs a float file of cumulative displacement from cum*.h5.
 =========
 Changelog
 =========
+v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
+ - Bug fix about masking
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementationf
 
@@ -125,7 +127,7 @@ def main(argv=None):
         imd_m = imdates[0]
         
     ### mask
-    if not maskfile:
+    if maskfile:
         mask = io_lib.read_img(maskfile, length, width)
         mask[mask==0] = np.nan
     else:
