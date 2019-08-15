@@ -8,8 +8,10 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
-v1.1 20190814 Yu Morishita, Uni of Leeds and GSI
+v1.1 20190815 Yu Morishita, Uni of Leeds and GSI
  - Add -r option
+ - Not use i2 if not exist
+ - Bug fix about lines2
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Created, originating from GIAnT
 
@@ -204,8 +206,8 @@ if __name__ == "__main__":
         cumfile2 = os.path.join(cumdir, 'cum.h5')
     
     if cumfile2 and not os.path.exists(cumfile2):
-        print('\nNo {} found!'.format(cumfile2), file=sys.stderr)
-        sys.exit(2)
+        print('\nNo {} found. Not use.'.format(cumfile2))
+        cumfile2 = []
 
     ### results dir
     if not resultsdir: # if not given
@@ -580,7 +582,8 @@ if __name__ == "__main__":
         index = models.index(label)
         visibilities[index] = not visibilities[index]
         lines1[index].set_visible(not lines1[index].get_visible())
-        lines2[index].set_visible(not lines2[index].get_visible())
+        if cumfile2:
+            lines2[index].set_visible(not lines2[index].get_visible())
         
         pts.canvas.draw()
 
