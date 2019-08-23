@@ -367,7 +367,7 @@ def calc_velstd_withnan(cum, dt_cum):
     with NumpyRNGContext(1):
         bootresult = bootstrap(ixs_day, bootnum, bootfunc=velinv)
         
-    vstd = np.std(bootresult, axis=0)
+    vstd = np.nanstd(bootresult, axis=0)
 
     print('')
 
@@ -387,7 +387,12 @@ def censored_lstsq2(A, B, M):
     # else solve via tensor representation
     rhs = np.dot(A.T, M * B).T[:,:,None] # n x r x 1 tensor
     T = np.matmul(A.T[None,:,:], M.T[:,:,None] * A[None,:,:]) # n x r x r tensor
-    return np.squeeze(np.linalg.solve(T, rhs)).T # transpose to get r x n
+    try:
+        X = np.squeeze(np.linalg.solve(T, rhs)).T # transpose to get r x n
+    except: ## In case Singular matrix
+        X = np.zeros((B.shape[1]), dtype=np.float32)*np.nan
+    
+    return X
 
     
 #%%
