@@ -8,6 +8,9 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.2 20190823 Yu Morioshita, Uni of Leeds and GSI
+ - Bag fix in calc_velstd_withnan
+ - Remove calc_velstd
 v1.1 20190807 Yu Morioshita, Uni of Leeds and GSI
  - Add calc_velsin
 v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
@@ -334,47 +337,6 @@ def calc_velsin(cum, dt_cum, imd0):
 
 
 #%%
-def calc_velstd(cum, dt_cum):
-    """
-    Not use 20190509
-    Calculate std of velocity by bootstrap. NaN is not allowed.
-
-    Inputs:
-      cum    : Cumulative phase block for each point (n_pt, n_im)
-      dt_cum : Cumulative days for each image (n_im)
-
-    Returns:
-      vstd   : Std of Velocity for each point (n_pt)
-    """
-    n_pt, n_im = cum.shape
-    bootnum = 100
-    n_batch = 1000 # number of processed points at a time
-
-    vstd = np.zeros((n_pt), dtype=np.float32)
-
-    G = np.stack((np.ones_like(dt_cum), dt_cum), axis=1)
-    velinv = lambda x : np.linalg.lstsq(G, x, rcond=None)[0][1]
-#    velinv = lambda x : sm.OLS(x, G).fit().params[1]
-    ## Much much faster than processing each point by sm
-
-    for i in range(int(np.ceil(n_pt/n_batch))):
-        ix1 = i*n_batch
-        ix2 = (i+1)*n_batch # dont need -1!
-        if ix2 > n_pt : ix2 = n_pt
-        if np.mod(i, 10) == 0:
-            print('\r  Finished {0:6}/{1:6}th point...'.format(ix1, n_pt), end='', flush=True)
-
-        with NumpyRNGContext(1):
-            bootresult = bootstrap(cum[ix1:ix2, :].transpose(), bootnum, bootfunc=velinv)
-
-        vstd[ix1:ix2] = np.std(bootresult, axis=0)
-
-    print('')
-
-    return vstd
-
-
-#%%
 def calc_velstd_withnan(cum, dt_cum):
     """
     Calculate std of velocity by bootstrap for each point which may include nan.
@@ -395,14 +357,15 @@ def calc_velstd_withnan(cum, dt_cum):
     vstd = np.zeros((n_pt), dtype=np.float32)
     G = np.stack((np.ones_like(dt_cum), dt_cum), axis=1)
     
-    fill_value = -9999 # not 0 because exact 0 already exist in the first image
     data = cum.transpose().copy()
-    data[np.isnan(data)] = fill_value # remove nan for censored_lstsq
+    ixs_day = np.arange(n_im)
+    mask = (~np.isnan(data))
+    data[np.isnan(data)] = 0
             
-    velinv = lambda x : censored_lstsq2(G, x, fill_value)[1]
+    velinv = lambda x : censored_lstsq2(G[x, :], data[x, :], mask[x, :])[1]
 
     with NumpyRNGContext(1):
-        bootresult = bootstrap(data, bootnum, bootfunc=velinv)
+        bootresult = bootstrap(ixs_day, bootnum, bootfunc=velinv)
         
     vstd = np.std(bootresult, axis=0)
 
@@ -411,13 +374,11 @@ def calc_velstd_withnan(cum, dt_cum):
     return vstd
 
 
-def censored_lstsq2(A, B, fill_value):
+def censored_lstsq2(A, B, M):
     ## http://alexhwilliams.info/itsneuronalblog/2018/02/26/censored-lstsq/
     global bootcount, bootnum
     print('\r  Running {0:3}/{1:3}th bootstrap...'.format(bootcount, bootnum), end='', flush=True)
     bootcount = bootcount+1
-
-    M = (B != fill_value) # False (0) at nodata
 
     # if B is a vector, simply drop out corresponding rows in A
     if B.ndim == 1 or B.shape[1] == 1:
