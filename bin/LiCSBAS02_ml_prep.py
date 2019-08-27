@@ -8,6 +8,8 @@ This script converts geotiff files to float format for further time series analy
 =========
 Changelog
 =========
+v1.1 20190824 Yu Morishita, Uni of Leeds and GSI
+ - Skip broken geotiff
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -227,6 +229,19 @@ def main(argv=None):
         unwfile = os.path.join(ifgdir1, ifgd+'.unw')
         ccfile = os.path.join(ifgdir1, ifgd+'.cc')
 
+       ### Read data from geotiff
+        try:
+            unw = gdal.Open(unw_tiffile).ReadAsArray()
+            unw[unw==0] = np.nan
+            cc = gdal.Open(cc_tiffile).ReadAsArray()
+            cc[cc==0] = np.nan
+        except: ## if broken
+            print ('  {} cannot open. Skip'.format(ifgd+'.geo.[unw|cc].tif'), flush=True)
+            with open(no_unw_list, 'a') as f:
+                print('{}'.format(ifgd), file=f)
+            shutil.rmtree(ifgdir1)
+            continue
+
         ### Make mli (only once)
         if not os.path.exists(mlifile):
             diffmag_tiffile = os.path.join(geocdir, ifgd, ifgd+'.geo.diff_mag.tif')
@@ -256,12 +271,6 @@ def main(argv=None):
                 length = int(length/nlook)
                 dlon = dlon*nlook
                 dlat = dlat*nlook
-
-        ### Read data from geotiff
-        unw = gdal.Open(unw_tiffile).ReadAsArray()
-        unw[unw==0] = np.nan
-        cc = gdal.Open(cc_tiffile).ReadAsArray()
-        cc[cc==0] = np.nan
 
         ### Multilook
         if nlook != 1:
