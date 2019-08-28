@@ -8,13 +8,15 @@ This script displays an image file (only in float format).
 =========
 Changelog
 =========
+v1.1 20190828 Yu Morishita, Uni of Leeds and GSI
+ - Add --png option
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
 =====
 Usage
 =====
-LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--cmax None] [--auto_crange 99]  [--cycle 3] [--bigendian]
+LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--cmax None] [--auto_crange 99]  [--cycle 3] [--bigendian] [--png [pngname]]
 
  -i  Input image file in float32
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
@@ -24,10 +26,11 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--
      - insar
      (Default: SCM5.roma_r, reverse of SCM5.roma)
  --cmin|cmax    Min|max values of color (Default: auto)
- --auto_crange  % of color range used for automatic determinatin
+ --auto_crange  % of color range used for automatic determinatin (Default: 99%)
  --cycle        Value*2pi/cycle if cmap=insar (Default: 3*2pi/cycle)
  --bigendian    If input file is in big endian
-              
+ --png          Save png (pdf etc also available) instead of displaying
+
 """
 
 
@@ -63,12 +66,13 @@ if __name__ == "__main__":
     auto_crange = 99
     cycle = 3
     endian = 'little'
+    pngname = []
     
     
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "cycle=", "bigendian"])
+            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "cycle=", "bigendian", "png="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -91,6 +95,8 @@ if __name__ == "__main__":
                 cycle = float(a)
             elif o == '--bigendian':
                 endian = 'big'
+            elif o == '--png':
+                pngname = a
 
         if not infile:
             raise Usage('No image file given, -i is not optional!')
@@ -161,4 +167,9 @@ if __name__ == "__main__":
     plt.imshow(data, clim=[cmin, cmax], cmap=cmap)
     if not cmap == 'insar': plt.colorbar()
     plt.tight_layout()
-    plt.show()
+    
+    if pngname:
+        plt.savefig(pngname)
+        print('\nOutput: {}\n'.format(pngname))
+    else:
+        plt.show()
