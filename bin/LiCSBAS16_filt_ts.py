@@ -8,6 +8,8 @@ This script applies spatial-temporal filter (HP in time and LP in space with gau
 =========
 Changelog
 =========
+v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+ - Remove cum_filt.h5 if exists before creation
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -151,6 +153,8 @@ def main(argv=None):
     velfile = os.path.join(resultsdir, 'vel.filt')
 
     cumh5 = h5.File(cumfile,'r')
+
+    if os.path.exists(cumffile): os.remove(cumffile)
     cumfh5 = h5.File(cumffile,'w')
 
 

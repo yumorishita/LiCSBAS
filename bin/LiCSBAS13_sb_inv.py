@@ -8,7 +8,9 @@ This script inverts the small baseline network of unw data to get the time serie
 =========
 Changelog
 =========
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+ - Remove cum.h5 if exists before creation
+vv1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
 ===============
@@ -194,6 +196,8 @@ def main(argv=None):
     if not os.path.exists(resdir): os.mkdir(resdir)
     restxtfile = os.path.join(infodir,'13resid.txt')
 
+    cumh5file = os.path.join(tsadir,'cum.h5')
+    
 
     #%% Check files
     try:
@@ -396,7 +400,8 @@ def main(argv=None):
 
 
     #%% Open cum.h5 for output
-    cumh5 = h5.File(os.path.join(tsadir,'cum.h5'), 'w')
+    if os.path.exists(cumh5file): os.remove(cumh5file)
+    cumh5 = h5.File(cumh5file, 'w')
     cumh5.create_dataset('imdates', data=[np.int32(imd) for imd in imdates])
     cumh5.create_dataset('refarea', data=refarea)
     if not np.all(np.abs(np.array(bperp))<=1):# if not dummy
