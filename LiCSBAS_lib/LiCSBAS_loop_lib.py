@@ -8,6 +8,8 @@ Python3 library of loop closure check functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.1 201900906 Yu Morioshita, Uni of Leeds and GSI
+ - tight_layout for loop png
 v1.0 20190708 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
 """
@@ -123,9 +125,16 @@ def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_png
     titles = [ifgd12, ifgd23, ifgd13, 'Loop phase (RMS={:.2f}rad)'.format(rms)]
     data = [unw12, unw23, unw13, loop_ph]
 
+    length, width = unw12.shape
+    if length > width:
+        figsize_y = 10
+        figsize_x = int((figsize_y-1)*width/length)
+    else:
+        figsize_x = 10
+        figsize_y = int(figsize_x*length/width+1)
+                
     ### Plot
-    fig = plt.figure(figsize = (12,12))
-    plt.tight_layout()
+    fig = plt.figure(figsize = (figsize_x, figsize_y))
 
     for i in range(4):
         data_wrapped = np.angle(np.exp(1j*(data[i]/cycle))*cycle)
@@ -134,6 +143,7 @@ def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_png
         ax.set_title('{0}'.format(titles[i]))
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-    
+
+    plt.tight_layout()
     plt.savefig(pngname)
     plt.close()

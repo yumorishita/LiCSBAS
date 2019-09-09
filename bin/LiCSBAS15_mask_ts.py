@@ -8,6 +8,8 @@ This script makes a mask of time series using several noise indices.
 =========
 Changelog
 =========
+v1.1 20190906 Yu Morishita, Uni of Leeds and GSI
+ - tight_layout and auto ajust of size for png
 v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -294,8 +296,14 @@ def main(argv=None):
         
 
     #%% Output thumbnail png
-    fig = plt.figure(figsize = (10,8))
-    plt.tight_layout()
+    if length > width:
+        figsize_y = 9
+        figsize_x = int(figsize_y*4/3*width/length+2)
+    else:
+        figsize_x = 12
+        figsize_y = int((figsize_x)/4*3*length/width)
+    
+    fig = plt.figure(figsize = (figsize_x, figsize_y))
 
     ##First 3; vel.mskd, vel, mask
     data = [vel_mskd, vel, mask]
@@ -335,6 +343,7 @@ def main(argv=None):
         ax.set_xticklabels([])
         ax.set_yticklabels([])
 
+    plt.tight_layout()
     plt.savefig(maskts_png)
     plt.close()
     
