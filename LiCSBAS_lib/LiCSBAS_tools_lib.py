@@ -8,6 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.0 20190916 Yu Morioshita, Uni of Leeds and GSI
+ - Add read_range_line and read_range_line_geo
 v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
 """
@@ -246,6 +248,23 @@ def read_range(range_str, width, length):
 
 
 #%%
+def read_range_line(range_str, width, length):
+    if re.match('[0-9]*,[0-9]*/[0-9]*,[0-9]', range_str):
+        x1, y1, x2, y2 = [int(s) for s in re.split('[,/]', range_str)]
+        if x1 > width-1 or x2 > width-1 or y1 > length-1 or y2 > length-1:
+            print("\nERROR:", file=sys.stderr)
+            print("Index exceed input dimension ({0},{1})!".format(width ,length), file=sys.stderr)
+            return False
+    else:
+        print("\nERROR:", file=sys.stderr)
+        print("Range format seems to be wrong (must be x1,y1/x2,y2)", file=sys.stderr)
+        return False
+    
+    return [x1, x2, y1, y2]
+
+
+
+#%%
 def read_range_geo(range_str, width, length, lat1, postlat, lon1, postlon):
     """
     lat1 is north edge and postlat is negative value.
@@ -263,7 +282,28 @@ def read_range_geo(range_str, width, length, lat1, postlat, lon1, postlon):
         y2 = int(np.ceil((lat_s - lat1)/postlat))+1 if lat_s > lat2 else length
     else:
         print("\nERROR:", file=sys.stderr)
-        print("Range format seems to be wrong (should be lat1/lat2/lon1/lon2)", file=sys.stderr)
+        print("Range format seems to be wrong (should be lon1/lon2/lat1/lat2)", file=sys.stderr)
+        return False
+    
+    return [x1, x2, y1, y2]
+
+
+#%%
+def read_range_line_geo(range_str, width, length, lat_n, postlat, lon_w, postlon):
+    """
+    lat_n is north edge and postlat is negative value.
+    lat lon values are in grid registration
+    """
+
+    if re.match('[+-]?\d+(?:\.\d+)?,[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?,[+-]?\d+(?:\.\d+)?', range_str):
+        lon1, lat1, lon2, lat2 = [float(s) for s in re.split('[,/]', range_str)]
+        x1 = int(np.round((lon1 - lon_w)/postlon))
+        x2 = int(np.round((lon2 - lon_w)/postlon))
+        y1 = int(np.round((lat1 - lat_n)/postlat))
+        y2 = int(np.round((lat2 - lat_n)/postlat))
+    else:
+        print("\nERROR:", file=sys.stderr)
+        print("Range format seems to be wrong (should be lon1,lat1/lon2,lat2)", file=sys.stderr)
         return False
     
     return [x1, x2, y1, y2]

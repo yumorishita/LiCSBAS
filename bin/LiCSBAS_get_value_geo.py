@@ -14,7 +14,7 @@ v1.0 20190801 Yu Morishita, Uni of Leeds and GSI
 =====
 Usage
 =====
-LiCSBAS_get_value_geo.py -i infile -p dempar -l locfile [-o outfile]
+LiCSBAS_get_value_geo.py -i infile -p dempar -l locfile [-o outfile] [--bigendian]
 
  -i  Input file (float, little endian, geocoded)
  -p  Dem parameter file (EQA.dem_par)
