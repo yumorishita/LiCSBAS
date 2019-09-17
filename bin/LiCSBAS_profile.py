@@ -3,7 +3,7 @@
 ========
 Overview
 ========
-This script gets a profile from a float file between specified points in geographical coordinates or xy coordinates. A text file, quick look images, and a kml file are output.
+This script gets a profile data between two points specified in geographical coordinates or xy coordinates from a float file. A quick look image is displayed and a text file and kml file are output. 
 
 =========
 Changelog
@@ -197,7 +197,8 @@ def main(argv=None):
 
     #%% Display
     if display_flag:
-        fig, axes = plt.subplots(2, 1)
+        fig, axes = plt.subplots(2, 1, num='Profile')
+        fig.suptitle('Profile from A({},{}) to B({},{})\n({:.6f},{:.6f}) -> ({:.6f},{:.6f})'.format(x1, y1, x2, y2, lon1, lat1, lon2, lat2))
         xmin = x1-margin if x1<x2 else x2-margin
         xmax = x1+margin if x1>x2 else x2+margin
         ymin = y1-margin if y1<y2 else y2-margin
@@ -209,12 +210,18 @@ def main(argv=None):
 
         im = axes[0].imshow(data)
         axes[0].plot([x1, x2], [y1, y2], 'ro-')
+        axes[0].text(x1, y1, 'A')
+        axes[0].text(x2, y2, 'B')
         fig.colorbar(im, ax=axes[0])
         axes[0].set_xlim([xmin, xmax])
         axes[0].set_ylim([ymax, ymin])
         
-        axes[1].plot(dists_m, profile, 'bo-')
-        axes[1].set_xlabel('Distance (m)')
+        dists_km = dists_m/1000
+        axes[1].plot(dists_km, profile, 'bo-')
+        vshift = (np.nanmax(profile)-np.nanmin(profile))/20
+        axes[1].text(dists_km[0], profile[0]+vshift, 'A', horizontalalignment='center')
+        axes[1].text(dists_km[-1], profile[-1]+vshift, 'B', horizontalalignment='center')
+        axes[1].set_xlabel('Distance (km)')
         axes[1].grid()
         
         plt.show()
