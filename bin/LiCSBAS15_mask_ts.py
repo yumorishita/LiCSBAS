@@ -3,11 +3,13 @@
 ========
 Overview
 ========
-This script makes a mask of time series using several noise indices.
+This script makes a mask for time series using several noise indices.
 
 =========
 Changelog
 =========
+v1.2 20190918 Yu Morishita, Uni of Leeds and GSI
+ - Output mask_ts_mskd.png
 v1.1 20190906 Yu Morishita, Uni of Leeds and GSI
  - tight_layout and auto ajust of size for png
 v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
@@ -31,7 +33,7 @@ Inputs in TS_GEOCml* :
  - info/parameters.txt
  
 Outputs in TS_GEOCml* directory
- - mask_ts.png
+ - mask_ts[_mskd].png
  - results/vel.mskd[.png]
  - results/mask[.png]
 
@@ -83,6 +85,16 @@ class Usage(Exception):
     """Usage context manager"""
     def __init__(self, msg):
         self.msg = msg
+
+
+#%%
+def add_subplot(fig, i, data, vmin, vmax, cmap, title):
+    ax = fig.add_subplot(3, 4, i+1) #index start from 1
+    im = ax.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap)
+    fig.colorbar(im)
+    ax.set_title('{0}'.format(title))
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
 
 
 #%% Main
@@ -161,6 +173,7 @@ def main(argv=None):
 
     parmfile = os.path.join(tsadir, 'info', 'parameters.txt')
     maskts_png = os.path.join(tsadir,'mask_ts.png')
+    maskts2_png = os.path.join(tsadir,'mask_ts_masked.png')
 
     names = ['coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid_rms'] ## noise indices
     gt_lt = ['lt', 'lt', 'gt', 'lt', 'gt', 'gt', 'gt', 'gt', 'gt'] ## > or <
@@ -304,6 +317,7 @@ def main(argv=None):
         figsize_y = int((figsize_x)/4*3*length/width)
     
     fig = plt.figure(figsize = (figsize_x, figsize_y))
+    fig2 = plt.figure(figsize = (figsize_x, figsize_y))
 
     ##First 3; vel.mskd, vel, mask
     data = [vel_mskd, vel, mask]
@@ -312,15 +326,14 @@ def main(argv=None):
     vmaxs = [vmax, vmax, 1]
     cmaps = ['jet', 'jet', 'viridis']
     for i in range(3): 
-        ## Mask nan at vel for each indecesexcept coh_avg and n_unw
-        ax = fig.add_subplot(3, 4, i+1) #index start from 1
-        im = ax.imshow(data[i], vmin=vmins[i], vmax=vmaxs[i], cmap=cmaps[i])
-        fig.colorbar(im)
-        ax.set_title('{0}'.format(titles[i]))
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
+        add_subplot(fig, i, data[i], vmins[i], vmaxs[i], cmaps[i], titles[i])
+        i2 = 0 if i==1 else 1 if i==0 else 2 # inv vel and vel.mskd
+        add_subplot(fig2, i2, data[i], vmins[i], vmaxs[i], cmaps[i], titles[i])
+
 
     ## Next 9 noise indices
+    mask_nan = mask.copy()
+    mask_nan[mask==0] = np.nan
     for i, name in enumerate(names):
         data = data_dict[name]
         ## Mask nan in vel for each indeces except coh_avg and n_unw
@@ -335,17 +348,20 @@ def main(argv=None):
             cmap = 'viridis_r'
             vmin_n = 0
             vmax_n = thre_dict[name]*1.2
-                
-        ax = fig.add_subplot(3, 4, i+4) #index start from 4
-        im = ax.imshow(data, vmin=vmin_n, vmax=vmax_n, cmap=cmap)
-        fig.colorbar(im)
-        ax.set_title('{} {}({})'.format(name, units[i], thre_dict[name]))
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
 
-    plt.tight_layout()
-    plt.savefig(maskts_png)
-    plt.close()
+        title = '{} {}({})'.format(name, units[i], thre_dict[name])
+        add_subplot(fig, i+3, data, vmin_n, vmax_n, cmap, title)
+        add_subplot(fig2, i+3, data*mask_nan, vmin_n, vmax_n, cmap, title)
+        #i+3 because 3 data already plotted
+              
+
+    fig.tight_layout()
+    fig.savefig(maskts_png)
+    fig2.tight_layout()
+    fig2.savefig(maskts2_png)
+    
+    plt.close(fig=fig)
+
     
     #%% Output vel.mskd and mask
     velmskdfile = os.path.join(resultsdir,'vel.mskd')
