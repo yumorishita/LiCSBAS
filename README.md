@@ -12,7 +12,7 @@ THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS.
 
 ## Documentation
 
-See the [**wiki**](https://github.com/yumorishita/LiCSBAS/wiki) pages.
+See the [**wiki**](https://github.com/yumorishita/LiCSBAS/wiki) pages and [quick start](https://github.com/yumorishita/LiCSBAS/wiki/2_0_workflow#quick-start).
 
 ## Sample Products and Tutorial
 
