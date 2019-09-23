@@ -668,7 +668,7 @@ def main(argv=None):
     cmins = [None, None, None, None, None, None]
     cmaxs = [None, None, None, None, None, None]
     cmaps = ['jet', 'jet', 'viridis_r', 'viridis_r', 'viridis_r', 'viridis']
-    titles = ['Velocity (mm/yr)', 'Intercept of velocity (mm)', 'RMS of residual (mm)', 'Number of gaps in SB network', 'Number of ifgs with no loop', 'Max length of continous SB network (yr)']
+    titles = ['Velocity (mm/yr)', 'Intercept of velocity (mm)', 'RMS of residual (mm)', 'Number of gaps in SB network', 'Number of ifgs with no loops', 'Max length of connected SB network (yr)']
 
     for i in range(len(names)):
         file = os.path.join(resultsdir, names[i])

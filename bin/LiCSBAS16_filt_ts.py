@@ -358,7 +358,7 @@ def main(argv=None):
     #%% Output image
     cmap = 'jet'
     pngfile = os.path.join(resultsdir,'vel.filt.png')
-    title = 'Filtered velocity (mm)'
+    title = 'Filtered velocity (mm/yr)'
     vmin = np.nanpercentile(vel, 1)
     vmax = np.nanpercentile(vel, 99)
     plot_lib.make_im_png(vel, pngfile, cmap, title, vmin, vmax)
@@ -372,14 +372,14 @@ def main(argv=None):
 
     if maskflag:
         pngfile = os.path.join(resultsdir,'vel.filt.mskd.png')
-        title = 'Filtered velocity (mm)'
+        title = 'Masked filtered velocity (mm/yr)'
         vmin = np.nanpercentile(vel_mskd, 1)
         vmax = np.nanpercentile(vel_mskd, 99)
         plot_lib.make_im_png(vel_mskd, pngfile, cmap, title, vmin, vmax)
     
         ## vintercept
         pngfile = os.path.join(resultsdir,'vintercept.filt.mskd.png')
-        title = 'Intercept of filtered velocity (mm)'
+        title = 'Masked intercept of filtered velocity (mm)'
         vmin = np.nanpercentile(vconst_mskd, 1)
         vmax = np.nanpercentile(vconst_mskd, 99)
         plot_lib.make_im_png(vconst_mskd, pngfile, cmap, title, vmin, vmax)
