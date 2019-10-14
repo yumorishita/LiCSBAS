@@ -8,6 +8,9 @@ This script converts geotiff files to float format for further time series analy
 =========
 Changelog
 =========
+v1.2 20191014 Yu Morishita, Uni of Leeds and GSI
+ - Deal with format of uint8 of cc.tif
+ - Not available mli
 v1.1 20190824 Yu Morishita, Uni of Leeds and GSI
  - Skip broken geotiff
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
@@ -128,7 +131,7 @@ def main(argv=None):
         outdir = os.path.join(os.path.dirname(geocdir), 'GEOCml{}'.format(nlook))
     if not os.path.exists(outdir): os.mkdir(outdir)
 
-    mlifile = os.path.join(outdir, 'slc.mli')
+#    mlifile = os.path.join(outdir, 'slc.mli')
 
     mlipar = os.path.join(outdir, 'slc.mli.par')
     dempar = os.path.join(outdir, 'EQA.dem_par')
@@ -217,8 +220,13 @@ def main(argv=None):
         cc_tiffile = os.path.join(geocdir, ifgd, ifgd+'.geo.cc.tif')
 
         ### Check if inputs exist
-        if not os.path.exists(unw_tiffile) or not os.path.exists(cc_tiffile):
-            print ('  No {} found. Skip'.format(ifgd+'.geo.[unw|cc].tif'), flush=True)
+        if not os.path.exists(unw_tiffile):
+            print ('  No {} found. Skip'.format(ifgd+'.geo.unw.tif'), flush=True)
+            with open(no_unw_list, 'a') as f:
+                print('{}'.format(ifgd), file=f)
+            continue
+        elif not os.path.exists(cc_tiffile):
+            print ('  No {} found. Skip'.format(ifgd+'.geo.cc.tif'), flush=True)
             with open(no_unw_list, 'a') as f:
                 print('{}'.format(ifgd), file=f)
             continue
@@ -229,30 +237,41 @@ def main(argv=None):
         unwfile = os.path.join(ifgdir1, ifgd+'.unw')
         ccfile = os.path.join(ifgdir1, ifgd+'.cc')
 
-       ### Read data from geotiff
+        ### Read data from geotiff
         try:
             unw = gdal.Open(unw_tiffile).ReadAsArray()
             unw[unw==0] = np.nan
-            cc = gdal.Open(cc_tiffile).ReadAsArray()
-            cc[cc==0] = np.nan
         except: ## if broken
-            print ('  {} cannot open. Skip'.format(ifgd+'.geo.[unw|cc].tif'), flush=True)
+            print ('  {} cannot open. Skip'.format(ifgd+'.geo.unw.tif'), flush=True)
             with open(no_unw_list, 'a') as f:
                 print('{}'.format(ifgd), file=f)
             shutil.rmtree(ifgdir1)
             continue
 
-        ### Make mli (only once)
-        if not os.path.exists(mlifile):
-            diffmag_tiffile = os.path.join(geocdir, ifgd, ifgd+'.geo.diff_mag.tif')
-            if os.path.exists(diffmag_tiffile):
-                mag = gdal.Open(diffmag_tiffile).ReadAsArray()
-                mag[mag==0] = np.nan
-                if nlook != 1:
-                    mag = tools_lib.multilook(mag, nlook, nlook, n_valid_thre)
-                mag.tofile(mlifile)
-                mlipngfile = mlifile+'.png'
-                plot_lib.make_im_png(mag, mlipngfile, 'gray', 'MLI', cbar=False)
+        try:
+            cc = gdal.Open(cc_tiffile).ReadAsArray()
+            if cc.dtype == np.uint8: ## New format since 201910
+                cc = cc.astype(np.float32)/255
+            cc[cc==0] = np.nan
+        except: ## if broken
+            print ('  {} cannot open. Skip'.format(ifgd+'.geo.cc.tif'), flush=True)
+            with open(no_unw_list, 'a') as f:
+                print('{}'.format(ifgd), file=f)
+            shutil.rmtree(ifgdir1)
+            continue
+
+        ### Unavailable since 201910
+#        ### Make mli (only once)
+#        if not os.path.exists(mlifile):
+#            diffmag_tiffile = os.path.join(geocdir, ifgd, ifgd+'.geo.diff_mag.tif')
+#            if os.path.exists(diffmag_tiffile):
+#                mag = gdal.Open(diffmag_tiffile).ReadAsArray()
+#                mag[mag==0] = np.nan
+#                if nlook != 1:
+#                    mag = tools_lib.multilook(mag, nlook, nlook, n_valid_thre)
+#                mag.tofile(mlifile)
+#                mlipngfile = mlifile+'.png'
+#                plot_lib.make_im_png(mag, mlipngfile, 'gray', 'MLI', cbar=False)
 
         ### Read info (only once)
         ## If all float already exist, this is not done, but no problem because
