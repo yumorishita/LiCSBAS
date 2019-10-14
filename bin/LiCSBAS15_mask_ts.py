@@ -315,6 +315,7 @@ def main(argv=None):
     else:
         figsize_x = 12
         figsize_y = int((figsize_x)/4*3*length/width)
+        if figsize_y < 4: figsize_y = 4
     
     fig = plt.figure(figsize = (figsize_x, figsize_y))
     fig2 = plt.figure(figsize = (figsize_x, figsize_y))
