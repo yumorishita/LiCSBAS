@@ -8,6 +8,8 @@ This script displays an image file (only in float format).
 =========
 Changelog
 =========
+v1.2 20191025 Yu Morishita, Uni of Leeds and GSI
+ - Add --kmz option
 v1.1 20190828 Yu Morishita, Uni of Leeds and GSI
  - Add --png option
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
@@ -16,7 +18,7 @@ v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
 =====
 Usage
 =====
-LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--cmax None] [--auto_crange 99]  [--cycle 3] [--bigendian] [--png [pngname]]
+LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--cmax None] [--auto_crange 99]  [--cycle 3] [--bigendian] [--png pngname] [--kmz kmzname]
 
  -i  Input image file in float32
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
@@ -30,6 +32,7 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--
  --cycle        Value*2pi/cycle if cmap=insar (Default: 3*2pi/cycle)
  --bigendian    If input file is in big endian
  --png          Save png (pdf etc also available) instead of displaying
+ --kmz          Save kmz (need EQA.dem_par for -p option)
 
 """
 
@@ -42,6 +45,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import subprocess as subp
 import SCM5
+import zipfile
 
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_io_lib as io_lib
@@ -50,6 +54,21 @@ class Usage(Exception):
     """Usage context manager"""
     def __init__(self, msg):
         self.msg = msg
+
+#%%
+def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile):
+    kmlfile = kmzfile.replace('.kmz', '.kml')
+        
+    with open(kmlfile, "w") as f:
+        print('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">/n<Document><GroundOverlay><Icon>\n<href>{}</href>\n</Icon>\n<altitude>0</altitude>\n<tessellate>0</tessellate>\n<altitudeMode>clampToGround</altitudeMode>\n<LatLonBox><south>{}</south><north>{}</north><west>{}</west><east>{}</east></LatLonBox>\n</GroundOverlay></Document></kml>'.format(pngfile, lat1, lat2, lon1, lon2), file=f)
+        
+    with zipfile.ZipFile(kmzfile, 'w', compression=zipfile.ZIP_DEFLATED) as f:
+        f.write(kmlfile)
+        f.write(pngfile)
+
+    os.remove(kmlfile)
+
+    return
 
 
 #%% Main
@@ -67,12 +86,12 @@ if __name__ == "__main__":
     cycle = 3
     endian = 'little'
     pngname = []
-    
+    kmzname = []
     
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "cycle=", "bigendian", "png="])
+            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "cycle=", "bigendian", "png=", "kmz="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -97,6 +116,8 @@ if __name__ == "__main__":
                 endian = 'big'
             elif o == '--png':
                 pngname = a
+            elif o == '--kmz':
+                kmzname = a
 
         if not infile:
             raise Usage('No image file given, -i is not optional!')
@@ -139,6 +160,23 @@ if __name__ == "__main__":
         print('No fields about width/length found in {}!'.format(parfile), file=sys.stderr)
         sys.exit(2)
 
+    if kmzname:
+        try:
+            ### EQA.dem_par
+            dlat = float(io_lib.get_param_par(parfile, 'post_lat'))
+            dlon = float(io_lib.get_param_par(parfile, 'post_lon'))
+
+            lat_n_g = float(io_lib.get_param_par(parfile, 'corner_lat')) #grid reg
+            lon_w_g = float(io_lib.get_param_par(parfile, 'corner_lon')) #grid reg
+            ## Grid registration to pixel registration by shifing half pixel
+            lat_n_p = lat_n_g - dlat/2
+            lon_w_p = lon_w_g - dlon/2
+            lat_s_p = lat_n_p+dlat*length
+            lon_e_p = lon_w_p+dlon*width
+        except:
+            print('No fields about geo for kmz found in {}!'.format(parfile), file=sys.stderr)
+            sys.exit(2)
+
 
     #%% Read data
     data = io_lib.read_img(infile, length, width, endian=endian)
@@ -159,6 +197,23 @@ if __name__ == "__main__":
         if cmin is None: cmin = np.nanpercentile(data, 100-auto_crange)
         if cmax is None: cmax = np.nanpercentile(data, auto_crange)
 
+    #%% Output kmz
+    if kmzname:
+        dpi = 100
+        figsize2 = (width/dpi, length/dpi)
+        plt.figure(figsize=figsize2, dpi=dpi)
+        plt.imshow(data, clim=[cmin, cmax], cmap=cmap)
+        plt.axis('off')
+        plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        pngnametmp = kmzname.replace('.kmz', '_tmp.png')
+        plt.savefig(pngnametmp, dpi=dpi, transparent=True)
+        plt.close()
+          
+        make_kmz(lat_s_p, lat_n_p, lon_w_p, lon_e_p, pngnametmp, kmzname)
+        
+        os.remove(pngnametmp)
+        print('\nOutput: {}\n'.format(kmzname))
+
 
     #%% Plot figure
     figsize_x = 6 if length > width else 8
@@ -170,6 +225,8 @@ if __name__ == "__main__":
     
     if pngname:
         plt.savefig(pngname)
+        plt.close()
         print('\nOutput: {}\n'.format(pngname))
     else:
         plt.show()
+
