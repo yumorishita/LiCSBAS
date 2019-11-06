@@ -8,6 +8,8 @@ This script identifies bad data by checking loop closure. A tentative reference 
 =========
 Changelog
 =========
+v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
+ - Add iteration during ref search when no ref found
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -319,7 +321,13 @@ def main(argv=None):
 
     ### Find stable ref area which have all n_unw and minimum ns_bad_loop and loop_ph_rms_points
     mask1 = (n_unw==np.nanmax(n_unw))
-    mask2 = (ns_bad_loop==np.nanmin(ns_bad_loop))
+    min_ns_bad_loop = np.nanmin(ns_bad_loop)
+    while True:
+        mask2 = (ns_bad_loop==min_ns_bad_loop)
+        if np.all(~(mask1*mask2)): ## All masked
+            min_ns_bad_loop = min_ns_bad_loop+1 ## Make mask2 again
+        else:
+            break
     loop_ph_rms_points_masked = loop_ph_rms_points*mask1*mask2
     loop_ph_rms_points_masked[loop_ph_rms_points_masked==0] = np.nan
     refyx = np.where(loop_ph_rms_points_masked==np.nanmin(loop_ph_rms_points_masked))
