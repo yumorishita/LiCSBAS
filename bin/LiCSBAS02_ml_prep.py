@@ -8,6 +8,8 @@ This script converts geotiff files to float format for further time series analy
 =========
 Changelog
 =========
+v1.3 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Use mli and hgt
 v1.2 20191014 Yu Morishita, Uni of Leeds and GSI
  - Deal with format of uint8 of cc.tif
  - Not available mli
@@ -24,7 +26,7 @@ Inputs:
    - yyyymmdd_yyyymmdd
      - yyyymmdd_yyyymmdd.geo.unw.tif
      - yyyymmdd_yyyymmdd.geo.cc.tif
-    [- yyyymmdd_yyyymmdd.geo.diff_mag.tif] (if exist, just one file is used for slc.mli)
+  [- yyyymmdd.geo.mli.tif]
   [- *.geo.[ENU].tif] (if not exist, try to download from LiCSAR portal)
   [- baselines] (if not exist, try to download from LiCSAR portal or make dummy)
 
@@ -34,10 +36,11 @@ Outputs in GEOCml? directory (all binary files are 4byte float little endian):
  - baselines (may be dummy)
  - EQA.dem_par
  - slc.mli[.par|.png]
+ - hgt[.png]
  - E.geo (if exist)
  - N.geo (if exist)
  - U.geo (if exist)
- - no_unw_list.txt (if exist)
+ - no_unw_list.txt (if there are unavailable unw|cc exists)
 
 =====
 Usage
@@ -193,6 +196,46 @@ def main(argv=None):
         print('  {}.geo created'.format(ENU), flush=True)
 
 
+    #%% mli
+    mlitif = os.path.join(geocdir, '{}.geo.mli.tif'.format(frameID))
+    if os.path.exists(mlitif):
+        print('\nCreate slc.mli', flush=True)
+        mli = gdal.Open(mlitif).ReadAsArray()
+        mli[mli==0] = np.nan
+    
+        if nlook != 1:
+            ### Multilook
+            mli = tools_lib.multilook(mli, nlook, nlook)
+    
+        mlifile = os.path.join(outdir, 'slc.mli')
+        mli.tofile(mlifile)
+        mlipngfile = mlifile+'.png'
+        vmin = np.nanpercentile(mli, 5)
+        vmax = np.nanpercentile(mli, 95)
+        plot_lib.make_im_png(mli, mlipngfile, 'gray', 'MLI', vmin, vmax, cbar=True)
+        print('  slc.mli[.png] created', flush=True)
+
+
+    #%% hgt
+    hgttif = os.path.join(geocdir, '{}.geo.hgt.tif'.format(frameID))
+    if os.path.exists(hgttif):
+        print('\nCreate hgt', flush=True)
+        hgt = gdal.Open(hgttif).ReadAsArray()
+        hgt[hgt==0] = np.nan
+    
+        if nlook != 1:
+            ### Multilook
+            hgt = tools_lib.multilook(hgt, nlook, nlook)
+    
+        hgtfile = os.path.join(outdir, 'hgt')
+        hgt.tofile(hgtfile)
+        hgtpngfile = hgtfile+'.png'
+        vmax = np.nanpercentile(hgt, 99)
+        vmin = -vmax/3 ## bnecause 1/4 of terrain is blue
+        plot_lib.make_im_png(hgt, hgtpngfile, 'terrain', 'DEM (m)', vmin, vmax, cbar=True)
+        print('  hgt[.png] created', flush=True)
+
+
     #%% tif -> float (with multilook/downsampling)
     print('\nCreate unw and cc', flush=True)
     ifgdates = tools_lib.get_ifgdates(geocdir)
@@ -212,7 +255,7 @@ def main(argv=None):
         print("  {0:3}/{1:3} unw and cc already exist. Skip".format(n_ifg-n_ifg2, n_ifg), flush=True)
 
     ### Create
-    for i, ifgd in enumerate(reversed(ifgdates2)): ## From latest for mli
+    for i, ifgd in enumerate(ifgdates2):
         if np.mod(i,10) == 0:
             print("  {0:3}/{1:3}th IFG...".format(i, n_ifg2), flush=True)
 
@@ -259,19 +302,6 @@ def main(argv=None):
                 print('{}'.format(ifgd), file=f)
             shutil.rmtree(ifgdir1)
             continue
-
-        ### Unavailable since 201910
-#        ### Make mli (only once)
-#        if not os.path.exists(mlifile):
-#            diffmag_tiffile = os.path.join(geocdir, ifgd, ifgd+'.geo.diff_mag.tif')
-#            if os.path.exists(diffmag_tiffile):
-#                mag = gdal.Open(diffmag_tiffile).ReadAsArray()
-#                mag[mag==0] = np.nan
-#                if nlook != 1:
-#                    mag = tools_lib.multilook(mag, nlook, nlook, n_valid_thre)
-#                mag.tofile(mlifile)
-#                mlipngfile = mlifile+'.png'
-#                plot_lib.make_im_png(mag, mlipngfile, 'gray', 'MLI', cbar=False)
 
         ### Read info (only once)
         ## If all float already exist, this is not done, but no problem because

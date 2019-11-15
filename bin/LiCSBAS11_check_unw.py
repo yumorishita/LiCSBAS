@@ -8,6 +8,8 @@ This script checks quality of unw data and identifies bad interferograms based o
 =========
 Changelog
 =========
+v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Add hgt
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -27,7 +29,8 @@ Inputs in GEOCml* :
    - 11ifg_stats.txt  : Statistics of interferograms
    - EQA.dem_par (copy)
    - slc.mli.par (copy)
- - results/slc.mli[.png] (copy)
+ - results/slc.mli[.png] (copy, if exist)
+ - results/hgt[.png] (copy, if exist)
  - 11bad_ifg_ras/yyyymmdd_yyyymmdd.unw[.bmp|.png] : Ras images of bad ifgs
  - 11ifg_ras/yyyymmdd_yyyymmdd.unw[.bmp|.png] : Ras images other than bad ifgs
  - network/network11*.png    : Figures of baseline configuration
@@ -163,10 +166,9 @@ def main(argv=None):
         if os.path.exists(os.path.join(ifgdir, file)):
             shutil.copy(os.path.join(ifgdir, file), infodir)
 
-    for file in ['slc.mli', 'slc.mli.png']:
+    for file in ['slc.mli', 'slc.mli.png', 'hgt', 'hgt.png']:
         if os.path.exists(os.path.join(ifgdir, file)):
             shutil.copy(os.path.join(ifgdir, file), resultsdir)
-
 
 
     #%% Read data 

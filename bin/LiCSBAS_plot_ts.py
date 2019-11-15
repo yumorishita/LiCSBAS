@@ -8,6 +8,8 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
+v1.2 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Add hgt
 v1.1 20190815 Yu Morishita, Uni of Leeds and GSI
  - Add -r option
  - Not use i2 if not exist
@@ -19,7 +21,7 @@ v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
 Inputs
 ===============
  - cum_filt.h5 and/or cum.h5
-[- mask, coh_avg, n_unw, vstd, n_gap, n_ifg_noloop, n_loop_err, resid_rms, maxTlen, stc, scl.mli in results dir]
+[- mask, coh_avg, n_unw, vstd, n_gap, n_ifg_noloop, n_loop_err, resid_rms, maxTlen, stc, scl.mli, hgt in results dir]
 
 =====
 Usage
@@ -231,6 +233,7 @@ if __name__ == "__main__":
     maxTlenfile = os.path.join(resultsdir, 'maxTlen')
     stcfile = os.path.join(resultsdir, 'stc')
     mlifile = os.path.join(resultsdir, 'slc.mli')
+    hgtfile = os.path.join(resultsdir, 'hgt')
 
 
     #%% Read data
@@ -333,8 +336,8 @@ if __name__ == "__main__":
 
     #%% Read noise indecies
     mapdict_ind = {}
-    names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid', 'mli']
-    files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile, stcfile, n_ifg_noloopfile, n_loop_errfile, residfile, mlifile]
+    names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid', 'mli', 'hgt']
+    files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile, stcfile, n_ifg_noloopfile, n_loop_errfile, residfile, mlifile, hgtfile]
     for name, file in zip(names, files):
         try:
             data = io_lib.read_img(file, length, width)
@@ -476,8 +479,11 @@ if __name__ == "__main__":
 
     #%% Radio buttom for noise indecies
     if mapdict_ind: ## at least 1 indecies
-        axrad_ind = pv.add_axes([0.01, 0.15, 0.1, len(mapdict_ind)*0.03+0.04])
+        axrad_ind = pv.add_axes([0.01, 0.15, 0.1, len(mapdict_ind)*0.025+0.04])
         radio_ind = RadioButtons(axrad_ind, tuple(mapdict_ind.keys()))
+        
+        for label in radio_ind.labels:
+            label.set_fontsize(8)
         
         def show_indices(val):
             if val == 'mask': 
@@ -487,7 +493,8 @@ if __name__ == "__main__":
                 data = mapdict_ind[val]*mask
                 cmin_ind = np.nanpercentile(data*mask, 100-auto_crange)
                 cmax_ind = np.nanpercentile(data*mask, auto_crange)
-            
+                if val=='hgt': cmin_ind = -cmax_ind/3 ## bnecause 1/4 of terrain is blue
+
             cax.set_data(data)
  
             axv.set_title(val)
@@ -495,11 +502,13 @@ if __name__ == "__main__":
             elif val == 'maxTlen': cbr.set_label('yr')
             elif val == 'stc': cbr.set_label('mm')
             elif val == 'resid': cbr.set_label('mm')
+            elif val == 'hgt': cbr.set_label('m')
             else: cbr.set_label('')
 
             cmap = 'viridis_r'
             if val in ['coh_avg', 'n_unw', 'mask', 'maxTlen']: cmap = 'viridis'
             elif val=='mli': cmap = 'gray'
+            elif val=='hgt': cmap = 'terrain'
             cax.set_cmap(cmap)
 
             ### auto clim by None does not work...

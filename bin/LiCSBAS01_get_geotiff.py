@@ -8,6 +8,8 @@ This script downloads geotiff files of unw (unwrapped interferogram) and cc (coh
 =========
 Changelog
 =========
+v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Download mli and hgt
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 
@@ -18,10 +20,11 @@ Output files
    - yyyymmdd_yyyymmdd
      - yyyymmdd_yyyymmdd.geo.unw.tif
      - yyyymmdd_yyyymmdd.geo.cc.tif
-     - yyyymmdd_yyyymmdd.geo.diff_mag.tif (for just one latest ifg)
+   - *.geo.mli.tif (using just one first epoch)
    - *.geo.E.tif
    - *.geo.N.tif
    - *.geo.U.tif
+   - *.geo.hgt.tif
    - baselines
 
 =====
@@ -118,8 +121,8 @@ def main(argv=None):
     LiCSARweb = 'http://gws-access.ceda.ac.uk/public/nceo_geohazards/LiCSAR_products/'
 
 
-    #%% ENU
-    for ENU in ['E', 'N', 'U']:
+    #%% ENU and hgt
+    for ENU in ['E', 'N', 'U', 'hgt']:
         enutif = '{}.geo.{}.tif'.format(frameID, ENU)
         if os.path.exists(enutif):
             print('{} already exist. Skip download.'.format(enutif), flush=True)
@@ -137,6 +140,34 @@ def main(argv=None):
     url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'baselines')
     if not tools_lib.download_data(url, 'baselines'):
         print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
+
+
+    #%% mli
+    ### Get available dates
+    url = os.path.join(LiCSARweb, trackID, frameID, 'products', 'epochs')
+    response = requests.get(url)
+    response.encoding = response.apparent_encoding #avoid garble
+    html_doc = response.text
+    soup = BeautifulSoup(html_doc, "html.parser")
+    tags = soup.find_all(href=re.compile(r"\d{8}"))
+    imdates_all = [tag.get("href")[0:8] for tag in tags]
+    imd1 = []
+    for imd in imdates_all: ## Find first dates during specified period
+        if int(imd) >= startdate and int(imd) <= enddate:
+            imd1 = imd
+            break
+
+    ### Download
+    if imd1:
+        print('Donwnloading {}.geo.mli.tif as {}.geo.mli.tif...'.format(imd1, frameID), flush=True)
+        url_mli = os.path.join(url, imd1, imd1+'.geo.mli.tif')
+        mlitif = frameID+'.geo.mli.tif'
+        if os.path.exists(mlitif):
+            print('    {} already exist. Skip'.format(mlitif), flush=True)
+        elif not tools_lib.download_data(url_mli, mlitif):
+            print('    Error while downloading from {}'.format(url_mli), file=sys.stderr, flush=True)
+    else:
+        print('No mli available on {}'.format(url), file=sys.stderr, flush=True)
 
 
     #%% unw and cc
