@@ -10,7 +10,7 @@ Changelog
 =========
 v1.3 20191119 Yu Morishita, Uni of Leeds and GSI
  - Add mark of selected point and set aspect in image window
- - Display values of noise indices in time seires window
+ - Display values and unit of noise indices in time seires window
 v1.2 20191115 Yu Morishita, Uni of Leeds and GSI
  - Add hgt
 v1.1 20190815 Yu Morishita, Uni of Leeds and GSI
@@ -342,15 +342,19 @@ if __name__ == "__main__":
 
     #%% Read noise indecies
     mapdict_ind = {}
+    mapdict_unit = {}
     names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid', 'mli', 'hgt']
+    units = ['', '', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm', '', 'm']
     files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile, stcfile, n_ifg_noloopfile, n_loop_errfile, residfile, mlifile, hgtfile]
-    for name, file in zip(names, files):
+#    for name, file in zip(names, files):
+    for i, name in enumerate(names):
         try:
-            data = io_lib.read_img(file, length, width)
+            data = io_lib.read_img(files[i], length, width)
             mapdict_ind[name] = data
-            print('Reading {}'.format(os.path.basename(file)))
+            mapdict_unit[name] = units[i]
+            print('Reading {}'.format(os.path.basename(files[i])))
         except:
-            print('No {} found, not use.'.format(file))
+            print('No {} found, not use.'.format(files[i]))
 
 
     #%% Calc time in datetime and ordinal
@@ -502,14 +506,8 @@ if __name__ == "__main__":
                 if val=='hgt': cmin_ind = -cmax_ind/3 ## bnecause 1/4 of terrain is blue
 
             cax.set_data(data)
- 
             axv.set_title(val)
-            if val == 'vstd': cbr.set_label('mm/yr')
-            elif val == 'maxTlen': cbr.set_label('yr')
-            elif val == 'stc': cbr.set_label('mm')
-            elif val == 'resid': cbr.set_label('mm')
-            elif val == 'hgt': cbr.set_label('m')
-            else: cbr.set_label('')
+            cbr.set_label(mapdict_unit[val])
 
             cmap = 'viridis_r'
             if val in ['coh_avg', 'n_unw', 'mask', 'maxTlen']: cmap = 'viridis'
@@ -638,10 +636,11 @@ if __name__ == "__main__":
         if mapdict_ind and ~np.isnan(mask[ii, jj]): ## at least 1 indecies
             for key in mapdict_ind:
                 val = mapdict_ind[key][ii, jj]
+                unit = mapdict_unit[key]
                 if key.startswith('n_') or key=='mask':
-                    noisetxt = noisetxt+'{}: {:d}\n'.format(key, int(val))
+                    noisetxt = noisetxt+'{}: {:d} {}\n'.format(key, int(val), unit)
                 else:
-                    noisetxt = noisetxt+'{}: {:.2f}\n'.format(key, val)
+                    noisetxt = noisetxt+'{}: {:.2f} {}\n'.format(key, val, unit)
 
         ### Get lat lon and show Ref info at side 
         if geocod_flag:
