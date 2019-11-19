@@ -261,7 +261,6 @@ if __name__ == "__main__":
         dlat = float(cumh5['post_lat'][()])
         dlon = float(cumh5['post_lon'][()])
         aspect = np.abs(dlat/dlon/np.cos(np.deg2rad(lat1+dlat*length/2)))
-        print(dlat, dlon, lat1, aspect)
     except:
         geocod_flag = False
         aspect = 1
