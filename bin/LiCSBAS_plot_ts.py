@@ -8,6 +8,9 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
+v1.3 20191119 Yu Morishita, Uni of Leeds and GSI
+ - Add mark of selected point and set aspect in image window
+ - Display values of noise indices in time seires window
 v1.2 20191115 Yu Morishita, Uni of Leeds and GSI
  - Add hgt
 v1.1 20190815 Yu Morishita, Uni of Leeds and GSI
@@ -241,6 +244,9 @@ if __name__ == "__main__":
     print('\nReading {}'.format(os.path.relpath(cumfile)))
     cumh5 = h5.File(cumfile,'r')
     vel = cumh5['vel']
+    cum = cumh5['cum']
+    n_im, length, width = cum.shape
+
     try:
         gap = cumh5['gap']
         label_gap = 'Gap of ifg network'
@@ -254,12 +260,12 @@ if __name__ == "__main__":
         lon1 = float(cumh5['corner_lon'][()])
         dlat = float(cumh5['post_lat'][()])
         dlon = float(cumh5['post_lon'][()])
+        aspect = np.abs(dlat/dlon/np.cos(np.deg2rad(lat1+dlat*length/2)))
+        print(dlat, dlon, lat1, aspect)
     except:
         geocod_flag = False
+        aspect = 1
         print('No latlon field found in {}. Skip.'.format(cumfile))
-
-    cum = cumh5['cum']
-    n_im, length, width = cum.shape
             
     ### Set ref area
     if not refarea:
@@ -380,17 +386,17 @@ if __name__ == "__main__":
 
     #%% Plot figure of cumulative displacement and velocity
     figsize_x = 6 if length > width else 8
-    figsize = (figsize_x, (figsize_x-2)*length/width+1)
+    figsize = (figsize_x, (figsize_x-2)*length*aspect/width+1)
     pv = plt.figure('Velocity / Cumulative Displacement', figsize)
     axv = pv.add_axes([0.15,0.15,0.83,0.83])
-    axt = pv.text(0.01, 0.88, 'Ref area:\nX {}:{}\nY {}:{}\n(start from 0)'.format(refx1, refx2, refy1, refy2))
-    axt2 = pv.text(0.01, 0.78, '(Right-drag\nto change\nref area)')
+    axt2 = pv.text(0.01, 0.99, 'Left-doubleclick:\n Plot time series\nRight-drag:\n Change ref area', fontsize=8, va='top')
+    axt = pv.text(0.01, 0.78, 'Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)'.format(refx1, refx2, refy1, refy2), fontsize=8, va='bottom')
     
     ### Fisrt show
     rax, = axv.plot([refx1h, refx2h, refx2h, refx1h, refx1h],
-                    [refy1h, refy1h, refy2h, refy2h, refy1h], 'k')
+                    [refy1h, refy1h, refy2h, refy2h, refy1h], '--k', alpha=0.8)
     data = vel*mask-np.nanmean((vel*mask)[refy1:refy2+1, refx1:refx2+1])
-    cax = axv.imshow(data, clim=[vmin, vmax], cmap=cmap)
+    cax = axv.imshow(data, clim=[vmin, vmax], cmap=cmap, aspect=aspect)
         
     axv.set_title('vel')
 
@@ -412,7 +418,7 @@ if __name__ == "__main__":
         refx1h = refx1-0.5; refx2h = refx2-0.5 ## Shift half for plot
         refy1h = refy1-0.5; refy2h = refy2-0.5
         
-        axt.set_text('Ref area:\nX {}:{}\nY {}:{}\n(start from 0)'.format(refx1, refx2, refy1, refy2))
+        axt.set_text('Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)'.format(refx1, refx2, refy1, refy2))
         rax.set_data([refx1h, refx2h, refx2h, refx1h, refx1h],
             [refy1h, refy1h, refy2h, refy2h, refy1h])
         pv.canvas.draw()
@@ -479,7 +485,7 @@ if __name__ == "__main__":
 
     #%% Radio buttom for noise indecies
     if mapdict_ind: ## at least 1 indecies
-        axrad_ind = pv.add_axes([0.01, 0.15, 0.1, len(mapdict_ind)*0.025+0.04])
+        axrad_ind = pv.add_axes([0.01, 0.15, 0.13, len(mapdict_ind)*0.025+0.04])
         radio_ind = RadioButtons(axrad_ind, tuple(mapdict_ind.keys()))
         
         for label in radio_ind.labels:
@@ -578,7 +584,7 @@ if __name__ == "__main__":
             label.set_horizontalalignment('right')
 
     ### Ref info at side
-    axtref = pts.text(0.83, 0.47, 'Ref area:\nX {}:{}\nY {}:{}\n(start from 0)\n\nRef date:\n{}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]))
+    axtref = pts.text(0.83, 0.93, 'Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]), fontsize=8, va='top')
 
 
     ### Fit function for time series
@@ -598,16 +604,28 @@ if __name__ == "__main__":
 
     fitcheck.on_clicked(fitfunc)
 
-
+    ### First show of selected point in image window
+    pax, = axv.plot([0], [0], 'k', linewidth=3)
+    
     ### Plot time series at clicked point
     def printcoords(event):
         global dph, lines1, lines2
         #outputting x and y coords to console
         if event.inaxes != axv:
             return
+        if event.button != 1: ## Only left click
+            return
+        if not event.dblclick: ## Only double click
+            return
 
         ii = np.int(np.round(event.ydata))
         jj = np.int(np.round(event.xdata))
+
+        ### Plot on image window
+        ii1h = ii-0.5; ii2h = ii+1-0.5 ## Shift half for plot
+        jj1h = jj-0.5; jj2h = jj+1-0.5
+        pax.set_data([jj1h, jj2h, jj2h, jj1h, jj1h], [ii1h, ii1h, ii2h, ii2h, ii1h])
+        pv.canvas.draw()
 
         axts.cla()
         axts.grid(zorder=0)
@@ -615,12 +633,22 @@ if __name__ == "__main__":
         axts.set_xlabel('Time')
         axts.set_ylabel('Displacement (mm)')
 
+        ### Get values of noise indices
+        noisetxt = ''
+        if mapdict_ind and ~np.isnan(mask[ii, jj]): ## at least 1 indecies
+            for key in mapdict_ind:
+                val = mapdict_ind[key][ii, jj]
+                if key.startswith('n_') or key=='mask':
+                    noisetxt = noisetxt+'{}: {:d}\n'.format(key, int(val))
+                else:
+                    noisetxt = noisetxt+'{}: {:.2f}\n'.format(key, val)
+
         ### Get lat lon and show Ref info at side 
         if geocod_flag:
             lat, lon = tools_lib.xy2bl(jj, ii, lat1, dlat, lon1, dlon)
-            axtref.set_text('Lat:{:.5f}\nLon:{:.5f}\n\nRef area:\nX {}:{}\nY {}:{}\n(start from 0)\n\nRef date:\n{}'.format(lat, lon, refx1, refx2, refy1, refy2, imdates[ix_m]))
+            axtref.set_text('Lat:{:.5f}\nLon:{:.5f}\n\nRef area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}\n\n{}'.format(lat, lon, refx1, refx2, refy1, refy2, imdates[ix_m], noisetxt))
         else: 
-            axtref.set_text('Ref area:\nX {}:{}\nY {}:{}\n(start from 0)\n\nRef date:\n{}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]))
+            axtref.set_text('Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]))
 
 
         ### If masked
