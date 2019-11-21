@@ -8,7 +8,7 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
-v1.3 20191119 Yu Morishita, Uni of Leeds and GSI
+v1.3 20191120 Yu Morishita, Uni of Leeds and GSI
  - Add mark of selected point and set aspect in image window
  - Display values and unit of noise indices in time seires window
 v1.2 20191115 Yu Morishita, Uni of Leeds and GSI
@@ -603,6 +603,7 @@ if __name__ == "__main__":
 
     ### First show of selected point in image window
     pax, = axv.plot([0], [0], 'k', linewidth=3)
+    pax2, = axv.plot([0], [0], 'Pk')
     
     ### Plot time series at clicked point
     def printcoords(event):
@@ -622,6 +623,7 @@ if __name__ == "__main__":
         ii1h = ii-0.5; ii2h = ii+1-0.5 ## Shift half for plot
         jj1h = jj-0.5; jj2h = jj+1-0.5
         pax.set_data([jj1h, jj2h, jj2h, jj1h, jj1h], [ii1h, ii1h, ii2h, ii2h, ii1h])
+        pax2.set_data(jj, ii)
         pv.canvas.draw()
 
         axts.cla()
