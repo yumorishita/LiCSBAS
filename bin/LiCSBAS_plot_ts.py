@@ -461,8 +461,8 @@ if __name__ == "__main__":
     axrad_vel = pv.add_axes([0.01, 0.65, 0.1, 0.1])
     
     if cumfile2:
-        radio_vel = RadioButtons(axrad_vel, ('vel', 'vel2'))
-        mapdict_vel = {'vel': vel, 'vel2': vel2}
+        radio_vel = RadioButtons(axrad_vel, ('vel(1)', 'vel(2)'))
+        mapdict_vel = {'vel(1)': vel, 'vel(2)': vel2}
     else:
         radio_vel = RadioButtons(axrad_vel, ('vel', ))
         mapdict_vel = {'vel': vel}
@@ -697,7 +697,7 @@ if __name__ == "__main__":
                 lines2[model], = axts.plot(xvalues, yvalues, 'r-', visible=vis, alpha=0.6, zorder=2)
                 
             axts.scatter(imdates_dt, dphf, c='r', label=label2, alpha=0.6, zorder=4)
-            axts.set_title('vel = {:.1f} mm/yr, vel2 = {:.1f} mm/yr @({}, {})'.format(vel1p, vel2p, jj, ii))
+            axts.set_title('vel(1) = {:.1f} mm/yr, vel(2) = {:.1f} mm/yr @({}, {})'.format(vel1p, vel2p, jj, ii))
 
         ## gap
         if gap:
