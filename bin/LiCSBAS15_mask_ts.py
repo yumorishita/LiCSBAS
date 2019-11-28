@@ -8,6 +8,8 @@ This script makes a mask for time series using several noise indices.
 =========
 Changelog
 =========
+v1.3 20191128 Yu Morishita, Uni of Leeds and GSI
+ - Add noautoadjust option
 v1.2 20190918 Yu Morishita, Uni of Leeds and GSI
  - Output mask_ts_mskd.png
 v1.1 20190906 Yu Morishita, Uni of Leeds and GSI
@@ -40,7 +42,7 @@ Outputs in TS_GEOCml* directory
 =====
 Usage
 =====
-LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre] [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin vmin] [--vmax vmin] [--keep_isolated]
+LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre] [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin vmin] [--vmax vmin] [--keep_isolated] [--noautoadjust]
 
  -t  Path to the TS_GEOCml* dir.
  -c  Threshold of coh_avg (average coherence)
@@ -56,6 +58,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
  --keep_isolated  Keep (not mask) isolated pixels
                   (Default: they are masked using STC)
+ --noautoadjust  Do not auto adjust threshold when all pixels are masked
+                 (Default: do auto adjust)
  
  Default thresholds for L-band:
    C-band : -c 0.05 -u 1.5 -v 10 -T 1 -g 10 -s 5  -i 10 -l 5 -r 2
@@ -114,12 +118,13 @@ def main(argv=None):
     vmin = []
     vmax = []
     keep_isolated = False
+    auto_adjust = True
 
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:r:T:s:", ["version", "help", "vmin=", "vmax=", "keep_isolated"])
+            opts, args = getopt.getopt(argv[1:], "ht:c:u:v:g:i:l:r:T:s:", ["version", "help", "vmin=", "vmax=", "keep_isolated", "noautoadjust"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -152,6 +157,8 @@ def main(argv=None):
                 vmax = float(a)
             elif o == '--keep_isolated':
                 keep_isolated = True
+            elif o == '--noautoadjust':
+                auto_adjust = False
 
         if not tsadir:
             raise Usage('No tsa directory given, -t is not optional!')
@@ -251,14 +258,15 @@ def main(argv=None):
 
         ### First check if the thre masks not all pixels
         ### If all pixels are masked, change thre to the max/min value
-        minvalue = np.nanmin(_data)
-        if minvalue > _thre:
-            print('\nAll pixels would be masked with {} thre of {}'.format(name, thre_dict[name]), flush=True)
-            thre_dict[name] = np.ceil(minvalue)
-            _thre = thre_dict[name]
-            if gt_lt[i] == 'lt':
-                thre_dict[name] = -1*thre_dict[name]
-            print('Automatically change the thre to {} (ceil of min value)'.format(thre_dict[name]), flush=True)
+        if auto_adjust:
+            minvalue = np.nanmin(_data)
+            if minvalue > _thre:
+                print('\nAll pixels would be masked with {} thre of {}'.format(name, thre_dict[name]), flush=True)
+                thre_dict[name] = np.ceil(minvalue)
+                _thre = thre_dict[name]
+                if gt_lt[i] == 'lt':
+                    thre_dict[name] = -1*thre_dict[name]
+                print('Automatically change the thre to {} (ceil of min value)'.format(thre_dict[name]), flush=True)
 
         ### Make mask for this index
         with warnings.catch_warnings(): ## To silence RuntimeWarning of nan<thre
@@ -290,7 +298,7 @@ def main(argv=None):
     print('Masked pixels  : {}/{} ({:.1f}%)'.format(n_pt_all-n_nomask, n_pt_all, 100-rate_nomask))
     print('Kept pixels    : {}/{} ({:.1f}%)\n'.format(n_nomask, n_pt_all, rate_nomask), flush=True)
 
-    if n_nomask == 0:
+    if n_nomask == 1:
         print('All pixels are masked!!', file=sys.stderr)
         print('Try again with different threshold.\n', file=sys.stderr)
         return 1

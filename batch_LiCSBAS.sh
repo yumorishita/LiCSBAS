@@ -86,6 +86,7 @@ p15_TSdir=""    # default: TS_$GEOCmldir
 p15_vmin=""	# default: auto (mm/yr)
 p15_vmax=""	# default: auto (mm/yr)
 p15_keep_isolated="n"	# y/n. default: n
+p15_noautoadjust="n" # y/n. default: n
 p16_TSdir=""    # default: TS_$GEOCmldir
 p16_nomask="n"	# y/n. default: n
 
@@ -285,6 +286,7 @@ if [ $start_step -le 15 -a $end_step -ge 15 ];then
   if [ ! -z $p15_vmin ];then p15_op="$p15_op --vmin $p15_vmin"; fi
   if [ ! -z $p15_vmax ];then p15_op="$p15_op --vmax $p15_vmax"; fi
   if [ $p15_keep_isolated == "y" ];then p15_op="$p15_op --keep_isolated"; fi
+  if [ $p15_noautoadjust == "y" ];then p15_op="$p15_op --noautoadjust"; fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS15_mask_ts.py $p15_op"
