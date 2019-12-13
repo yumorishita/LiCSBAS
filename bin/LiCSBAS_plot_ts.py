@@ -320,7 +320,7 @@ if __name__ == "__main__":
         
         if 'deramp_flag' in list(cumh52.keys()):
             deramp_flag2 = cumh52['deramp_flag'][()]
-            if len(deramp_flag2) == 0:: # no deramp
+            if len(deramp_flag2) == 0: # no deramp
                 deramp2 = ''
             else:
                 deramp2 = ', drmp={}'.format(deramp_flag2)
