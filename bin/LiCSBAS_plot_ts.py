@@ -8,6 +8,8 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
+v1.4 20191213 Yu Morishita, Uni of Leeds and GSI
+ - Bag fix for deramp_flag
 v1.3 20191120 Yu Morishita, Uni of Leeds and GSI
  - Add mark of selected point and set aspect in image window
  - Display values and unit of noise indices in time seires window
@@ -281,9 +283,9 @@ if __name__ == "__main__":
     refy1h = refy1-0.5; refy2h = refy2-0.5
 
     ### Filter info
-    try:
+    if 'deramp_flag' in list(cumh5.keys()):
         deramp_flag = cumh5['deramp_flag'][()]
-        if deramp_flag.size == 0: # no deramp
+        if not deramp_flag: # no deramp
             deramp = ''
         else:
             deramp = ', drmp={}'.format(deramp_flag)
@@ -291,9 +293,9 @@ if __name__ == "__main__":
         filtwidth_yr = float(cumh5['filtwidth_yr'][()])
         filtwidth_day = int(np.round(filtwidth_yr*365.25))
         label1 = '1: s={:.1f}km, t={:.2f}yr ({}d){}'.format(filtwidth_km, filtwidth_yr, filtwidth_day, deramp)
-    except:
-        deramp_flag = filtwidth_km = filtwidth_yr = filtwidth_day = None
+    else:
         label1 = '1: No filter'
+
 
     ### Set master (reference) date
     imdates = cumh5['imdates'][()].astype(str).tolist()
@@ -316,12 +318,17 @@ if __name__ == "__main__":
         cum2_ref = cum2[ix_m, :, :]
         vel2 = cumh52['vel']
         
-        try:
+        if 'deramp_flag' in list(cumh52.keys()):
             deramp_flag2 = cumh52['deramp_flag'][()]
+            if not deramp_flag2: # no deramp
+                deramp2 = ''
+            else:
+                deramp2 = ', drmp={}'.format(deramp_flag2)
             filtwidth_km2 = float(cumh52['filtwidth_km'][()])
             filtwidth_yr2 = float(cumh52['filtwidth_yr'][()])
-            label2 = '2: s={:.1f}km, t={:.2f}yr, drmp={}'.format(filtwidth_km2, filtwidth_yr2, deramp_flag2)
-        except:
+            filtwidth_day2 = int(np.round(filtwidth_yr2*365.25))
+            label2 = '2: s={:.1f}km, t={:.2f}yr ({}d){}'.format(filtwidth_km2, filtwidth_yr2, filtwidth_day2, deramp2)
+        else:
             label2 = '2: No filter'
         
 
