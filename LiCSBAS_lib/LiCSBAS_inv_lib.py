@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.3 20200103 Yu Morioshita, Uni of Leeds and GSI
+ - Bag fix in calc_stc (return nonzero even if two adjacent pixels have identical ts)
 v1.2 20190823 Yu Morioshita, Uni of Leeds and GSI
  - Bag fix in calc_velstd_withnan
  - Remove calc_velstd
@@ -430,6 +432,10 @@ def calc_stc(cum):
         n_dd_cum = np.float32(np.sum(~np.isnan(dd_cum), axis=0)) #nof non-nan
         n_dd_cum[n_dd_cum==0] = np.nan #to avoid 0 division
         _stc[:, :, i] = np.sqrt(sumsq_dd_cum/n_dd_cum)
+
+    ### Strange but some adjacent pixels can have identical time series, 
+    ### resulting in 0 of stc. To avoid this, replace 0 with nan.
+    _stc[_stc==0] = np.nan
 
     ### Identify minimum value as final STC
     with warnings.catch_warnings(): ## To silence warning by All-Nan slice
