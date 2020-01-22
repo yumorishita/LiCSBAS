@@ -8,6 +8,8 @@ This script makes a mask for time series using several noise indices.
 =========
 Changelog
 =========
+v1.4 20200122 Yu Morishita, Uni of Leeds and GSI
+ - Remove close fig which can cause error
 v1.3 20191128 Yu Morishita, Uni of Leeds and GSI
  - Add noautoadjust option
 v1.2 20190918 Yu Morishita, Uni of Leeds and GSI
@@ -369,7 +371,7 @@ def main(argv=None):
     fig2.tight_layout()
     fig2.savefig(maskts2_png)
     
-    plt.close(fig=fig)
+#    plt.close(fig=fig)
 
     
     #%% Output vel.mskd and mask
