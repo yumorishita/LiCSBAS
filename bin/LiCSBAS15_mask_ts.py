@@ -8,6 +8,8 @@ This script makes a mask for time series using several noise indices.
 =========
 Changelog
 =========
+v1.5 20200123 Yu Morishita, Uni of Leeds and GSI
+ - Change default n_gap threshold for L-band to 1
 v1.4 20200122 Yu Morishita, Uni of Leeds and GSI
  - Remove close fig which can cause error
 v1.3 20191128 Yu Morishita, Uni of Leeds and GSI
@@ -65,7 +67,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-
  
  Default thresholds for L-band:
    C-band : -c 0.05 -u 1.5 -v 10 -T 1 -g 10 -s 5  -i 10 -l 5 -r 2
-   L-band : -c 0.01 -u 1   -v 20 -T 1 -g 10 -s 10 -i 10 -l 1 -r 10
+   L-band : -c 0.01 -u 1   -v 20 -T 1 -g 1  -s 10 -i 10 -l 1 -r 10
  
 """
 
@@ -202,13 +204,13 @@ def main(argv=None):
     
     #%% Determine default thretholds depending on frequency band
     if not 'maxTlen' in thre_dict: thre_dict['maxTlen'] = 1
-    if not 'n_gap' in thre_dict: thre_dict['n_gap'] = 10
     if not 'n_ifg_noloop' in thre_dict: thre_dict['n_ifg_noloop'] = 10
 
     if wavelength > 0.2: ## L-band
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.01
         if not 'n_unw_r' in thre_dict: thre_dict['n_unw_r'] = 1.0
         if not 'vstd' in thre_dict: thre_dict['vstd'] = 20
+        if not 'n_gap' in thre_dict: thre_dict['n_gap'] = 1
         if not 'stc' in thre_dict: thre_dict['stc'] = 10
         if not 'n_loop_err' in thre_dict: thre_dict['n_loop_err'] = 1
         if not 'resid_rms' in thre_dict: thre_dict['resid_rms'] = 10
@@ -216,6 +218,7 @@ def main(argv=None):
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.05
         if not 'n_unw_r' in thre_dict: thre_dict['n_unw_r'] = 1.5
         if not 'vstd' in thre_dict: thre_dict['vstd'] = 10
+        if not 'n_gap' in thre_dict: thre_dict['n_gap'] = 10
         if not 'stc' in thre_dict: thre_dict['stc'] = 5
         if not 'n_loop_err' in thre_dict: thre_dict['n_loop_err'] = 5
         if not 'resid_rms' in thre_dict: thre_dict['resid_rms'] = 2
