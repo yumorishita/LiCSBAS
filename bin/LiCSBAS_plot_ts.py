@@ -396,7 +396,9 @@ if __name__ == "__main__":
 
     #%% Plot figure of cumulative displacement and velocity
     figsize_x = 6 if length > width else 8
-    figsize = (figsize_x, (figsize_x-2)*length*aspect/width+1)
+    figsize_y = (figsize_x-2)*length*aspect/width+1
+    if figsize_y < 4: figsize_y = 4 
+    figsize = (figsize_x, figsize_y)
     pv = plt.figure('Velocity / Cumulative Displacement', figsize)
     axv = pv.add_axes([0.15,0.15,0.83,0.83])
     axt2 = pv.text(0.01, 0.99, 'Left-doubleclick:\n Plot time series\nRight-drag:\n Change ref area', fontsize=8, va='top')

@@ -650,6 +650,8 @@ def main(argv=None):
 #            print('{}'.format(ifgd))
     
     print('\n{0}/{1} ifgs are discarded from further processing.'.format(len(bad_ifg_all), n_ifg), flush=True)
+    for ifgd in bad_ifg_all:
+        print('{}'.format(ifgd), flush=True)
 
     ### Gap
     gap_infofile = os.path.join(infodir, '12network_gap_info.txt')

@@ -160,6 +160,7 @@ def main(argv=None):
     mlipar = os.path.join(ifgdir, 'slc.mli.par')
     width = int(io_lib.get_param_par(mlipar, 'range_samples'))
     length = int(io_lib.get_param_par(mlipar, 'azimuth_lines'))
+    print("\nSize         : {} x {}".format(width, length), flush=True)
 
     ### Copy dempar and mli[png|par]
     for file in ['slc.mli.par', 'EQA.dem_par']:
@@ -223,6 +224,7 @@ def main(argv=None):
 
     #%% Identify bad ifgs, link ras and output stats information
     bad_ifgdates = []
+    ixs_bad_ifgdates = []
 
     ### Header of stats file 
     ifg_statsfile = os.path.join(infodir, '11ifg_stats.txt')
@@ -247,6 +249,7 @@ def main(argv=None):
         ### Identify bad ifgs and link ras
         if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre:
             bad_ifgdates.append(ifgdates[i])
+            ixs_bad_ifgdates.append(i)
             rm_flag = '*'
             os.symlink(os.path.relpath(rasorg, bad_ifg_rasdir), os.path.join(bad_ifg_rasdir, rasname))
         else:
@@ -266,10 +269,13 @@ def main(argv=None):
     fstats.close()
 
     ### Output list of bad ifg            
+    print('\n{0}/{1} ifgs are discarded from further processing.'.format(len(bad_ifgdates), n_ifg))
+    print('ifg dates        unw_cov coh_av')
     bad_ifgfile = os.path.join(infodir, '11bad_ifg.txt')
     with open(bad_ifgfile, 'w') as f:
-        for i in bad_ifgdates:
-            print('{}'.format(i), file=f)
+        for i, ifgd in enumerate(bad_ifgdates):
+            print('{}'.format(ifgd), file=f)
+            print('{}  {:5.3f}  {:5.3f}'.format(ifgd, rate_cov[ixs_bad_ifgdates[i]],  coh_avg_ifg[ixs_bad_ifgdates[i]]), flush=True)
 
 
     #%% Identify removed image and output file
@@ -299,9 +305,7 @@ def main(argv=None):
 
 
     #%% Finish
-    print('\n{0}/{1} ifgs are discarded from further processing.\n'.format(len(bad_ifgdates), n_ifg))
-
-    print('Check network/*, 11bad_ifg_ras/* and 11ifg_ras/* in TS dir.')
+    print('\nCheck network/*, 11bad_ifg_ras/* and 11ifg_ras/* in TS dir.')
     print('If you want to change the bad ifgs to be discarded, re-run with different thresholds or edit bad_ifg11.txt before next step.')
 
     elapsed_time = time.time()-start

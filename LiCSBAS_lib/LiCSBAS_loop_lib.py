@@ -129,9 +129,11 @@ def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_png
     if length > width:
         figsize_y = 10
         figsize_x = int((figsize_y-1)*width/length)
+        if figsize_x < 5: figsize_x = 5
     else:
         figsize_x = 10
         figsize_y = int(figsize_x*length/width+1)
+        if figsize_y < 3: figsize_y = 3
                 
     ### Plot
     fig = plt.figure(figsize = (figsize_x, figsize_y))

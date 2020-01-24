@@ -24,7 +24,7 @@ GEOCmldir="GEOCml${nlook}"	# If start from 11 or later after doing 03-05, use e.
 check_only="n" # y/n. If y, not run scripts and just show commands to be done
 
 logdir="log"
-log="$logdir/$(date +%Y%m%d%H%M)batch_LiCSBAS_${start_step}_${end_step}.log"
+log="$logdir/$(date +%Y%m%d%H%M)$(basename $0 .sh)_${start_step}_${end_step}.log"
 
 ### Optional steps (03-05) ###
 do03op_GACOS="n"	# y/n
@@ -42,7 +42,7 @@ p11_coh_thre=""	# default: 0.1
 p12_loop_thre=""	# default: 1.5 rad
 p15_coh_thre=""	# default: 0.05
 p15_n_unw_r_thre=""	# default: 1.5
-p15_vstd_thre=""	# default: 10 mm/yr
+p15_vstd_thre=""	# default: 100 mm/yr
 p15_maxTlen_thre=""	# default: 1 yr
 p15_n_gap_thre=""	# default: 10
 p15_stc_thre=""	# default: 5 mm
