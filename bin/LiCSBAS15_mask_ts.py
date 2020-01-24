@@ -8,6 +8,8 @@ This script makes a mask for time series using several noise indices.
 =========
 Changelog
 =========
+v1.6 20200124 Yu Morishita, Uni of Leeds and GSI
+ - Increase default vstd threshold because vstd is not useful
 v1.5 20200123 Yu Morishita, Uni of Leeds and GSI
  - Change default n_gap threshold for L-band to 1
 v1.4 20200122 Yu Morishita, Uni of Leeds and GSI
@@ -66,8 +68,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-
                  (Default: do auto adjust)
  
  Default thresholds for L-band:
-   C-band : -c 0.05 -u 1.5 -v 10 -T 1 -g 10 -s 5  -i 10 -l 5 -r 2
-   L-band : -c 0.01 -u 1   -v 20 -T 1 -g 1  -s 10 -i 10 -l 1 -r 10
+   C-band : -c 0.05 -u 1.5 -v 100 -T 1 -g 10 -s 5  -i 10 -l 5 -r 2
+   L-band : -c 0.01 -u 1   -v 200 -T 1 -g 1  -s 10 -i 10 -l 1 -r 10
  
 """
 
@@ -88,6 +90,7 @@ with warnings.catch_warnings(): ## To silence user warning
     warnings.simplefilter('ignore', UserWarning)
     matplotlib.use('Agg')
 from matplotlib import pyplot as plt
+plt.rcParams['axes.titlesize'] = 10
 
 class Usage(Exception):
     """Usage context manager"""
@@ -209,7 +212,7 @@ def main(argv=None):
     if wavelength > 0.2: ## L-band
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.01
         if not 'n_unw_r' in thre_dict: thre_dict['n_unw_r'] = 1.0
-        if not 'vstd' in thre_dict: thre_dict['vstd'] = 20
+        if not 'vstd' in thre_dict: thre_dict['vstd'] = 200
         if not 'n_gap' in thre_dict: thre_dict['n_gap'] = 1
         if not 'stc' in thre_dict: thre_dict['stc'] = 10
         if not 'n_loop_err' in thre_dict: thre_dict['n_loop_err'] = 1
@@ -217,7 +220,7 @@ def main(argv=None):
     if wavelength < 0.2: ## C-band
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.05
         if not 'n_unw_r' in thre_dict: thre_dict['n_unw_r'] = 1.5
-        if not 'vstd' in thre_dict: thre_dict['vstd'] = 10
+        if not 'vstd' in thre_dict: thre_dict['vstd'] = 100
         if not 'n_gap' in thre_dict: thre_dict['n_gap'] = 10
         if not 'stc' in thre_dict: thre_dict['stc'] = 5
         if not 'n_loop_err' in thre_dict: thre_dict['n_loop_err'] = 5
@@ -325,6 +328,7 @@ def main(argv=None):
     if length > width:
         figsize_y = 9
         figsize_x = int(figsize_y*4/3*width/length+2)
+        if figsize_x < 6: figsize_x = 6
     else:
         figsize_x = 12
         figsize_y = int((figsize_x)/4*3*length/width)
