@@ -27,7 +27,7 @@ See the [**wiki**](https://github.com/yumorishita/LiCSBAS/wiki) pages and [quick
 
 ## Citation
 
-Morishita, Y.; Lazecky, M.; Wright, T.J.; Weiss, J.R.; Elliott, J.; Hooper, A. LiCSBAS: An open-source InSAR time series analysis package integrated with the LiCSAR automated Sentinel-1 InSAR processor. submitted.
+Morishita, Y.; Lazecky, M.; Wright, T.J.; Weiss, J.R.; Elliott, J.R.; Hooper, A. LiCSBAS: An Open-Source InSAR Time Series Analysis Package Integrated with the LiCSAR Automated Sentinel-1 InSAR Processor. *Remote Sens.* **2020**, *12*, 424, https://doi.org/10.3390/RS12030424.
 
 ## Acknowledgements
 
