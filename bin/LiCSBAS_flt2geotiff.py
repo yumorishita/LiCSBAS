@@ -8,6 +8,8 @@ This script makes a GeoTIFF file from an image file (only in float format). The 
 =========
 Changelog
 =========
+v1.2 20200130 Yu Morishita, Uni of Leeds and GSI
+ - Add compress option with DEFLATE for gdal
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
  - Original implementationf
 
@@ -55,6 +57,9 @@ def main(argv=None):
     dempar = []
     outfile = []
     endian = 'little'
+
+    compress_option = ['COMPRESS=DEFLATE', 'PREDICTOR=3']
+    ## ['COMPRESS=LZW', 'PREDICTOR=3'], ['COMPRESS=PACKBITS']
 
     #%% Read options
     try:
@@ -146,7 +151,7 @@ def main(argv=None):
         data = io_lib.read_img(infile, length, width, endian=endian)
     
         driver = gdal.GetDriverByName('GTiff')
-        outRaster = driver.Create(outfile, width, length, 1, gdal.GDT_Float32)
+        outRaster = driver.Create(outfile, width, length, 1, gdal.GDT_Float32, options=compress_option)
         outRaster.SetGeoTransform((lon_w_p, dlon, 0, lat_n_p, 0, dlat))
         outband = outRaster.GetRasterBand(1)
         outband.WriteArray(data)
