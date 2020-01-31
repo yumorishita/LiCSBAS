@@ -282,6 +282,8 @@ def main(argv=None):
             cum_filt[i, :, :] = cum[i, :, :] ## No spatial
         else:
             with warnings.catch_warnings(): ## To silence warning
+                if i ==0: cum_hpt = cum_hpt+sys.float_info.epsilon ##To distinguish from 0 of filtered nodata
+
 #                warnings.simplefilter('ignore', FutureWarning)
                 warnings.simplefilter('ignore', RuntimeWarning)
                 kernel = Gaussian2DKernel(x_stddev, y_stddev)
