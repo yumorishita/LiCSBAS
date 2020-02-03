@@ -8,6 +8,8 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
+v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
+ - Immediate update of image and ts plot when change ref or mask
 v1.4 20191213 Yu Morishita, Uni of Leeds and GSI
  - Bag fix for deramp_flag
 v1.3 20191120 Yu Morishita, Uni of Leeds and GSI
@@ -347,7 +349,7 @@ if __name__ == "__main__":
 
 
     #%% Read noise indecies
-    mapdict_ind = {}
+    mapdict_data = {}
     mapdict_unit = {}
     names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid', 'mli', 'hgt']
     units = ['', '', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm', '', 'm']
@@ -356,7 +358,7 @@ if __name__ == "__main__":
     for i, name in enumerate(names):
         try:
             data = io_lib.read_img(files[i], length, width)
-            mapdict_ind[name] = data
+            mapdict_data[name] = data
             mapdict_unit[name] = units[i]
             print('Reading {}'.format(os.path.basename(files[i])))
         except:
@@ -415,11 +417,15 @@ if __name__ == "__main__":
     cbr = pv.colorbar(cax, orientation='vertical')
     cbr.set_label('mm/yr')
 
+    cum_disp_flag = False
+
 
     #%% Set ref function
     def line_select_callback(eclick, erelease):
         global refx1, refx2, refy1, refy2, dmin, dmax
-        ## global cannot cahnge existing values... why?
+        ## global cannot change existing values... why?
+
+        refx1p, refx2p, refy1p, refy2p = refx1, refx2, refy1, refy2 ## Previous 
         
         x1, y1 = eclick.xdata, eclick.ydata
         x2, y2 = erelease.xdata, erelease.ydata
@@ -427,6 +433,12 @@ if __name__ == "__main__":
         elif x1 > x2: refx1, refx2 = [int(np.round(x1)), int(np.round(x2))]
         if y1 <= y2: refy1, refy2 = [int(np.round(y1)), int(np.round(y2))]
         elif y1 > y2: refy1, refy2 = [int(np.round(y1)), int(np.round(y2))]
+
+        if np.all(np.isnan(mask[refy1:refy2, refx1:refx2])): ## All nan
+            print('Selected ref {}:{}/{}:{} has all nan!! Reselect different ref area.'.format(refx1, refx2, refy1, refy2))
+            refx1, refx2, refy1, refy2 = refx1p, refx2p, refy1p, refy2p ## Get back
+            return  ## No change
+
         refx1h = refx1-0.5; refx2h = refx2-0.5 ## Shift half for plot
         refy1h = refy1-0.5; refy2h = refy2-0.5
         
@@ -441,6 +453,17 @@ if __name__ == "__main__":
             dmin = dmin_auto - refvalue_lastcum
             dmax = dmax_auto - refvalue_lastcum
     
+        ### Update draw
+        if not cum_disp_flag:  ## vel or noise indice
+            val_selected = radio_vel.value_selected
+            val_ind = list(mapdict_data.keys()).index(val_selected)
+            radio_vel.set_active(val_ind)
+        else:  ## cumulative displacement
+            time_selected = tslider.val
+            tslider.set_val(time_selected)
+    
+        if lastevent:  ## Time series plot
+            printcoords(lastevent)
     
     RS = RectangleSelector(axv, line_select_callback, drawtype='box', useblit=True, button=[3], spancoords='pixels', interactive=False)
 
@@ -449,7 +472,7 @@ if __name__ == "__main__":
 
     #%% Check box for mask ON/OFF
     if maskflag:
-        axbox = pv.add_axes([0.01, 0.55, 0.1, 0.08])
+        axbox = pv.add_axes([0.01, 0.25, 0.1, 0.08])
         visibility = True
         check = CheckButtons(axbox, ['mask', ], [visibility, ])
         
@@ -462,74 +485,73 @@ if __name__ == "__main__":
             else:
                 mask = mask_vel
                 visibility = True
-        
+
+            ### Update draw
+            val_selected = radio_vel.value_selected
+            val_ind = list(mapdict_data.keys()).index(val_selected)
+            radio_vel.set_active(val_ind)
+
         check.on_clicked(func)
     
 
     #%% Radio buttom for velocity selection
-    axrad_vel = pv.add_axes([0.01, 0.65, 0.1, 0.1])
-    
+    ## Add vel to mapdict
     if cumfile2:
-        radio_vel = RadioButtons(axrad_vel, ('vel(1)', 'vel(2)'))
         mapdict_vel = {'vel(1)': vel, 'vel(2)': vel2}
+        mapdict_unit.update([('vel(1)', 'mm/yr'), ('vel(2)', 'mm/yr')])
     else:
-        radio_vel = RadioButtons(axrad_vel, ('vel', ))
         mapdict_vel = {'vel': vel}
+        mapdict_unit.update([('vel', 'mm/yr')])
+
+    mapdict_vel.update(mapdict_data)
+    mapdict_data = mapdict_vel  ## To move vel to top
+    axrad_vel = pv.add_axes([0.01, 0.4, 0.13, len(mapdict_data)*0.025+0.04])
     
-    def show_vel(val):
-        global vmin, vmax
-        data = mapdict_vel[val]*mask
-        data = data-np.nanmean(data[refy1:refy2, refx1:refx2])
+    ### Radio buttons        
+    radio_vel = RadioButtons(axrad_vel, tuple(mapdict_data.keys()))
+    for label in radio_vel.labels:
+        label.set_fontsize(8)
+    
+    def show_vel(val_ind):
+        global vmin, vmax, cum_disp_flag
+        cum_disp_flag = False
+
+        if 'vel' in val_ind:  ## Velocity
+            data = mapdict_data[val_ind]*mask
+            data = data-np.nanmean(data[refy1:refy2, refx1:refx2])
+            if vlimauto: ## auto
+                vmin = np.nanpercentile(data*mask, 100-auto_crange)
+                vmax = np.nanpercentile(data*mask, auto_crange)
+            cax.set_cmap(cmap)
+            cax.set_clim(vmin, vmax)
+            cbr.set_label('mm/yr')
+                
+        elif val_ind == 'mask': 
+            data = mapdict_data[val_ind]
+            cax.set_cmap('viridis_r')
+            cax.set_clim(0, 1)
+            cbr.set_label('')
+            
+        else:  ## Other noise indices
+            data = mapdict_data[val_ind]*mask
+            cmin_ind = np.nanpercentile(data*mask, 100-auto_crange)
+            cmax_ind = np.nanpercentile(data*mask, auto_crange)
+            if val_ind=='hgt': cmin_ind = -cmax_ind/3 ## bnecause 1/4 of terrain is blue
+            cmap2 = 'viridis_r'
+            if val_ind in ['coh_avg', 'n_unw', 'mask', 'maxTlen']:
+                cmap2 = 'viridis'
+            elif val_ind=='mli': cmap2 = 'gray'
+            elif val_ind=='hgt': cmap2 = 'terrain'
+            cax.set_cmap(cmap2)
+            cax.set_clim(cmin_ind, cmax_ind)
         
-        if vlimauto: ## auto
-            vmin = np.nanpercentile(data*mask, 100-auto_crange)
-            vmax = np.nanpercentile(data*mask, auto_crange)
-        
+        cbr.set_label(mapdict_unit[val_ind])
         cax.set_data(data)
-        cax.set_cmap(cmap)
-        cax.set_clim(vmin, vmax)
-        axv.set_title(val)
-        cbr.set_label('mm/yr')
+        axv.set_title(val_ind)
+
         pv.canvas.draw()
         
     radio_vel.on_clicked(show_vel)
-
-
-    #%% Radio buttom for noise indecies
-    if mapdict_ind: ## at least 1 indecies
-        axrad_ind = pv.add_axes([0.01, 0.15, 0.13, len(mapdict_ind)*0.025+0.04])
-        radio_ind = RadioButtons(axrad_ind, tuple(mapdict_ind.keys()))
-        
-        for label in radio_ind.labels:
-            label.set_fontsize(8)
-        
-        def show_indices(val):
-            if val == 'mask': 
-                data = mapdict_ind[val]
-                cmin_ind = 0; cmax_ind = 1
-            else:
-                data = mapdict_ind[val]*mask
-                cmin_ind = np.nanpercentile(data*mask, 100-auto_crange)
-                cmax_ind = np.nanpercentile(data*mask, auto_crange)
-                if val=='hgt': cmin_ind = -cmax_ind/3 ## bnecause 1/4 of terrain is blue
-
-            cax.set_data(data)
-            axv.set_title(val)
-            cbr.set_label(mapdict_unit[val])
-
-            cmap = 'viridis_r'
-            if val in ['coh_avg', 'n_unw', 'mask', 'maxTlen']: cmap = 'viridis'
-            elif val=='mli': cmap = 'gray'
-            elif val=='hgt': cmap = 'terrain'
-            cax.set_cmap(cmap)
-
-            ### auto clim by None does not work...
-#            cax.set_clim(None, None)
-            cax.set_clim(cmin_ind, cmax_ind)
-            
-            pv.canvas.draw()
-            
-        radio_ind.on_clicked(show_indices)
 
 
     #%% Slider for cumulative displacement
@@ -538,7 +560,6 @@ if __name__ == "__main__":
     tslider.ax.bar(imdates_ordinal, np.ones(len(imdates_ordinal)), facecolor='black', width=4)
 
     tslider.ax.bar(imdates_ordinal[ix_m], 1, facecolor='red', width=8)
-
 
     loc_tslider =  tslider.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     try: # Only support from Matplotlib 3.1!
@@ -552,6 +573,7 @@ if __name__ == "__main__":
     dstr_ref = imdates_dt[ix_m].strftime('%Y/%m/%d')
     ### Slide bar action
     def tim_slidupdate(val):
+        global cum_disp_flag
         timein = tslider.val
         timenearest = np.argmin(np.abs(mdates.date2num(imdates_dt)-timein))
         dstr = imdates_dt[timenearest].strftime('%Y/%m/%d')
@@ -564,6 +586,8 @@ if __name__ == "__main__":
         cax.set_cmap(cmap)
         cax.set_clim(dmin, dmax)
         cbr.set_label('mm')
+        cum_disp_flag = True
+
         pv.canvas.draw()
 
 
@@ -615,15 +639,18 @@ if __name__ == "__main__":
     pax2, = axv.plot([0], [0], 'Pk')
     
     ### Plot time series at clicked point
+    lastevent = []
     def printcoords(event):
-        global dph, lines1, lines2
+        global dph, lines1, lines2, lastevent
         #outputting x and y coords to console
         if event.inaxes != axv:
             return
-        if event.button != 1: ## Only left click
+        elif event.button != 1: ## Only left click
             return
-        if not event.dblclick: ## Only double click
+        elif not event.dblclick: ## Only double click
             return
+        else:
+            lastevent = event
 
         ii = np.int(np.round(event.ydata))
         jj = np.int(np.round(event.xdata))
@@ -643,14 +670,15 @@ if __name__ == "__main__":
 
         ### Get values of noise indices
         noisetxt = ''
-        if mapdict_ind and ~np.isnan(mask[ii, jj]): ## at least 1 indecies
-            for key in mapdict_ind:
-                val = mapdict_ind[key][ii, jj]
-                unit = mapdict_unit[key]
-                if key.startswith('n_') or key=='mask':
-                    noisetxt = noisetxt+'{}: {:d} {}\n'.format(key, int(val), unit)
-                else:
-                    noisetxt = noisetxt+'{}: {:.2f} {}\n'.format(key, val, unit)
+        for key in mapdict_data:
+            val = mapdict_data[key][ii, jj]
+            unit = mapdict_unit[key]
+            if key.startswith('vel'): ## Not plot here
+                continue
+            elif key.startswith('n_') or key=='mask':
+                noisetxt = noisetxt+'{}: {:d} {}\n'.format(key, int(val), unit)
+            else:
+                noisetxt = noisetxt+'{}: {:.2f} {}\n'.format(key, val, unit)
 
         ### Get lat lon and show Ref info at side 
         if geocod_flag:
@@ -658,7 +686,6 @@ if __name__ == "__main__":
             axtref.set_text('Lat:{:.5f}\nLon:{:.5f}\n\nRef area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}\n\n{}'.format(lat, lon, refx1, refx2, refy1, refy2, imdates[ix_m], noisetxt))
         else: 
             axtref.set_text('Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]))
-
 
         ### If masked
         if np.isnan(mask[ii, jj]):
