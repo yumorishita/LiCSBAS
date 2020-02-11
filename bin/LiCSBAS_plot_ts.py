@@ -8,6 +8,8 @@ This script displays the velocity, cumulative displacement, and noise indices, a
 =========
 Changelog
 =========
+v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
+ - Adjust figure size and ax location
 v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
  - Immediate update of image and ts plot when change ref or mask
 v1.4 20191213 Yu Morishita, Uni of Leeds and GSI
@@ -397,9 +399,9 @@ if __name__ == "__main__":
 
 
     #%% Plot figure of cumulative displacement and velocity
-    figsize_x = 6 if length > width else 8
+    figsize_x = 6 if length > width else 9
     figsize_y = (figsize_x-2)*length*aspect/width+1
-    if figsize_y < 4: figsize_y = 4 
+    if figsize_y < 5: figsize_y = 5 
     figsize = (figsize_x, figsize_y)
     pv = plt.figure('Velocity / Cumulative Displacement', figsize)
     axv = pv.add_axes([0.15,0.15,0.83,0.83])
@@ -472,7 +474,7 @@ if __name__ == "__main__":
 
     #%% Check box for mask ON/OFF
     if maskflag:
-        axbox = pv.add_axes([0.01, 0.25, 0.1, 0.08])
+        axbox = pv.add_axes([0.01, 0.2, 0.1, 0.08])
         visibility = True
         check = CheckButtons(axbox, ['mask', ], [visibility, ])
         
@@ -505,7 +507,7 @@ if __name__ == "__main__":
 
     mapdict_vel.update(mapdict_data)
     mapdict_data = mapdict_vel  ## To move vel to top
-    axrad_vel = pv.add_axes([0.01, 0.4, 0.13, len(mapdict_data)*0.025+0.04])
+    axrad_vel = pv.add_axes([0.01, 0.3, 0.13, len(mapdict_data)*0.025+0.04])
     
     ### Radio buttons        
     radio_vel = RadioButtons(axrad_vel, tuple(mapdict_data.keys()))
