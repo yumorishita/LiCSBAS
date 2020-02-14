@@ -5,15 +5,7 @@ Overview
 ========
 This script displays an image file (only in float format).
 
-=========
-Changelog
-=========
-v1.2 20191025 Yu Morishita, Uni of Leeds and GSI
- - Add --kmz option
-v1.1 20190828 Yu Morishita, Uni of Leeds and GSI
- - Add --png option
-v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
+v1.3 20200212 Yu Morishita, Uni of Leeds and GSI
 
 =====
 Usage
@@ -35,6 +27,18 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--
  --kmz          Save kmz (need EQA.dem_par for -p option)
 
 """
+
+#%% Change log
+'''
+v1.3 20200212 Yu Morishita, Uni of Leeds and GSI
+ - Not display image with --kmz option
+v1.2 20191025 Yu Morishita, Uni of Leeds and GSI
+ - Add --kmz option
+v1.1 20190828 Yu Morishita, Uni of Leeds and GSI
+ - Add --png option
+v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 
 #%% Import
@@ -75,6 +79,10 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile):
 ## Not use def main to use global valuables
 if __name__ == "__main__":
     argv = sys.argv
+
+    ver=1.3; date=20200212; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
+    print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     #%% Set default
     infile = []
@@ -213,6 +221,8 @@ if __name__ == "__main__":
         
         os.remove(pngnametmp)
         print('\nOutput: {}\n'.format(kmzname))
+        
+        sys.exit(0)
 
 
     #%% Plot figure
