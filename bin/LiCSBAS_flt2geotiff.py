@@ -3,29 +3,33 @@
 ========
 Overview
 ========
-This script makes a GeoTIFF file from an image file (only in float format). The geotiff file can be read by a GIS software (e.g., QGIS) and used to make a figure. NaN will be relaced with 0 as a default. 0 will be regarded as NoDataValue.
+This script makes a GeoTIFF file from an image file (only in float format). The geotiff file can be read by a GIS software (e.g., QGIS) and used to make a figure. Nan will be regarded as NoDataValue as default. 0 can be replaced with nan.
 Note: gdal must be installed.
 
-v1.3 20200211 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
 
 =====
 Usage
 =====
-LiCSBAS_flt2geotiff.py -i infile -p dempar [-o outfile] [--keep_nan] [--zero2nan] [--a_nodata nodata_value] [--bigendian]
+LiCSBAS_flt2geotiff.py -i infile -p dempar [-o outfile] [--zero2nan] [--nan2zero] [--a_nodata nodata_value] [--bigendian]
 
  -i  Path to input file (float, little endian)
  -p  Path to dem parameter file (EQA.dem_par)
  -o  Output geotiff file (Default: infile[.geo].tif)
- --a_nodata   Assign a specified nodata value in output (Default: 0)
+ --a_nodata   Assign a specified nodata value in output (Default: nan)
               "None" assigns no value as nodata
- --keep_nan   Don't replace nan with 0 (Default: replace nan with 0)
  --zero2nan   Replace 0 with nan (Default: NOT replace 0 with nan)
+ --nan2zero   Replace nan with 0 (Default: NOT replace nan with 0)
  --bigendian  If input file is in big endian
 
 """
+## Hidden option: --gamma
 
 #%% Change log
 '''
+v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
+ - Change Default nodata to nan
+ - Remove --keep_nan and add --nan2zero
 v1.3 20200211 Yu Morishita, Uni of Leeds and GSI
  - Add --keep_nan, --zero2nan, and --nodata options
  - Change default to replace nan with 0.
@@ -60,7 +64,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200211; author="Y. Morishita"
+    ver=1.4; date=20200214; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -68,9 +72,9 @@ def main(argv=None):
     infile = []
     dempar = []
     outfile = []
-    nodata = 0
+    nodata = np.nan
     endian = 'little'
-    keep_nan_flag = False
+    nan2zero_flag = False
     zero2nan_flag = False
     gamma_flag = False
 
@@ -80,7 +84,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:p:o:", ["help", "a_nodata=", "keep_nan", "zero2nan", "bigendian", "gamma"])
+            opts, args = getopt.getopt(argv[1:], "hi:p:o:", ["help", "a_nodata=", "nan2zero", "zero2nan", "bigendian", "gamma"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -100,13 +104,13 @@ def main(argv=None):
                     nodata = None
                 else:
                     nodata = float(a)
-            elif o == '--keep_nan':
-                keep_nan_flag = True
+            elif o == '--nan2zero':
+                nan2zero_flag = True
             elif o == '--zero2nan':
                 zero2nan_flag = True
             elif o == '--bigendian':
                 endian = 'big'
-            elif o == '--gamma':
+            elif o == '--gamma': ## hidden option
                 gamma_flag = True
 
         if not infile:
@@ -117,6 +121,8 @@ def main(argv=None):
             raise Usage('No dempar file given, -p is not optional!')
         elif not os.path.exists(dempar):
             raise Usage('No {} exists!'.format(dempar))
+        if nan2zero_flag and zero2nan_flag:
+            raise Usage("Don't use both --zero2nan and --nan2zero!")
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -181,10 +187,10 @@ def main(argv=None):
                 
         data = io_lib.read_img(infile, length, width, endian=endian)
 
-        if not keep_nan_flag: ### Replace nan with 0
-            data[np.isnan(data)] = 0
         if zero2nan_flag: ### Replace 0 with nan
             data[data==0] = np.nan
+        if nan2zero_flag: ### Replace nan with 0
+            data[np.isnan(data)] = 0
     
         driver = gdal.GetDriverByName('GTiff')
         outRaster = driver.Create(outfile, width, length, 1, gdal.GDT_Float32, options=compress_option)
