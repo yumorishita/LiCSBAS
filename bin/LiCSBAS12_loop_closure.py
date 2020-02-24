@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -56,6 +56,8 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
 """
 #%% Change log
 '''
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Not output network pdf
 v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
  - Add iteration during ref search when no ref found
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -611,13 +613,13 @@ def main(argv=None):
         bperp = np.random.random(n_im).tolist()
 
     pngfile = os.path.join(netdir, 'network12_all.png')
-    plot_lib.plot_network(ifgdates, bperp, [], pngfile, pdf=True)
+    plot_lib.plot_network(ifgdates, bperp, [], pngfile)
 
     pngfile = os.path.join(netdir, 'network12.png')
-    plot_lib.plot_network(ifgdates, bperp, bad_ifg_all, pngfile, pdf=True)
+    plot_lib.plot_network(ifgdates, bperp, bad_ifg_all, pngfile)
 
     pngfile = os.path.join(netdir, 'network12_nobad.png')
-    plot_lib.plot_network(ifgdates, bperp, bad_ifg_all, pngfile, plot_bad=False, pdf=True)
+    plot_lib.plot_network(ifgdates, bperp, bad_ifg_all, pngfile, plot_bad=False)
 
     ### Network info
     ## Identify gaps

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -66,6 +66,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg inv_alg] [--mem_size mem_si
 """
 #%% Change log
 '''
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Not output network pdf
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum.h5 if exists before creation
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -318,13 +320,13 @@ def main(argv=None):
         bperp = np.random.random(n_im).tolist()
         
     pngfile = os.path.join(netdir, 'network13_all.png')
-    plot_lib.plot_network(ifgdates_all, bperp_all, [], pngfile, pdf=True)
+    plot_lib.plot_network(ifgdates_all, bperp_all, [], pngfile)
 
     pngfile = os.path.join(netdir, 'network13.png')
-    plot_lib.plot_network(ifgdates_all, bperp_all, bad_ifg_all, pngfile, pdf=True)
+    plot_lib.plot_network(ifgdates_all, bperp_all, bad_ifg_all, pngfile)
 
     pngfile = os.path.join(netdir, 'network13_nobad.png')
-    plot_lib.plot_network(ifgdates_all, bperp_all, bad_ifg_all, pngfile, plot_bad=False, pdf=True)
+    plot_lib.plot_network(ifgdates_all, bperp_all, bad_ifg_all, pngfile, plot_bad=False)
 
 
     #%% Get patch row number

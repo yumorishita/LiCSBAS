@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -44,6 +44,8 @@ LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
 """
 #%% Change log
 '''
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Not output network pdf
 v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
  - Add hgt
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
@@ -297,13 +299,13 @@ def main(argv=None):
 
     #%% Plot network
     pngfile = os.path.join(netdir, 'network11_all.png')
-    plot_lib.plot_network(ifgdates, bperp, [], pngfile, pdf=True)
+    plot_lib.plot_network(ifgdates, bperp, [], pngfile)
 
     pngfile = os.path.join(netdir, 'network11.png')
-    plot_lib.plot_network(ifgdates, bperp, bad_ifgdates, pngfile, pdf=True)
+    plot_lib.plot_network(ifgdates, bperp, bad_ifgdates, pngfile)
 
     pngfile = os.path.join(netdir, 'network11_nobad.png')
-    plot_lib.plot_network(ifgdates, bperp, bad_ifgdates, pngfile, plot_bad=False, pdf=True)
+    plot_lib.plot_network(ifgdates, bperp, bad_ifgdates, pngfile, plot_bad=False)
 
 
     #%% Finish
