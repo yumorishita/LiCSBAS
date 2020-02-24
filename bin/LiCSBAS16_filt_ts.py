@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -40,6 +40,8 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--n
 """
 #%% Change log
 '''
+v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Divide 16filt dir to 16filt_increment and 16filt_cum
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum_filt.h5 if exists before creation
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
@@ -77,7 +79,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20190829; author="Y. Morishita"
+    ver=1.2; date=20200224; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -146,8 +148,10 @@ def main(argv=None):
     elif wavelength <= 0.2: ## C-band
         cycle = 3 # 3*2pi/cycle for comparison png
 
-    filtdir = os.path.join(tsadir, '16filt')
-    if not os.path.exists(filtdir): os.mkdir(filtdir)
+    filtincdir = os.path.join(tsadir, '16filt_increment')
+    if not os.path.exists(filtincdir): os.mkdir(filtincdir)
+    filtcumdir = os.path.join(tsadir, '16filt_cum')
+    if not os.path.exists(filtcumdir): os.mkdir(filtcumdir)
     
     cumffile = os.path.join(tsadir, 'cum_filt.h5')
 
@@ -215,7 +219,9 @@ def main(argv=None):
     if not deg_ramp:
         cum = cum_org[()]
         ## Remove past *_deramp.png if exist
-        for png in glob.glob(os.path.join(filtdir, '*_deramp.png')):
+        for png in glob.glob(os.path.join(filtincdir, '*_deramp.png')):
+            os.remove(png)
+        for png in glob.glob(os.path.join(filtcumdir, '*_deramp.png')):
             os.remove(png)
         
     else:
@@ -232,14 +238,14 @@ def main(argv=None):
             ## Output comparison image of deramp
             data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum_org[i, :, :]*mask, ramp, cum[i, :, :]*mask]]
             title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{}, {}pi/cycle)'.format(deg_ramp, cycle*2), 'After deramp ({}pi/cycle)'.format(cycle*2)]
-            pngfile = os.path.join(filtdir, imdates[i]+'_deramp.png')
+            pngfile = os.path.join(filtcumdir, imdates[i]+'_deramp.png')
             plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
             ## Output comparison image of deramp for increment
             if i != 0:
                 data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [(cum_org[i, :, :]-cum_org[i-1, :, :])*mask, ramp-ramp1, (cum[i, :, :]-cum[i-1, :, :])*mask]]
                 title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{}, {}pi/cycle)'.format(deg_ramp, cycle*2), 'After deramp ({}pi/cycle)'.format(cycle*2)]
-                pngfile = os.path.join(filtdir, '{}_{}_deramp.png'.format(imdates[i-1], imdates[i]))
+                pngfile = os.path.join(filtincdir, '{}_{}_deramp.png'.format(imdates[i-1], imdates[i]))
                 plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
             ramp1 = ramp.copy() ## backup last ramp        
@@ -298,15 +304,14 @@ def main(argv=None):
         #%% Output comparison image
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum[i, :, :]*mask, cum_hptlps, cum_filt[i, :, :]*mask]]
         title3 = ['Before filter ({}pi/cycle)'.format(cycle*2), 'Filter phase ({}pi/cycle)'.format(cycle*2), 'After filter ({}pi/cycle)'.format(cycle*2)]
-        pngfile = os.path.join(filtdir, imdates[i]+'_filt.png')
+        pngfile = os.path.join(filtcumdir, imdates[i]+'_filt.png')
         plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
         
         ### Output comparison image for increment
         if i != 0:
             data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [(cum[i, :, :]-cum[i-1, :, :])*mask, cum_hptlps-cum_hptlps1, (cum_filt[i, :, :]-cum_filt[i-1, :, :])*mask]]
             title3 = ['Before filter ({}pi/cycle)'.format(cycle*2), 'Filter phase ({}pi/cycle)'.format(cycle*2), 'After filter ({}pi/cycle)'.format(cycle*2)]
-            pngfile = os.path.join(filtdir, imdates[i]+'_filt.png')
-            pngfile = os.path.join(filtdir, '{}_{}_filt.png'.format(imdates[i-1], imdates[i]))
+            pngfile = os.path.join(filtincdir, '{}_{}_filt.png'.format(imdates[i-1], imdates[i]))
             plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
         cum_hptlps1 = cum_hptlps.copy() ## backup last filt phase
