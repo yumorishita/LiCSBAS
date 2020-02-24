@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200212 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -10,18 +10,19 @@ This script displays an image file (only in float format).
 =====
 Usage
 =====
-LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--cmax None] [--auto_crange 99]  [--cycle 3] [--bigendian] [--png pngname] [--kmz kmzname]
+LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax float] [--auto_crange float]  [--cycle float] [--bigendian] [--png pngname] [--kmz kmzname]
 
  -i  Input image file in float32
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
- -c  Colormap (see below for available colormap)
-     - https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
+ -c  Colormap name (see below for available colormap)
+     - https://matplotlib.org/tutorials/colors/colormaps.html
      - http://www.fabiocrameri.ch/colourmaps.php
      - insar
-     (Default: SCM5.roma_r, reverse of SCM5.roma)
- --cmin|cmax    Min|max values of color (Default: auto)
- --auto_crange  % of color range used for automatic determinatin (Default: 99%)
- --cycle        Value*2pi/cycle if cmap=insar (Default: 3*2pi/cycle)
+     (Default: SCM.roma_r, reverse of SCM.roma)
+ --cmin|cmax    Min|max values of color (Default: None (auto))
+ --auto_crange  % of color range used for automatic determinatin (Default: 99)
+ --cycle        Value*2pi/cycle only if cyclic cmap (i.e., insar or SCM.*O*)
+                (Default: 3 (6pi/cycle))
  --bigendian    If input file is in big endian
  --png          Save png (pdf etc also available) instead of displaying
  --kmz          Save kmz (need EQA.dem_par for -p option)
@@ -30,6 +31,8 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c SCM5.roma_r] [--cmin None] [--
 
 #%% Change log
 '''
+v1.4 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Use SCM instead of SCM5
 v1.3 20200212 Yu Morishita, Uni of Leeds and GSI
  - Not display image with --kmz option
 v1.2 20191025 Yu Morishita, Uni of Leeds and GSI
@@ -48,7 +51,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import subprocess as subp
-import SCM5
+import SCM
 import zipfile
 
 import LiCSBAS_tools_lib as tools_lib
@@ -80,18 +83,18 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.3; date=20200212; author="Y. Morishita"
+    ver=1.4; date=20200224; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     #%% Set default
     infile = []
     parfile = []
-    cmap = "SCM5.roma_r"
+    cmap_name = "SCM.roma_r"
     cmin = None
     cmax = None
-    auto_crange = 99
-    cycle = 3
+    auto_crange = 99.0
+    cycle = 3.0
     endian = 'little'
     pngname = []
     kmzname = []
@@ -111,7 +114,7 @@ if __name__ == "__main__":
             elif o == '-p':
                 parfile = a
             elif o == '-c':
-                cmap = a
+                cmap_name = a
             elif o == '--cmin':
                 cmin = float(a)
             elif o == '--cmax':
@@ -143,16 +146,19 @@ if __name__ == "__main__":
         sys.exit(2)
 
 
-    #%% Set cmap if SCM5
-    if cmap.startswith('SCM5'):
-        if cmap.endswith('_r'):
-            exec("cmap = {}.reversed()".format(cmap[:-2]))
+    #%% Set cmap if SCM
+    if cmap_name.startswith('SCM'):
+        if cmap_name.endswith('_r'):
+            exec("cmap = {}.reversed()".format(cmap_name[:-2]))
         else:
-            exec("cmap = {}".format(cmap))
-    elif cmap == 'insar':
+            exec("cmap = {}".format(cmap_name))
+    elif cmap_name == 'insar':
         cdict = tools_lib.cmap_insar()
         plt.register_cmap(name='insar', data=cdict)
-
+        cmap='insar'
+    else:
+        cmap = cmap_name
+        
 
     #%% Get info
     try:
@@ -189,7 +195,7 @@ if __name__ == "__main__":
     #%% Read data
     data = io_lib.read_img(infile, length, width, endian=endian)
     
-    if cmap == 'insar':
+    if cmap_name == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
         data = np.angle(np.exp(1j*(data/cycle))*cycle)
         cmin = -np.pi
         cmax = np.pi
@@ -230,7 +236,10 @@ if __name__ == "__main__":
     figsize = (figsize_x, ((figsize_x-2)*length/width))
     plt.figure('{}'.format(infile), figsize)
     plt.imshow(data, clim=[cmin, cmax], cmap=cmap)
-    if not cmap == 'insar': plt.colorbar()
+    if cmap == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
+        plt.title('{}*2pi/cycle'.format(cycle))
+    else:  ### Not cyclic
+        plt.colorbar()
     plt.tight_layout()
     
     if pngname:

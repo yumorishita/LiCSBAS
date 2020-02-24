@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
+v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -16,7 +16,7 @@ Inputs
 =====
 Usage
 =====
-LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymmdd] [-r x1:x2/y1:y2] [--nomask] [--cmap cmap] [--vmin vmin] [--vmax vmax] [--auto_crange auto_crange] [--dmin dmin] [--dmax dmax] [--ylen ylen]
+LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymmdd] [-r x1:x2/y1:y2] [-c cmap] [--nomask] [--vmin float] [--vmax float] [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
 
  -i    Input cum hdf5 file (Default: ./cum_filt.h5 or ./cum.h5)
  --i2  Input 2nd cum hdf5 file
@@ -25,11 +25,11 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
  -d    Directory containing noise indices (e.g., mask, coh_avg, etc.)
        (Default: "results" at the same dir as cum[_filt].h5)
  -r    Reference area (Default: same as info/ref.txt)
+ -c    Color map for velocity and cumulative displacement
+       - https://matplotlib.org/tutorials/colors/colormaps.html
+       - http://www.fabiocrameri.ch/colourmaps.php
+       (Default: SCM.roma_r, reverse of SCM.roma)
  --nomask     Not mask (Default: use mask)
- --cmap       Color map for velocity and cumulative displacement
-              - https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
-              - http://www.fabiocrameri.ch/colourmaps.php
-              (Default: SCM5.roma_r, reverse of SCM5.roma)
  --vmin|vmax  Min|max values of color for velocity map
               (Default: auto)
  --dmin|dmax  Min|max values of color for cumulative displacement map
@@ -41,6 +41,9 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
 """
 #%% Change log
 '''
+v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Use SCM instead of SCM5
+ - Change option from --cmap to -c
 v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
  - Adjust figure size and ax location
 v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
@@ -72,7 +75,7 @@ from matplotlib.widgets import Slider, RadioButtons, RectangleSelector, CheckBut
 import h5py as h5
 import datetime as dt
 import statsmodels.api as sm
-import SCM5
+import SCM
 import warnings
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -128,7 +131,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.6; date=20200210; author="Y. Morishita"
+    ver=1.7; date=20200224; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -144,13 +147,13 @@ if __name__ == "__main__":
     ylen = []
     vmin = None
     vmax = None
-    cmap = "SCM5.roma_r"
+    cmap = "SCM.roma_r"
     auto_crange = 99.0
     
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:d:m:r:", ["help", "i2=", "nomask",  "cmap=", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
+            opts, args = getopt.getopt(argv[1:], "hi:d:m:r:c:", ["help", "i2=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -167,10 +170,10 @@ if __name__ == "__main__":
                 mdate = a
             elif o == '-r':
                 refarea = a
+            elif o == '-c':
+                cmap = a
             elif o == '--nomask':
                 maskflag = False
-            elif o == '--cmap':
-                cmap = a
             elif o == '--vmin':
                 vmin = float(a)
             elif o == '--vmax':
@@ -191,8 +194,8 @@ if __name__ == "__main__":
         sys.exit(2)
 
 
-    #%% Set cmap if SCM5
-    if cmap.startswith('SCM5'):
+    #%% Set cmap if SCM
+    if cmap.startswith('SCM'):
         if cmap.endswith('_r'):
             exec("cmap = {}.reversed()".format(cmap[:-2]))
         else:
