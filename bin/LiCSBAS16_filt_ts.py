@@ -13,17 +13,19 @@ Input & output files
 Inputs in TS_GEOCml* :
  - cum.h5
  - results/mask
- - info/parameters.txt
+ - info/13parameters.txt
  
 Outputs in TS_GEOCml* directory
  - cum_filt.h5
- - 16filt
+ - 16filt_cum
    - yyyymmdd_filt.png
-   - yyyymmdd_yyyymmdd_filt.png
   [- yyyymmdd_deramp.png]
+ - 16filt_increment
+   - yyyymmdd_yyyymmdd_filt.png
   [- yyyymmdd_yyyymmdd_deramp.png]
  - results/vel.filt[.mskd][.png]
  - results/vintercept.filt.mskd[.png]
+ - info/16parameters.txt
 
 =====
 Usage
@@ -43,6 +45,7 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--n
 v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
  - Divide 16filt dir to 16filt_increment and 16filt_cum
  - Change color of png
+ - Update about parameters.txt
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum_filt.h5 if exists before creation
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
@@ -136,14 +139,17 @@ def main(argv=None):
     tsadir = os.path.abspath(tsadir)
     cumfile = os.path.join(tsadir, cumname)
     resultsdir = os.path.join(tsadir, 'results')
-    parmfile = os.path.join(tsadir, 'info',  'parameters.txt')
+    inparmfile = os.path.join(tsadir, 'info',  '13parameters.txt')
+    if not os.path.exists(inparmfile):  ## for old LiCSBAS13 <v1.2
+        inparmfile = os.path.join(tsadir, 'info', 'parameters.txt')
+    outparmfile = os.path.join(tsadir, 'info',  '16parameters.txt')
 
-    pixsp_r = float(io_lib.get_param_par(parmfile, 'pixel_spacing_r'))
-    pixsp_a = float(io_lib.get_param_par(parmfile, 'pixel_spacing_a'))
+    pixsp_r = float(io_lib.get_param_par(inparmfile, 'pixel_spacing_r'))
+    pixsp_a = float(io_lib.get_param_par(inparmfile, 'pixel_spacing_a'))
     x_stddev = filtwidth_km*1000/pixsp_r
     y_stddev = filtwidth_km*1000/pixsp_a
 
-    wavelength = float(io_lib.get_param_par(parmfile, 'wavelength')) #meter
+    wavelength = float(io_lib.get_param_par(inparmfile, 'wavelength')) #meter
     coef_r2m = -wavelength/4/np.pi*1000 #rad -> mm, positive is -LOS
 
     if wavelength > 0.2: ## L-band
@@ -205,6 +211,14 @@ def main(argv=None):
     print('Width of filter in space : {} km ({:.1f}x{:.1f} pixel)'.format(filtwidth_km, x_stddev, y_stddev))
     print('Width of filter in time  : {:.3f} yr ({} days)'.format(filtwidth_yr, int(filtwidth_yr*365.25)))
     print('Deramp flag              : {}'.format(deg_ramp), flush=True)
+
+    with open(outparmfile, "w") as f:
+        print('filtwidth_km:  {}'.format(filtwidth_km), file=f)
+        print('filtwidth_xpixels:  {:.1f}'.format(x_stddev), file=f)
+        print('filtwidth_ypixels:  {:.1f}'.format(y_stddev), file=f)
+        print('filtwidth_yr:  {:.3f}'.format(filtwidth_yr), file=f)
+        print('filtwidth_day:  {}'.format(int(filtwidth_yr*365.25)), file=f)
+        print('deg_ramp:  {}'.format(deg_ramp), file=f)
 
 
     #%% Load Mask (1: unmask, 0: mask, nan: no cum data)

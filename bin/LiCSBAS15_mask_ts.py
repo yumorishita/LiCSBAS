@@ -11,23 +11,15 @@ This script makes a mask for time series using several noise indices.
 Input & output files
 ===============
 Inputs in TS_GEOCml* :
- - results/
-   - vel
-   - coh_avg
-   - n_unw
-   - vstd
-   - maxTlen
-   - n_gap
-   - stc
-   - n_ifg_noloop
-   - n_loop_err
-   - resid_rms
- - info/parameters.txt
+ - results/[vel, coh_avg, n_unw, vstd, maxTlen, n_gap, stc,
+            n_ifg_noloop, n_loop_err, resid_rms]
+ - info/13parameters.txt
  
 Outputs in TS_GEOCml* directory
  - mask_ts[_mskd].png
  - results/vel.mskd[.png]
  - results/mask[.png]
+ - info/15parameters.txt
 
 =====
 Usage
@@ -60,6 +52,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-
 '''
 v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
  - Change color of mask_ts.png
+ - Update about parameters.txt
 v1.6 20200124 Yu Morishita, Uni of Leeds and GSI
  - Increase default vstd threshold because vstd is not useful
 v1.5 20200123 Yu Morishita, Uni of Leeds and GSI
@@ -192,7 +185,10 @@ def main(argv=None):
     tsadir = os.path.abspath(tsadir)
     resultsdir = os.path.join(tsadir,'results')
 
-    parmfile = os.path.join(tsadir, 'info', 'parameters.txt')
+    inparmfile = os.path.join(tsadir, 'info', '13parameters.txt')
+    if not os.path.exists(inparmfile):  ## for old LiCSBAS13 <v1.2
+        inparmfile = os.path.join(tsadir, 'info', 'parameters.txt')
+    outparmfile = os.path.join(tsadir, 'info', '15parameters.txt')
     maskts_png = os.path.join(tsadir,'mask_ts.png')
     maskts2_png = os.path.join(tsadir,'mask_ts_masked.png')
 
@@ -205,11 +201,11 @@ def main(argv=None):
 
 
     ### Get size and ref
-    width = int(io_lib.get_param_par(parmfile, 'range_samples'))
-    length = int(io_lib.get_param_par(parmfile, 'azimuth_lines'))
-    wavelength = float(io_lib.get_param_par(parmfile, 'wavelength'))
+    width = int(io_lib.get_param_par(inparmfile, 'range_samples'))
+    length = int(io_lib.get_param_par(inparmfile, 'azimuth_lines'))
+    wavelength = float(io_lib.get_param_par(inparmfile, 'wavelength'))
 
-    n_im = int(io_lib.get_param_par(parmfile, 'n_im'))
+    n_im = int(io_lib.get_param_par(inparmfile, 'n_im'))
 
     
     #%% Determine default thretholds depending on frequency band
@@ -304,14 +300,20 @@ def main(argv=None):
     rate_nomask = n_nomask/n_pt_all*100
 
 
-    #%% Stdout info
-    print('')
-    print('Noise index    : Threshold  (rate to be masked)')
-    for i, name in enumerate(names):
-        print('- {:12s} : {:4} {:5} ({:4.1f}%)'.format(name, thre_dict[name], units[i], mskd_rate[i]))
-    print('')
-    print('Masked pixels  : {}/{} ({:.1f}%)'.format(n_pt_all-n_nomask, n_pt_all, 100-rate_nomask))
-    print('Kept pixels    : {}/{} ({:.1f}%)\n'.format(n_nomask, n_pt_all, rate_nomask), flush=True)
+    #%% Stdout and save info
+    with open(outparmfile, "w") as f:
+        print('')
+        print('Noise index    : Threshold  (rate to be masked)')
+        print('Noise index    : Threshold  (rate to be masked)', file=f)
+        for i, name in enumerate(names):
+            print('- {:12s} : {:4} {:5} ({:4.1f}%)'.format(name, thre_dict[name], units[i], mskd_rate[i]))
+            print('- {:12s} : {:4} {:5} ({:4.1f}%)'.format(name, thre_dict[name], units[i], mskd_rate[i]), file=f)
+        print('')
+        print('', file=f)
+        print('Masked pixels  : {}/{} ({:.1f}%)'.format(n_pt_all-n_nomask, n_pt_all, 100-rate_nomask))
+        print('Masked pixels  : {}/{} ({:.1f}%)'.format(n_pt_all-n_nomask, n_pt_all, 100-rate_nomask), file=f)
+        print('Kept pixels    : {}/{} ({:.1f}%)\n'.format(n_nomask, n_pt_all, rate_nomask), flush=True)
+        print('Kept pixels    : {}/{} ({:.1f}%)\n'.format(n_nomask, n_pt_all, rate_nomask), file=f)
 
     if n_nomask == 1:
         print('All pixels are masked!!', file=sys.stderr)

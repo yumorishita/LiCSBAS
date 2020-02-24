@@ -32,7 +32,7 @@ Outputs in TS_GEOCml* directory
    - n_ifg_noloop[.png] :  Number of ifgs with no loop
    - maxTlen[.png]    : Max length of continous SB network in year
  - info/
-   - parameters.txt   : Used parameters
+   - 13parameters.txt   : Used parameters
    - 13used_image.txt : List of used images
    - 13resid.txt      : List of RMS of residual for each ifg
  - 13increment/yyyymmdd_yyyymmdd.inc_comp.png
@@ -69,6 +69,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg inv_alg] [--mem_size mem_si
 v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Change color of png
+ - Change name of parameters.txt to 13parameters.txt
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum.h5 if exists before creation
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -344,7 +345,7 @@ def main(argv=None):
     n_patch, patchrow = tools_lib.get_patchrow(width, length, n_store_data, memory_size)
 
 
-    #%% Display and output settings & paramters
+    #%% Display and output settings & parameters
     print('')
     print('Size of image (w,l)    : {}, {}'.format(width, length))
     print('# of all images        : {}'.format(n_im_all))
@@ -360,7 +361,7 @@ def main(argv=None):
     print('Inversion algorism     : {}'.format(inv_alg))
     print('Gamma value            : {}'.format(gamma), flush=True)
 
-    with open(os.path.join(infodir, 'parameters.txt'), "w") as f:
+    with open(os.path.join(infodir, '13parameters.txt'), "w") as f:
         print('range_samples:  {}'.format(width), file=f)
         print('azimuth_lines:  {}'.format(length), file=f)
         print('wavelength:     {}'.format(wavelength), file=f)
