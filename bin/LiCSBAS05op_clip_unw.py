@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+v1.1 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -15,6 +15,7 @@ Inputs in GEOCml* directory:
  - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc
  - slc.mli[.par|.png]
  - EQA.dem.par
+ - Others (baselines, [E|N|U].geo, hgt[.png])
  
 Outputs in output directory:
  - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw[.png] (clipped)
@@ -38,6 +39,8 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
 """
 #%% Change log
 '''
+v1.1 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Bag fix for hgt.png
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 '''
@@ -224,6 +227,13 @@ def main(argv=None):
             mli = io_lib.read_img(os.path.join(out_dir, 'slc.mli'), length_c, width_c)
             pngfile = os.path.join(out_dir, 'slc.mli.png')
             plot_lib.make_im_png(mli, pngfile, 'gray', 'MLI', cbar=False)
+        elif file==os.path.join(in_dir, 'hgt.png'):
+            print('Recreate hgt.png', flush=True)
+            hgt = io_lib.read_img(os.path.join(out_dir, 'hgt'), length_c, width_c)
+            vmax = np.nanpercentile(hgt, 99)
+            vmin = -vmax/3 ## bnecause 1/4 of terrain is blue
+            pngfile = os.path.join(out_dir, 'hgt.png')
+            plot_lib.make_im_png(hgt, pngfile, 'terrain', 'DEM (m)', vmin, vmax, cbar=True)
         else:
             print('Copy {}'.format(os.path.basename(file)), flush=True)
             shutil.copy(file, out_dir)
