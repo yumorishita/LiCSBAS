@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.6 20200124 Yu Morishita, Uni of Leeds and GSI
+v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -32,7 +32,7 @@ Outputs in TS_GEOCml* directory
 =====
 Usage
 =====
-LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre] [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin vmin] [--vmax vmin] [--keep_isolated] [--noautoadjust]
+LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre] [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin float] [--vmax float] [--keep_isolated] [--noautoadjust]
 
  -t  Path to the TS_GEOCml* dir.
  -c  Threshold of coh_avg (average coherence)
@@ -58,6 +58,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-
 """
 #%% Change log
 '''
+v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
+ - Change color of mask_ts.png
 v1.6 20200124 Yu Morishita, Uni of Leeds and GSI
  - Increase default vstd threshold because vstd is not useful
 v1.5 20200123 Yu Morishita, Uni of Leeds and GSI
@@ -81,6 +83,7 @@ os.environ['QT_QPA_PLATFORM']='offscreen'
 import sys
 import time
 import numpy as np
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_plot_lib as plot_lib
 
@@ -116,7 +119,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.6; date=20200124; author="Y. Morishita"
+    ver=1.7; date=20200224; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -128,7 +131,9 @@ def main(argv=None):
     vmax = []
     keep_isolated = False
     auto_adjust = True
-
+    
+    cmap_vel = SCM.roma.reversed()
+    cmap_noise = SCM.turku
 
     #%% Read options
     try:
@@ -344,7 +349,7 @@ def main(argv=None):
     titles = ['vel.mskd', 'vel', 'mask']
     vmins = [vmin, vmin, 0]
     vmaxs = [vmax, vmax, 1]
-    cmaps = ['jet', 'jet', 'viridis']
+    cmaps = [cmap_vel, cmap_vel, cmap_noise]
     for i in range(3): 
         add_subplot(fig, i, data[i], vmins[i], vmaxs[i], cmaps[i], titles[i])
         i2 = 0 if i==1 else 1 if i==0 else 2 # inv vel and vel.mskd
@@ -361,11 +366,11 @@ def main(argv=None):
             data[bool_nan] = np.nan
         
         if gt_lt[i] == 'lt': ## coh_avg, n_unw, maxTlen
-            cmap = 'viridis'
+            cmap = cmap_noise
             vmin_n = thre_dict[name]*0.8
             vmax_n = np.nanmax(data)
         else:
-            cmap = 'viridis_r'
+            cmap = cmap_noise.reversed()
             vmin_n = 0
             vmax_n = thre_dict[name]*1.2
 
@@ -388,18 +393,16 @@ def main(argv=None):
     vel_mskd.tofile(velmskdfile)
 
     pngfile = velmskdfile+'.png'
-    cmap = 'jet'
     title = 'Masked velocity (mm/yr)'
-    plot_lib.make_im_png(vel_mskd, pngfile, cmap, title, vmin, vmax)
+    plot_lib.make_im_png(vel_mskd, pngfile, cmap_vel, title, vmin, vmax)
 
 
     maskfile = os.path.join(resultsdir,'mask')
     mask.tofile(maskfile)
 
     pngfile = maskfile+'.png'
-    cmap = 'viridis'
     title = 'Mask'
-    plot_lib.make_im_png(mask, pngfile, cmap, title, 0, 1)
+    plot_lib.make_im_png(mask, pngfile, cmap_noise, title, 0, 1)
 
     
     #%% Finish

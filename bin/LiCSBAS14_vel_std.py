@@ -30,6 +30,7 @@ LiCSBAS14_vel_std.py -t tsadir [--mem_size mem_size]
 '''
 v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
  - Bag fix of stc calculation with overlapping
+ - Change color of png
 v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 '''
@@ -42,6 +43,7 @@ import time
 import h5py as h5
 import numpy as np
 import datetime as dt
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -70,7 +72,8 @@ def main(argv=None):
     tsadir = []
     memory_size = 4000
 
-
+    cmap_noise_r = SCM.turku.reversed()
+    
     #%% Read options
     try:
         try:
@@ -188,18 +191,17 @@ def main(argv=None):
 
     stc = io_lib.read_img(stcfile, length, width)
     pngfile = stcfile+'.png'
-    cmap = 'viridis_r'
     title = 'Spatio-temporal consistency (mm)'
     cmin = np.nanpercentile(stc, 1)
     cmax = np.nanpercentile(stc, 99)
-    plot_lib.make_im_png(stc, pngfile, cmap, title, cmin, cmax)
+    plot_lib.make_im_png(stc, pngfile, cmap_noise_r, title, cmin, cmax)
 
     vstd = io_lib.read_img(vstdfile, length, width)
     pngfile = vstdfile+'.png'
     title = 'STD of velocity (mm/yr)'
     cmin = np.nanpercentile(vstd, 1)
     cmax = np.nanpercentile(vstd, 99)
-    plot_lib.make_im_png(vstd, pngfile, cmap, title, cmin, cmax)
+    plot_lib.make_im_png(vstd, pngfile, cmap_noise_r, title, cmin, cmax)
 
 
     #%% Finish

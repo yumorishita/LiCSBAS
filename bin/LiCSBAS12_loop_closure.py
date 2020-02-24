@@ -62,6 +62,7 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
 v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Improve bad loop cand identification
+ - Change color of png
 v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
  - Add iteration during ref search when no ref found
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -77,6 +78,7 @@ import shutil
 import glob
 import numpy as np
 import datetime as dt
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_loop_lib as loop_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -108,6 +110,8 @@ def main(argv=None):
     tsadir = []
     loop_thre = 1.5
 
+    cmap_noise = SCM.turku
+    cmap_noise_r = SCM.turku.reversed()
 
     #%% Read options
     try:
@@ -351,11 +355,10 @@ def main(argv=None):
     loop_ph_rms_maskedfile = os.path.join(loopdir, 'loop_ph_rms_masked')
     loop_ph_rms_points_masked.tofile(loop_ph_rms_maskedfile)
 
-    cmap = 'viridis_r'
     cmax = np.nanpercentile(loop_ph_rms_points_masked, 95)
     pngfile = loop_ph_rms_maskedfile+'.png'
     title = 'RMS of loop phase (rad)'
-    plot_lib.make_im_png(loop_ph_rms_points_masked, pngfile, cmap, title, None, cmax)
+    plot_lib.make_im_png(loop_ph_rms_points_masked, pngfile, cmap_noise_r, title, None, cmax)
 
     ### Check ref exist in unw. If not, list as noref_ifg
     noref_ifg = []
@@ -568,12 +571,12 @@ def main(argv=None):
 
     ### Save png
     title = 'Average coherence'
-    plot_lib.make_im_png(coh_avg, coh_avgfile+'.png', 'viridis', title)
+    plot_lib.make_im_png(coh_avg, coh_avgfile+'.png', cmap_noise, title)
     title = 'Number of used unw data'
-    plot_lib.make_im_png(n_unw, n_unwfile+'.png', 'viridis', title, n_im)
+    plot_lib.make_im_png(n_unw, n_unwfile+'.png', cmap_noise, title, n_im)
 
     title = 'Number of unclosed loops'
-    plot_lib.make_im_png(ns_loop_err, n_loop_errfile+'.png', 'viridis_r', title)
+    plot_lib.make_im_png(ns_loop_err, n_loop_errfile+'.png', cmap_noise_r, title)
 
 
     #%% Link ras

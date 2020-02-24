@@ -68,6 +68,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg inv_alg] [--mem_size mem_si
 '''
 v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
+ - Change color of png
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum.h5 if exists before creation
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -83,6 +84,7 @@ import time
 import h5py as h5
 import numpy as np
 import datetime as dt
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -125,6 +127,9 @@ def main(argv=None):
     n_unw_r_thre = []
     keep_incfile = False
 
+    cmap_vel = SCM.roma.reversed()
+    cmap_noise = SCM.turku
+    cmap_noise_r = SCM.turku.reversed()
 
     #%% Read options
     try:
@@ -636,7 +641,7 @@ def main(argv=None):
 
         ### Output png for comparison
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [unw, inc, inc-unw]]
-        title3 = ['Daisy-chain IFG', 'Inverted', 'Difference']
+        title3 = ['Daisy-chain IFG ({}pi/cycle)'.format(cycle*2), 'Inverted ({}pi/cycle)'.format(cycle*2), 'Difference ({}pi/cycle)'.format(cycle*2)]
         pngfile = os.path.join(incdir, '{}.increment.png'.format(ifgd))
         plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
@@ -644,7 +649,6 @@ def main(argv=None):
             os.remove(incfile)
 
     ### Residual for each ifg. png and txt.
-    cmap = 'jet'
     with open(restxtfile, "w") as f:
         print('# RMS of residual (mm)', file=f)
     for ifgd in ifgdates:
@@ -656,17 +660,17 @@ def main(argv=None):
         
         pngfile = infile+'.png'
         title = 'Residual (mm) of {} (RMS:{:.2f}mm)'.format(ifgd, resid_rms)
-        plot_lib.make_im_png(resid, pngfile, cmap, title, -wavelength/2*1000, wavelength/2*1000)
+        plot_lib.make_im_png(resid, pngfile, cmap_vel, title, -wavelength/2*1000, wavelength/2*1000)
         
 
         if not keep_incfile:
             os.remove(infile)
     
     ### Velocity and noise indices
-    #names = ['vel', 'vconst', 'resid_rms', 'n_gap', 'n_ifg_noloop', 'maxTlen']
     cmins = [None, None, None, None, None, None]
     cmaxs = [None, None, None, None, None, None]
-    cmaps = ['jet', 'jet', 'viridis_r', 'viridis_r', 'viridis_r', 'viridis']
+    cmap_noise = SCM.turku
+    cmaps = [cmap_vel, cmap_vel, cmap_noise_r, cmap_noise_r, cmap_noise_r, cmap_noise]
     titles = ['Velocity (mm/yr)', 'Intercept of velocity (mm)', 'RMS of residual (mm)', 'Number of gaps in SB network', 'Number of ifgs with no loops', 'Max length of connected SB network (yr)']
 
     for i in range(len(names)):

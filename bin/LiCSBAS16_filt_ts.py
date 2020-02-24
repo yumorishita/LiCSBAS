@@ -42,6 +42,7 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--n
 '''
 v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
  - Divide 16filt dir to 16filt_increment and 16filt_cum
+ - Change color of png
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum_filt.h5 if exists before creation
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
@@ -60,6 +61,7 @@ import numpy as np
 import datetime as dt
 import h5py as h5
 from astropy.convolution import Gaussian2DKernel, convolve_fft
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_inv_lib as inv_lib
@@ -92,7 +94,8 @@ def main(argv=None):
     maskflag = True
     
     cumname = 'cum.h5'
-
+    
+    cmap_vel = SCM.roma.reversed()
 
     #%% Read options
     try:
@@ -365,33 +368,32 @@ def main(argv=None):
 
  
     #%% Output image
-    cmap = 'jet'
     pngfile = os.path.join(resultsdir,'vel.filt.png')
     title = 'Filtered velocity (mm/yr)'
     vmin = np.nanpercentile(vel, 1)
     vmax = np.nanpercentile(vel, 99)
-    plot_lib.make_im_png(vel, pngfile, cmap, title, vmin, vmax)
+    plot_lib.make_im_png(vel, pngfile, cmap_vel, title, vmin, vmax)
 
     ## vintercept
     pngfile = os.path.join(resultsdir,'vintercept.filt.png')
     title = 'Intercept of filtered velocity (mm)'
     vmin = np.nanpercentile(vconst, 1)
     vmax = np.nanpercentile(vconst, 99)
-    plot_lib.make_im_png(vconst, pngfile, cmap, title, vmin, vmax)
+    plot_lib.make_im_png(vconst, pngfile, cmap_vel, title, vmin, vmax)
 
     if maskflag:
         pngfile = os.path.join(resultsdir,'vel.filt.mskd.png')
         title = 'Masked filtered velocity (mm/yr)'
         vmin = np.nanpercentile(vel_mskd, 1)
         vmax = np.nanpercentile(vel_mskd, 99)
-        plot_lib.make_im_png(vel_mskd, pngfile, cmap, title, vmin, vmax)
+        plot_lib.make_im_png(vel_mskd, pngfile, cmap_vel, title, vmin, vmax)
     
         ## vintercept
         pngfile = os.path.join(resultsdir,'vintercept.filt.mskd.png')
         title = 'Masked intercept of filtered velocity (mm)'
         vmin = np.nanpercentile(vconst_mskd, 1)
         vmax = np.nanpercentile(vconst_mskd, 99)
-        plot_lib.make_im_png(vconst_mskd, pngfile, cmap, title, vmin, vmax)
+        plot_lib.make_im_png(vconst_mskd, pngfile, cmap_vel, title, vmin, vmax)
 
 
     #%% Finish
