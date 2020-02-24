@@ -23,8 +23,11 @@ Outputs in TS_GEOCml* :
  - 12loop/
    - loop_info.txt : Statistical information of loop phase closure
    - bad_ifg_*.txt : List of bad ifgs identified by loop closure
-   - [bad_]loop_[cand_]png/yyyymmdd_yyyymmdd_yyyymmdd_loop.png
-                   : png images of loop phase closure
+   - good_loop_png/*_loop.png: png images of good loop phase closure
+   - bad_loop_png/*_loop.png : png images of bad loop phase closure
+   - bad_loop_cand_png/*_loop.png: png images of bad loop candidates in which
+                                   bad ifgs were not identified
+
  - info/
    - ref.txt             : ref point automatically sed by loop check (X/Y)
    - 12removed_image.txt : List of images to be removed in further processing
@@ -58,15 +61,12 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
 '''
 v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
+ - Improve bad loop cand identification
 v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
  - Add iteration during ref search when no ref found
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 '''
-
-#To do?:
-#- Enable to define ref beforehand and rerun this
-       
 
 #%% Import
 import getopt
@@ -98,7 +98,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20191106; author="Y. Morishita"
+    ver=1.2; date=20200224; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -157,7 +157,7 @@ def main(argv=None):
     loopdir = os.path.join(tsadir, '12loop')
     if not os.path.exists(loopdir): os.mkdir(loopdir)
 
-    loop_pngdir = os.path.join(loopdir ,'loop_png')
+    loop_pngdir = os.path.join(loopdir ,'good_loop_png')
     bad_loop_pngdir = os.path.join(loopdir,'bad_loop_png')
     bad_loop_cand_pngdir = os.path.join(loopdir,'bad_loop_cand_png')
 
@@ -448,7 +448,7 @@ def main(argv=None):
             print('{}'.format(i), file=f)
 
     ### Remaining candidate of bad ifg
-    bad_ifg_cand_res = list(set(bad_ifg_cand+bad_ifg_cand2)-set(bad_ifg_all))
+    bad_ifg_cand_res = list(set(bad_ifg_cand2)-set(bad_ifg_all))
     bad_ifg_cand_res.sort()
 
     bad_ifg_candfile = os.path.join(infodir, '12bad_ifg_cand.txt')
@@ -488,8 +488,8 @@ def main(argv=None):
     #%% Output loop info, move bad_loop_png
     loop_info_file = os.path.join(loopdir, 'loop_info.txt')
     f = open(loop_info_file, 'w')
-    print('# loop_thre: {} rad. *: Removed w/o ref'.format(loop_thre), file=f)
-    print('# /: Candidates of bad but kept, **: Removed w/ ref', file=f)
+    print('# loop_thre: {} rad. *: Removed w/o ref, **: Removed w/ ref'.format(loop_thre), file=f)
+    print('# /: Candidates of bad loops but causative ifgs unidentified', file=f)
     print('# image1   image2   image3 RMS w/oref  w/ref', file=f)
 
     for i in range(n_loop):
