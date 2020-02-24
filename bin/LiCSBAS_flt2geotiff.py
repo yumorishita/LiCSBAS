@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
+v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script makes a GeoTIFF file from an image file (only in float format). The geotiff file can be read by a GIS software (e.g., QGIS) and used to make a figure. Nan will be regarded as NoDataValue as default. 0 can be replaced with nan.
 Note: gdal must be installed.
-
-v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
 
 =====
 Usage
@@ -38,7 +38,6 @@ v1.2 20200130 Yu Morishita, Uni of Leeds and GSI
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
  - Original implementationf
 '''
-
 
 #%% Import
 import getopt

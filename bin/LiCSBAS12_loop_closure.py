@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script identifies bad data by checking loop closure. A tentative reference point that has all valid unw data and the smallest RMS of loop phases is also determined.
-
-=========
-Changelog
-=========
-v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
- - Add iteration during ref search when no ref found
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -60,6 +54,14 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
      (Default: 1.5 [rad])
 
 """
+#%% Change log
+'''
+v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
+ - Add iteration during ref search when no ref found
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
+
 #To do?:
 #- Enable to define ref beforehand and rerun this
        
@@ -94,6 +96,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20191106; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

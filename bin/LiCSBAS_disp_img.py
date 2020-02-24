@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.3 20200212 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script displays an image file (only in float format).
-
-v1.3 20200212 Yu Morishita, Uni of Leeds and GSI
 
 =====
 Usage

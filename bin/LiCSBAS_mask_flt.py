@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script masks a float file using a mask file.
-
-=========
-Changelog
-=========
-v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
- - Original implementationf
 
 =====
 Usage
@@ -21,6 +17,12 @@ LiCSBAS_mask_flt.py -i infile -m maskfile [-o outfile]
  -o  Output masked float file (Default: infile.mskd)
 
 """
+#%% Change log
+'''
+v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
+ - Original implementationf
+'''
+
 # [--png]
 # --png   Make png file (Default: No)
 # no png option because it needs size of float...
@@ -47,6 +49,10 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.0; date=20190731; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
+    print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
+
 
     #%% Set default
     infile = []

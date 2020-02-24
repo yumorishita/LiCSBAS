@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.3 20191115 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script converts geotiff files to float format for further time series analysis, and also downsamples (multilooks) data if specified.
-
-=========
-Changelog
-=========
-v1.3 20191115 Yu Morishita, Uni of Leeds and GSI
- - Use mli and hgt
-v1.2 20191014 Yu Morishita, Uni of Leeds and GSI
- - Deal with format of uint8 of cc.tif
- - Not available mli
-v1.1 20190824 Yu Morishita, Uni of Leeds and GSI
- - Skip broken geotiff
-v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -54,6 +43,18 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f FRAME]
      (Default: Read from directory name)
 
 """
+#%% Change log
+'''
+v1.3 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Use mli and hgt
+v1.2 20191014 Yu Morishita, Uni of Leeds and GSI
+ - Deal with format of uint8 of cc.tif
+ - Not available mli
+v1.1 20190824 Yu Morishita, Uni of Leeds and GSI
+ - Skip broken geotiff
+v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 
 #%% Import
@@ -84,6 +85,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.3; date=20191115; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

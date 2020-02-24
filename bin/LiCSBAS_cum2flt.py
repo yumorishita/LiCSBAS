@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script outputs a float file of cumulative displacement from cum*.h5.
-
-=========
-Changelog
-=========
-v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
- - Bug fix about masking
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
- - Original implementationf
 
 =====
 Usage
@@ -28,7 +22,13 @@ LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/
  --png   Make png file (Default: No)
 
 """
-
+#%% Change log
+'''
+v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
+ - Bug fix about masking
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+ - Original implementationf
+'''
 
 #%% Import
 import getopt
@@ -56,6 +56,9 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20190813; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
+    print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 
     #%% Set default

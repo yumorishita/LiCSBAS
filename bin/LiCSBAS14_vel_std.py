@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script calculates the standard deviation of the velocity by bootstrap and STC (spatio-temporal consistency; Hanssen et al., 2008, Terrafirma).
-
-=========
-Changelog
-=========
-v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
- - Bag fix of stc calculation with overlapping
-v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -32,7 +26,13 @@ LiCSBAS14_vel_std.py -t tsadir [--mem_size mem_size]
  --mem_size   Max memory size for each patch in MB. (Default: 4000)
 
 """
-
+#%% Change log
+'''
+v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
+ - Bag fix of stc calculation with overlapping
+v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 #%% Import
 import getopt
@@ -61,6 +61,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20190805; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

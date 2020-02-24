@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20190812 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script applies a tropospheric correction to unw data using GACOS data. GACOS data must be prepared beforehand by requesting on GACOS web. This step is optional.
-
-=========
-Changelog
-=========
-v1.1 20190812 Yu Morishita, Uni of Leeds and GSI
- - Add fillhole option
-v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -46,6 +40,13 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir -z ztddir [--fillhole]
  --fillhole  Fill holes of GACOS data at hgt=0 in SRTM3 by averaging surrounding pixels (Default: no filling)
 
 """
+#%% Change log
+'''
+v1.1 20190812 Yu Morishita, Uni of Leeds and GSI
+ - Add fillhole option
+v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 
 #%% Import
@@ -106,6 +107,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20190812; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

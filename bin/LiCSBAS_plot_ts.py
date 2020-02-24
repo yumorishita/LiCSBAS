@@ -1,30 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script displays the velocity, cumulative displacement, and noise indices, and plots the time series of displacement. You can interactively change the displayed image/area and select a point for the time series plot. The reference area can also be changed by right dragging.
-
-=========
-Changelog
-=========
-v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
- - Adjust figure size and ax location
-v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
- - Immediate update of image and ts plot when change ref or mask
-v1.4 20191213 Yu Morishita, Uni of Leeds and GSI
- - Bag fix for deramp_flag
-v1.3 20191120 Yu Morishita, Uni of Leeds and GSI
- - Add mark of selected point and set aspect in image window
- - Display values and unit of noise indices in time seires window
-v1.2 20191115 Yu Morishita, Uni of Leeds and GSI
- - Add hgt
-v1.1 20190815 Yu Morishita, Uni of Leeds and GSI
- - Add -r option
- - Not use i2 if not exist
- - Bug fix about lines2
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
- - Created, originating from GIAnT
 
 ===============
 Inputs
@@ -58,7 +39,26 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
  --ylen       Y Length of time series plot in mm (Default: auto)
               
 """
-
+#%% Change log
+'''
+v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
+ - Adjust figure size and ax location
+v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
+ - Immediate update of image and ts plot when change ref or mask
+v1.4 20191213 Yu Morishita, Uni of Leeds and GSI
+ - Bag fix for deramp_flag
+v1.3 20191120 Yu Morishita, Uni of Leeds and GSI
+ - Add mark of selected point and set aspect in image window
+ - Display values and unit of noise indices in time seires window
+v1.2 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Add hgt
+v1.1 20190815 Yu Morishita, Uni of Leeds and GSI
+ - Add -r option
+ - Not use i2 if not exist
+ - Bug fix about lines2
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+ - Created, originating from GIAnT
+'''
 
 #%% Import
 import getopt
@@ -127,6 +127,10 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 ## Not use def main to use global valuables
 if __name__ == "__main__":
     argv = sys.argv
+
+    ver=1.6; date=20200210; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
+    print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     #%% Set default
     cumfile = []

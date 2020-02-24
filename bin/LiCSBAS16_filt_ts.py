@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script applies spatial-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramp can also be applied if specified by -r option.
-
-=========
-Changelog
-=========
-v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
- - Remove cum_filt.h5 if exists before creation
-v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -44,7 +38,13 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--n
  --nomask  Not mask (Default: use mask)
   
 """
-
+#%% Change log
+'''
+v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+ - Remove cum_filt.h5 if exists before creation
+v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 #%% Import
 import getopt
@@ -77,6 +77,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20190829; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

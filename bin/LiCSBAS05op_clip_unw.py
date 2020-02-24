@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script clips a specified rectangular area of interest from unw and cc data. The clipping can make the data size smaller and processing faster, and improve the result of step 12 (loop closure).
-
-=========
-Changelog
-=========
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -40,7 +36,11 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
  -g  Range to be clipped in geographical coordinates (deg).
 
 """
-
+#%% Change log
+'''
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 #%% Import
 import getopt
@@ -69,6 +69,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.0; date=20190730; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

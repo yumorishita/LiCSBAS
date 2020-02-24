@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script inverts the small baseline network of unw data to get the time series of displacement and velocity using the NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
-
-=========
-Changelog
-=========
-v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
- - Remove cum.h5 if exists before creation
-vv1.0 20190730 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -70,12 +64,13 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg inv_alg] [--mem_size mem_si
               Not remove inc and resid files (Default: remove them)
 
 """
-## Not supported options
-#[-r auto|x1/x2/y1/y2]
-# -r  Reference area after inversion. x1/x2/y1/y2 or "auto". (Default: "auto")
-#     "auto" use the same ref point as defined in LiCSBAS12.
-#     0 for x2/y2 means all. (ex. 1/0/1/0 means whole area).
-
+#%% Change log
+'''
+v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
+ - Remove cum.h5 if exists before creation
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 #%% Import
 import getopt
@@ -111,6 +106,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20190829; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

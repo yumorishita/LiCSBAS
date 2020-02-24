@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.0 20190916 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script gets a profile data between two points specified in geographical coordinates or xy coordinates from a float file. A quick look image is displayed and a text file and kml file are output. 
-
-=========
-Changelog
-=========
-v1.0 20190916 Yu Morishita, Uni of Leeds and GSI
- - Original implementationf
 
 =====
 Usage
@@ -26,7 +22,11 @@ LiCSBAS_profile.py -i infile -p dempar [-r x1,y1/x2,y2] [-g lon1,lat1/lon2,lat2]
  --nodisplay  Not display quick look images
 
 """
-
+#%% Change log
+'''
+v1.0 20190916 Yu Morishita, Uni of Leeds and GSI
+ - Original implementationf
+'''
 
 #%% Import
 import getopt
@@ -57,6 +57,9 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.0; date=20190916; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
+    print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     #%% Set default
     infile = []

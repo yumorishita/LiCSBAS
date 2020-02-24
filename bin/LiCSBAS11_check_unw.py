@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script checks quality of unw data and identifies bad interferograms based on average coherence and coverage of the unw data. This also prepares a time series working directory.
-
-=========
-Changelog
-=========
-v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
- - Add hgt
-v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -48,7 +42,13 @@ LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
      (Default: 0.5)
 
 """
-
+#%% Change log
+'''
+v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Add hgt
+v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 #%% Import
 import getopt
@@ -76,6 +76,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20191115; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

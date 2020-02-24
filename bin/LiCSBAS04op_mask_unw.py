@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script masks some parts of unw data. The masking is effective when the unw data include areas which have many unwrapping errors and are not of interest, and can improve the result of step 12 (loop closure).
-
-=========
-Changelog
-=========
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -36,7 +32,11 @@ LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-f txtfile]
  -f  Text file of a list of ranges to be masked (format is x1:x2/y1:y2)
 
 """
-
+#%% Change log
+'''
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 #%% Import
 import getopt
@@ -63,6 +63,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.0; date=20190730; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

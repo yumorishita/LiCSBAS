@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
-This script downloads geotiff files of unw (unwrapped interferogram) and cc (coherence) for the specified frame ID from COMET-LiCS web. The -f option is not necessary because the frame ID can be automatically identified from the name of the working directory.
-
-=========
-Changelog
-=========
-v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
- - Download mli and hgt
-v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
+This script downloads geotiff files of unw (unwrapped interferogram) and cc (coherence) for the specified frame ID from COMET-LiCS web. The -f option is not necessary when the frame ID can be automatically identified from the name of the working directory.
 
 ============
 Output files
@@ -37,6 +31,13 @@ LiCSBAS01_get_geotiff.py [-f FRAME] [-s start_date] [-e end_date]
  -e  End date (Default: Today)
  
 """
+#%% Change log
+'''
+v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+ - Download mli and hgt
+v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 
 #%% Import
@@ -65,6 +66,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.1; date=20191115; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

@@ -1,27 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.6 20200124 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script makes a mask for time series using several noise indices.
-
-=========
-Changelog
-=========
-v1.6 20200124 Yu Morishita, Uni of Leeds and GSI
- - Increase default vstd threshold because vstd is not useful
-v1.5 20200123 Yu Morishita, Uni of Leeds and GSI
- - Change default n_gap threshold for L-band to 1
-v1.4 20200122 Yu Morishita, Uni of Leeds and GSI
- - Remove close fig which can cause error
-v1.3 20191128 Yu Morishita, Uni of Leeds and GSI
- - Add noautoadjust option
-v1.2 20190918 Yu Morishita, Uni of Leeds and GSI
- - Output mask_ts_mskd.png
-v1.1 20190906 Yu Morishita, Uni of Leeds and GSI
- - tight_layout and auto ajust of size for png
-v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
- - Original implementation
 
 ===============
 Input & output files
@@ -72,7 +56,23 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-
    L-band : -c 0.01 -u 1   -v 200 -T 1 -g 1  -s 10 -i 10 -l 1 -r 10
  
 """
-
+#%% Change log
+'''
+v1.6 20200124 Yu Morishita, Uni of Leeds and GSI
+ - Increase default vstd threshold because vstd is not useful
+v1.5 20200123 Yu Morishita, Uni of Leeds and GSI
+ - Change default n_gap threshold for L-band to 1
+v1.4 20200122 Yu Morishita, Uni of Leeds and GSI
+ - Remove close fig which can cause error
+v1.3 20191128 Yu Morishita, Uni of Leeds and GSI
+ - Add noautoadjust option
+v1.2 20190918 Yu Morishita, Uni of Leeds and GSI
+ - Output mask_ts_mskd.png
+v1.1 20190906 Yu Morishita, Uni of Leeds and GSI
+ - tight_layout and auto ajust of size for png
+v1.0 20190724 Yu Morishita, Uni of Leeds and GSI
+ - Original implementation
+'''
 
 #%% Import
 import getopt
@@ -116,6 +116,8 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.6; date=20200124; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
 

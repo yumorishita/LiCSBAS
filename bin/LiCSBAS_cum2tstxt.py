@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+
 ========
 Overview
 ========
 This script outputs a txt file of time series of displacement at a specified point from cum*.h5.
-
-=========
-Changelog
-=========
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
- - Original implementationf
 
 =====
 Usage
@@ -24,7 +20,11 @@ LiCSBAS_cum2tstxt.py [-p x/y] [-g lon/lat] [-i cumfile] [-o tsfile] [-r x1:x2/y1
  --mask  Path to maskfile for ref calculation (Default: No mask)
 
 """
-
+#%% Change log
+'''
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+ - Original implementationf
+'''
 
 #%% Import
 import getopt
@@ -51,6 +51,10 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
+    ver=1.0; date=20190730; author="Y. Morishita"
+    print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
+    print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
+
 
     #%% Set default
     xy_str = []
