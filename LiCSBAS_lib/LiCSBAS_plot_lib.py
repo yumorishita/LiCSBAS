@@ -8,6 +8,8 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.2 20200225 Yu Morioshita, Uni of Leeds and GSI
+ - Remove pdf option in plot_network
 v1.0 20190729 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
 
@@ -96,11 +98,12 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
 
 
 #%%
-def plot_network(ifgdates, bperp, rm_ifgdates, pngfile, plot_bad=True, pdf=False):
+def plot_network(ifgdates, bperp, rm_ifgdates, pngfile, plot_bad=True):
     """
     Plot network of interferometric pairs.
     
     bperp can be dummy (-1~1).
+    Suffix of pngfile can be png, ps, pdf, or svg.
     plot_bad
         True  : Plot bad ifgs by red lines
         False : Do not plot bad ifgs
@@ -182,7 +185,4 @@ def plot_network(ifgdates, bperp, rm_ifgdates, pngfile, plot_bad=True, pdf=False
 
     ### Save
     plt.savefig(pngfile)
-    if pdf:
-        plt.savefig(pngfile.replace('.png', '.pdf'))
-    
     plt.close()
