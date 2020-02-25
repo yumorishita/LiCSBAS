@@ -8,7 +8,9 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
-v1.0 20190916 Yu Morioshita, Uni of Leeds and GSI
+v1.2 20200225 Yu Morioshita, Uni of Leeds and GSI
+ - Add read_point
+v1.1 20190916 Yu Morioshita, Uni of Leeds and GSI
  - Add read_range_line and read_range_line_geo
 v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
@@ -222,6 +224,22 @@ def multilook(array, nlook_r, nlook_c, n_valid_thre=0.5):
     array_ml[bool_invalid] = np.nan
     
     return array_ml
+
+
+#%%
+def read_point(point_str, width, length):
+    if re.match('[0-9]*/[0-9]*', point_str):
+        x, y = [int(s) for s in re.split('[/]', point_str)]
+        if x > width-1 or y > length-1:
+            print("\nERROR:", file=sys.stderr)
+            print("Index exceed input dimension ({0},{1})!".format(width,length), file=sys.stderr)
+            return False
+    else:
+        print("\nERROR:", file=sys.stderr)
+        print("Point format seems to be wrong (should be x/y)", file=sys.stderr)
+        return False
+    
+    return [x, y]
 
 
 #%%

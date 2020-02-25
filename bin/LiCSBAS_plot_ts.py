@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.7 20200225 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -16,7 +16,7 @@ Inputs
 =====
 Usage
 =====
-LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymmdd] [-r x1:x2/y1:y2] [-c cmap] [--nomask] [--vmin float] [--vmax float] [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
+LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymmdd] [-r x1:x2/y1:y2] [-p x/y] [-c cmap] [--nomask] [--vmin float] [--vmax float] [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
 
  -i    Input cum hdf5 file (Default: ./cum_filt.h5 or ./cum.h5)
  --i2  Input 2nd cum hdf5 file
@@ -24,14 +24,14 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
  -m    Master (reference) date for time-seires (Default: first date)
  -d    Directory containing noise indices (e.g., mask, coh_avg, etc.)
        (Default: "results" at the same dir as cum[_filt].h5)
- -r    Reference area (Default: same as info/ref.txt)
+ -r    Initial reference area (Default: same as info/ref.txt)
+ -p    Initial selected point for time series plot (Default: left top of ref)
  -c    Color map for velocity and cumulative displacement
        - https://matplotlib.org/tutorials/colors/colormaps.html
        - http://www.fabiocrameri.ch/colourmaps.php
        (Default: SCM.roma_r, reverse of SCM.roma)
  --nomask     Not mask (Default: use mask)
- --vmin|vmax  Min|max values of color for velocity map
-              (Default: auto)
+ --vmin|vmax  Min|max values of color for velocity map (Default: auto)
  --dmin|dmax  Min|max values of color for cumulative displacement map
               (Default: auto)
  --auto_crange  Percentage of color range used for automatic determinatin
@@ -41,10 +41,11 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
 """
 #%% Change log
 '''
-v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.7 20200225 Yu Morishita, Uni of Leeds and GSI
  - Use SCM instead of SCM5
  - Change option from --cmap to -c
  - Change cmap for noise indices
+ - Add initial point selection
 v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
  - Adjust figure size and ax location
 v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
@@ -71,6 +72,7 @@ import os
 import re
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.backend_bases
 import numpy as np
 from matplotlib.widgets import Slider, RadioButtons, RectangleSelector, CheckButtons
 import h5py as h5
@@ -142,6 +144,7 @@ if __name__ == "__main__":
     resultsdir = []
     mdate = []
     refarea = []
+    point = []
     maskflag = True
     dmin = None
     dmax = None
@@ -154,7 +157,7 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:d:m:r:c:", ["help", "i2=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
+            opts, args = getopt.getopt(argv[1:], "hi:d:m:r:p:c:", ["help", "i2=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -171,6 +174,8 @@ if __name__ == "__main__":
                 mdate = a
             elif o == '-r':
                 refarea = a
+            elif o == '-p':
+                point = a
             elif o == '-c':
                 cmap = a
             elif o == '--nomask':
@@ -280,7 +285,7 @@ if __name__ == "__main__":
         aspect = 1
         print('No latlon field found in {}. Skip.'.format(cumfile))
             
-    ### Set ref area
+    ### Set initial ref area
     if not refarea:
         refarea = cumh5['refarea'][()]
         refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
@@ -293,6 +298,18 @@ if __name__ == "__main__":
     
     refx1h = refx1-0.5; refx2h = refx2-0.5 ## Shift half for plot
     refy1h = refy1-0.5; refy2h = refy2-0.5
+
+    ### Set initial point
+    if not point:
+        point_x = refx1
+        point_y = refy1
+    else:
+        if not tools_lib.read_point(point, width, length):
+            print('\nERROR in {}\n'.format(point), file=sys.stderr)
+            sys.exit(2)
+        else:
+            point_x, point_y = tools_lib.read_point(point, width, length)
+    
 
     ### Filter info
     if 'deramp_flag' in list(cumh5.keys()):
@@ -645,8 +662,8 @@ if __name__ == "__main__":
     fitcheck.on_clicked(fitfunc)
 
     ### First show of selected point in image window
-    pax, = axv.plot([0], [0], 'k', linewidth=3)
-    pax2, = axv.plot([0], [0], 'Pk')
+    pax, = axv.plot([point_y], [point_x], 'k', linewidth=3)
+    pax2, = axv.plot([point_y], [point_x], 'Pk')
     
     ### Plot time series at clicked point
     lastevent = []
@@ -660,8 +677,8 @@ if __name__ == "__main__":
         elif not event.dblclick: ## Only double click
             return
         else:
-            lastevent = event
-
+            lastevent = event  ## Update last event
+            
         ii = np.int(np.round(event.ydata))
         jj = np.int(np.round(event.xdata))
 
@@ -761,6 +778,17 @@ if __name__ == "__main__":
         axts.legend()
 
         pts.canvas.draw()
+
+
+    #%% First show of time series window
+    event = matplotlib.backend_bases.LocationEvent
+    event.xdata = point_x
+    event.ydata = point_y
+    event.inaxes = axv
+    event.button = 1
+    event.dblclick = True
+    lastevent = event
+    printcoords(lastevent)
 
 
     #%% Final linking of the canvas to the plots.
