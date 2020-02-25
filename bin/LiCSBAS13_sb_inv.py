@@ -132,8 +132,8 @@ def main(argv=None):
     keep_incfile = False
 
     cmap_vel = SCM.roma.reversed()
-    cmap_noise = SCM.turku
-    cmap_noise_r = SCM.turku.reversed()
+    cmap_noise = 'viridis'
+    cmap_noise_r = 'viridis_r'
 
     #%% Read options
     try:
@@ -721,7 +721,6 @@ def main(argv=None):
     ### Velocity and noise indices
     cmins = [None, None, None, None, None, None]
     cmaxs = [None, None, None, None, None, None]
-    cmap_noise = SCM.turku
     cmaps = [cmap_vel, cmap_vel, cmap_noise_r, cmap_noise_r, cmap_noise_r, cmap_noise]
     titles = ['Velocity (mm/yr)', 'Intercept of velocity (mm)', 'RMS of residual (mm)', 'Number of gaps in SB network', 'Number of ifgs with no loops', 'Max length of connected SB network (yr)']
 

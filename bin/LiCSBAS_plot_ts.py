@@ -44,8 +44,7 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
 v1.7 20200225 Yu Morishita, Uni of Leeds and GSI
  - Use SCM instead of SCM5
  - Change option from --cmap to -c
- - Change cmap for noise indices
- - Add initial point selection
+ - Add initial point selection option for time series plot
 v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
  - Adjust figure size and ax location
 v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
@@ -555,7 +554,7 @@ if __name__ == "__main__":
                 
         elif val_ind == 'mask': 
             data = mapdict_data[val_ind]
-            cax.set_cmap(SCM.turku)
+            cax.set_cmap('viridis')
             cax.set_clim(0, 1)
             cbr.set_label('')
             
@@ -564,9 +563,9 @@ if __name__ == "__main__":
             cmin_ind = np.nanpercentile(data*mask, 100-auto_crange)
             cmax_ind = np.nanpercentile(data*mask, auto_crange)
             if val_ind=='hgt': cmin_ind = -cmax_ind/3 ## bnecause 1/4 of terrain is blue
-            cmap2 = SCM.turku
+            cmap2 = 'viridis_r'
             if val_ind in ['coh_avg', 'n_unw', 'mask', 'maxTlen']:
-                cmap2 = SCM.turku.reversed()
+                cmap2 = 'viridis'
             elif val_ind=='mli': cmap2 = SCM.grayC.reversed()
             elif val_ind=='hgt': cmap2 = 'terrain'
             cax.set_cmap(cmap2)

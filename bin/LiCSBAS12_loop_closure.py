@@ -111,8 +111,8 @@ def main(argv=None):
     tsadir = []
     loop_thre = 1.5
 
-    cmap_noise = SCM.turku
-    cmap_noise_r = SCM.turku.reversed()
+    cmap_noise = 'viridis'
+    cmap_noise_r = 'viridis_r'
 
     #%% Read options
     try:

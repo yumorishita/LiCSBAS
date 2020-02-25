@@ -126,8 +126,9 @@ def main(argv=None):
     auto_adjust = True
     
     cmap_vel = SCM.roma.reversed()
-    cmap_noise = SCM.turku
-
+    cmap_noise = 'viridis'
+    cmap_noise_r = 'viridis_r'
+    
     #%% Read options
     try:
         try:
@@ -372,7 +373,7 @@ def main(argv=None):
             vmin_n = thre_dict[name]*0.8
             vmax_n = np.nanmax(data)
         else:
-            cmap = cmap_noise.reversed()
+            cmap = cmap_noise_r
             vmin_n = 0
             vmax_n = thre_dict[name]*1.2
 

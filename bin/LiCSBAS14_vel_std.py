@@ -30,7 +30,6 @@ LiCSBAS14_vel_std.py -t tsadir [--mem_size mem_size]
 '''
 v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
  - Bag fix of stc calculation with overlapping
- - Change color of png
 v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 '''
@@ -72,7 +71,7 @@ def main(argv=None):
     tsadir = []
     memory_size = 4000
 
-    cmap_noise_r = SCM.turku.reversed()
+    cmap_noise_r = 'viridis_r'
     
     #%% Read options
     try:
