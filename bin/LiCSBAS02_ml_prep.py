@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20191115 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -19,9 +19,10 @@ Inputs:
   [- *.geo.[ENU].tif] (if not exist, try to download from LiCSAR portal)
   [- baselines] (if not exist, try to download from LiCSAR portal or make dummy)
 
-Outputs in GEOCml? directory (all binary files are 4byte float little endian):
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw[.png] (downsampled if indicated)
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc[.png] (downsampled if indicated)
+Outputs in GEOCml? directory (downsampled if indicated):
+ - yyyymmdd_yyyymmdd
+   - yyyymmdd_yyyymmdd.unw[.png] (float32)
+   - yyyymmdd_yyyymmdd.cc (uint8)
  - baselines (may be dummy)
  - EQA.dem_par
  - slc.mli[.par|.png]
@@ -45,6 +46,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f FRAME]
 """
 #%% Change log
 '''
+v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
+ - Change format of output cc from float32 to uint8
 v1.3 20191115 Yu Morishita, Uni of Leeds and GSI
  - Use mli and hgt
 v1.2 20191014 Yu Morishita, Uni of Leeds and GSI
@@ -85,7 +88,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20191115; author="Y. Morishita"
+    ver=1.4; date=20200225; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -296,9 +299,9 @@ def main(argv=None):
 
         try:
             cc = gdal.Open(cc_tiffile).ReadAsArray()
-            if cc.dtype == np.uint8: ## New format since 201910
-                cc = cc.astype(np.float32)/255
-            cc[cc==0] = np.nan
+            #if cc.dtype == np.uint8: ## New format since 201910
+                #cc = cc.astype(np.float32)/255
+            #cc[cc==0] = np.nan
         except: ## if broken
             print ('  {} cannot open. Skip'.format(ifgd+'.geo.cc.tif'), flush=True)
             with open(no_unw_list, 'a') as f:
@@ -327,7 +330,10 @@ def main(argv=None):
         ### Multilook
         if nlook != 1:
             unw = tools_lib.multilook(unw, nlook, nlook, n_valid_thre)
+            cc = cc.astype(np.float32)
+            cc[cc==0] = np.nan
             cc = tools_lib.multilook(cc, nlook, nlook, n_valid_thre)
+            cc = cc.astype(np.uint8) ##nan->0, max255, auto-floored
 
         ### Output float
         unw.tofile(unwfile)

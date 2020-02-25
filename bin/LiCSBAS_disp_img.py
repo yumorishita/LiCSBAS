@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-v1.4 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
 ========
-This script displays an image file (only in float format).
+This script displays an image file.
 
 =====
 Usage
 =====
 LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax float] [--auto_crange float]  [--cycle float] [--bigendian] [--png pngname] [--kmz kmzname]
 
- -i  Input image file in float32
+ -i  Input image file in float32 or uint8
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
  -c  Colormap name (see below for available colormap)
      - https://matplotlib.org/tutorials/colors/colormaps.html
@@ -31,8 +31,9 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax f
 
 #%% Change log
 '''
-v1.4 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
  - Use SCM instead of SCM5
+ - Support uint8
 v1.3 20200212 Yu Morishita, Uni of Leeds and GSI
  - Not display image with --kmz option
 v1.2 20191025 Yu Morishita, Uni of Leeds and GSI
@@ -193,7 +194,11 @@ if __name__ == "__main__":
 
 
     #%% Read data
-    data = io_lib.read_img(infile, length, width, endian=endian)
+    if os.path.getsize(infile) == length*width:
+        print('File format: uint8')
+        data = io_lib.read_img(infile, length, width, np.uint8, endian=endian)
+    else:
+        data = io_lib.read_img(infile, length, width, endian=endian)
     
     if cmap_name == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
         data = np.angle(np.exp(1j*(data/cycle))*cycle)

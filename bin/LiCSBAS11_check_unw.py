@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -44,8 +44,9 @@ LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
 """
 #%% Change log
 '''
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
+ - Deal with cc file in uint8 format
 v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
  - Add hgt
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
@@ -78,7 +79,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20191115; author="Y. Morishita"
+    ver=1.2; date=20200225; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -212,7 +213,12 @@ def main(argv=None):
 
         ## cc
         ccfile = os.path.join(ifgdir, ifgd, ifgd+'.cc')
-        coh = io_lib.read_img(ccfile, length, width)
+        if os.path.getsize(ccfile) == length*width:
+            coh = io_lib.read_img(ccfile, length, width, np.uint8)
+            coh = coh.astype(np.float32)/255
+            coh[coh==0] = np.nan
+        else:
+            coh = io_lib.read_img(ccfile, length, width)
 
         coh_avg_ifg.append(np.nanmean(coh[bool_valid])) # Use valid area only
 

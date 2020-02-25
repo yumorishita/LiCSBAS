@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -29,7 +29,7 @@ Outputs in TS_GEOCml* :
                                    bad ifgs were not identified
 
  - info/
-   - ref.txt             : ref point automatically sed by loop check (X/Y)
+   - ref_prelim.txt      : Preliminaly ref point for SB inversion (X/Y)
    - 12removed_image.txt : List of images to be removed in further processing
    - 12bad_ifg.txt       : List of bad ifgs to be removed in further processing
    - 12network_gap_info.txt : Information of gaps in network
@@ -59,10 +59,11 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
 """
 #%% Change log
 '''
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Improve bad loop cand identification
  - Change color of png
+ - Deal with cc file in uint8 format
 v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
  - Add iteration during ref search when no ref found
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -100,7 +101,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200224; author="Y. Morishita"
+    ver=1.2; date=20200225; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -346,8 +347,8 @@ def main(argv=None):
     refx1 = refyx[1][0]
     refx2 = refyx[1][0]+1
 
-    ### Save ref.txt
-    reffile = os.path.join(infodir, 'ref.txt')
+    ### Save ref_prelim.txt
+    reffile = os.path.join(infodir, 'ref_prelim.txt')
     with open(reffile, 'w') as f:
         print('{0}:{1}/{2}:{3}'.format(refx1, refx2, refy1, refy2), file=f)
 
@@ -542,9 +543,13 @@ def main(argv=None):
     n_unw = np.zeros((length, width), dtype=np.int16)
     for ifgd in ifgdates_good:
         ccfile = os.path.join(ifgdir, ifgd, ifgd+'.cc')
-        coh = io_lib.read_img(ccfile, length, width)
-        
-        coh[np.isnan(coh)] = 0 # Fill nan with 0
+        if os.path.getsize(ccfile) == length*width:
+            coh = io_lib.read_img(ccfile, length, width, np.uint8)
+            coh = coh.astype(np.float32)/255
+        else:
+            coh = io_lib.read_img(ccfile, length, width)
+            coh[np.isnan(coh)] = 0 # Fill nan with 0
+
         coh_avg += coh
         n_coh += (coh!=0)
 

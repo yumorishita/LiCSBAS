@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.1 20200225 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -39,8 +39,9 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
 """
 #%% Change log
 '''
-v1.1 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.1 20200225 Yu Morishita, Uni of Leeds and GSI
  - Bag fix for hgt.png
+ - Deal with cc file in uint8 format
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 '''
@@ -72,7 +73,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.0; date=20190730; author="Y. Morishita"
+    ver=1.1; date=20200225; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -263,7 +264,14 @@ def main(argv=None):
         ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
         
         unw = io_lib.read_img(unwfile, length, width)
-        coh = io_lib.read_img(ccfile, length, width)
+        if os.path.getsize(ccfile) == length*width:
+            ccformat = np.uint8
+        elif os.path.getsize(ccfile) == length*width*4:
+            ccformat = np.float32
+        else:
+            print("ERROR: unkown file format for {}".format(ccfile), file=sys.stderr)
+            continue
+        coh = io_lib.read_img(ccfile, length, width, dtype=ccformat)
 
         ### Clip
         unw = unw[y1:y2, x1:x2]

@@ -24,7 +24,7 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
  -m    Master (reference) date for time-seires (Default: first date)
  -d    Directory containing noise indices (e.g., mask, coh_avg, etc.)
        (Default: "results" at the same dir as cum[_filt].h5)
- -r    Initial reference area (Default: same as info/ref.txt)
+ -r    Initial reference area (Default: same as info/ref_stable.txt)
  -p    Initial selected point for time series plot (Default: left top of ref)
  -c    Color map for velocity and cumulative displacement
        - https://matplotlib.org/tutorials/colors/colormaps.html

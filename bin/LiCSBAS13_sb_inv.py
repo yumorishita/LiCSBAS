@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
 ========
-This script inverts the small baseline network of unw data to get the time series of displacement and velocity using the NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
+This script inverts the small baseline network of ifgs to get the time series of displacement and velocity using the NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
+A stable reference point is determined after the inversion. RMS of the time series wrt median among all points as tentative reference is calculated for each point. Then the point with minimum RMS and minumum n_gap is selected as new stable reference point.
 
 ===============
 Input & output files
@@ -18,7 +19,7 @@ Inputs in GEOCml* :
  - baselines (can be dummy)
 
 Inputs in TS_GEOCml*/info :
- - ref[.txt|.kml]
+ - ref[_prelim].txt
  - 11bad_ifg.txt
  - 12bad_ifg.txt
  
@@ -35,6 +36,7 @@ Outputs in TS_GEOCml* directory
    - 13parameters.txt   : Used parameters
    - 13used_image.txt : List of used images
    - 13resid.txt      : List of RMS of residual for each ifg
+   - ref_stable[.txt|.kml]   : Auto-determined stable ref point
  - 13increment/yyyymmdd_yyyymmdd.inc_comp.png
                       : Estimated incremental displacement and daisy chain IFG
  - 13resid/yyyymmdd_yyyymmdd.res.png : Residual for each ifg
@@ -43,15 +45,15 @@ Outputs in TS_GEOCml* directory
 =====
 Usage
 =====
-LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg inv_alg] [--mem_size mem_size] [--gamma gamma] [--n_core n_core] [--n_unw_r_thre n_unw_r_thre] [--keep_incfile] 
+LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_core int] [--n_unw_r_thre float] [--keep_incfile] 
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
 
  --inv_alg    Inversion algolism (Default: LS)
-               LS : NSBAS Least Square
-               WLS: NSBAS Weighted Least Square (more accurate but slower)
-                    Weight (variance) is calculated by (1-coh**2)/(2*coh**2)
+   LS :       NSBAS Least Square with no weight
+   WLS:       NSBAS Weighted Least Square (not well tested)
+              Weight (variance) is calculated by (1-coh**2)/(2*coh**2)
  --mem_size   Max memory size for each patch in MB. (Default: 4000)
  --gamma      Gamma value for NSBAS inversion (Default: 0.0001)
  --n_core     Number of cores for parallel processing (Default: 1)
@@ -66,10 +68,12 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg inv_alg] [--mem_size mem_si
 """
 #%% Change log
 '''
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Change color of png
  - Change name of parameters.txt to 13parameters.txt
+ - Deal with cc file in uint8 format
+ - Automatically find stable reference point
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum.h5 if exists before creation
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -111,7 +115,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20190829; author="Y. Morishita"
+    ver=1.2; date=20200225; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -119,7 +123,6 @@ def main(argv=None):
     #%% Set default
     ifgdir = []
     tsadir = []
-    refflag = 'auto' ## not supported
     inv_alg = 'LS'
     n_core = 1
 
@@ -135,7 +138,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:t:r:", ["help",  "mem_size=", "gamma=", "n_unw_r_thre=", "keep_incfile", "inv_alg=", "n_core="])
+            opts, args = getopt.getopt(argv[1:], "hd:t:", ["help",  "mem_size=", "gamma=", "n_unw_r_thre=", "keep_incfile", "inv_alg=", "n_core="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -146,8 +149,6 @@ def main(argv=None):
                 ifgdir = a
             elif o == '-t':
                 tsadir = a
-            elif o == '-r':
-                refflag = a
             elif o == '--mem_size':
                 memory_size = float(a)
             elif o == '--gamma':
@@ -192,7 +193,9 @@ def main(argv=None):
 
     bad_ifg11file = os.path.join(infodir, '11bad_ifg.txt')
     bad_ifg12file = os.path.join(infodir, '12bad_ifg.txt')
-    reffile = os.path.join(infodir, 'ref.txt')
+    reffile = os.path.join(infodir, 'ref_prelim.txt')
+    if not os.path.exists(reffile): ## for old LiCSBAS12 < v1.1
+        reffile = os.path.join(infodir, 'ref.txt')
 
     incdir = os.path.join(tsadir,'13increment')
     if not os.path.exists(incdir): os.mkdir(incdir)
@@ -207,11 +210,11 @@ def main(argv=None):
     #%% Check files
     try:
         if not os.path.exists(bad_ifg11file):
-            raise Usage('No 11bad_ifg.txt file exists in {}!'.format(tsadir))
+            raise Usage('No 11bad_ifg.txt file exists in {}!'.format(infodir))
         if not os.path.exists(bad_ifg12file):
-            raise Usage('No 12bad_ifg.txt file exists in {}!'.format(tsadir))
+            raise Usage('No 12bad_ifg.txt file exists in {}!'.format(infodir))
         if not os.path.exists(reffile):
-            raise Usage('No ref.txt file exists in {}!'.format(tsadir))
+            raise Usage('No ref[_prelim].txt file exists in {}!'.format(infodir))
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
@@ -219,11 +222,10 @@ def main(argv=None):
         return 2
 
       
-    #%% Check and set reference
-    if refflag == 'auto': # Automatic setting based on ref.txt
-        with open(reffile, "r") as f:
-            refarea = f.read().split()[0]  #str, x1/x2/y1/y2
-        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
+    #%% Set preliminaly reference
+    with open(reffile, "r") as f:
+        refarea = f.read().split()[0]  #str, x1/x2/y1/y2
+    refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
 
 
     #%% Read data information
@@ -252,12 +254,6 @@ def main(argv=None):
         rb = ra*(1-1/recip_f) ## polar radius
         pixsp_a = 2*np.pi*rb/360*abs(dlat)
         pixsp_r = 2*np.pi*ra/360*dlon*np.cos(np.deg2rad(centerlat))
-        
-        ### Make ref.kml
-        reflat = lat1+dlat*refy1
-        reflon = lon1+dlon*refx1
-        make_point_kml(reflat, reflon, os.path.join(infodir, 'ref.kml'))
-        
     else:
         print('In radar coordinates', flush=True)
         pixsp_r_org = float(io_lib.get_param_par(mlipar, 'range_pixel_spacing'))
@@ -408,7 +404,6 @@ def main(argv=None):
     if os.path.exists(cumh5file): os.remove(cumh5file)
     cumh5 = h5.File(cumh5file, 'w')
     cumh5.create_dataset('imdates', data=[np.int32(imd) for imd in imdates])
-    cumh5.create_dataset('refarea', data=refarea)
     if not np.all(np.abs(np.array(bperp))<=1):# if not dummy
         cumh5.create_dataset('bperp', data=bperp)
     cum = cumh5.require_dataset('cum', (n_im, length, width), dtype=np.float32)
@@ -445,7 +440,7 @@ def main(argv=None):
         for i, ifgd in enumerate(ifgdates):
             unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
             f = open(unwfile, 'rb')
-            f.seek(countf*4, os.SEEK_SET) #Seek for >=2nd path, 4 means byte
+            f.seek(countf*4, os.SEEK_SET) #Seek for >=2nd patch, 4 means byte
             
             ### Read unw data (mm) at patch area
             unw = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))*coef_r2m
@@ -458,9 +453,14 @@ def main(argv=None):
             if inv_alg == 'WLS':
                 cohfile = os.path.join(ifgdir, ifgd, ifgd+'.cc')
                 f = open(cohfile, 'rb')
-                f.seek(countf*4, os.SEEK_SET) #Seek for >=2nd path, 4 means byte
-                cohpatch[i, :, :] = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))
-
+                
+                if os.path.getsize(cohfile) == length*width: ## uint8 format
+                    f.seek(countf, os.SEEK_SET) #Seek for >=2nd patch
+                    cohpatch[i, :, :] = (np.fromfile(f, dtype=np.uint8, count=countl).reshape((lengththis, width))).astype(np.float32)/255
+                else: ## old float32 format
+                    f.seek(countf*4, os.SEEK_SET) #Seek for >=2nd patch, 4 means byte
+                    cohpatch[i, :, :] = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))
+                cohpatch[cohpatch==0] = np.nan
 
         unwpatch = unwpatch.reshape((n_ifg, n_pt_all)).transpose() #(n_pt_all, n_ifg)
 
@@ -617,8 +617,59 @@ def main(argv=None):
 
         i_patch += 1 #Next patch count
 
+
+    #%% Find stable ref point
+    print('\nFind stable reference point...', flush=True)
+    ### Compute RMS of time series with reference to all points
+    sumsq_cum_wrt_med = np.zeros((length, width), dtype=np.float32)
+    for i in range(n_im):
+        sumsq_cum_wrt_med = sumsq_cum_wrt_med + (cum[i, :, :]-np.nanmedian(cum[i, :, :]))**2
+    rms_cum_wrt_med = np.sqrt(sumsq_cum_wrt_med/n_im)
+
+    ### Mask by minimum n_gap
+    n_gap = io_lib.read_img(os.path.join(resultsdir, 'n_gap'), length, width)
+    min_n_gap = np.nanmin(n_gap)
+    mask_n_gap = np.float32(n_gap==min_n_gap)
+    mask_n_gap[mask_n_gap==0] = np.nan
+    rms_cum_wrt_med = rms_cum_wrt_med*mask_n_gap
+    
+    ### Find stable reference
+    min_rms = np.nanmin(rms_cum_wrt_med)
+    refy1s, refx1s = np.where(rms_cum_wrt_med==min_rms)
+    refy1s, refx1s = refy1s[0], refx1s[0] ## Only first index
+    refy2s, refx2s = refy1s+1, refx1s+1
+    print('Selected ref: {}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s), flush=True)
+
+    ### Rerferencing cumulative displacement  and vel to new stable ref
+    for i in range(n_im):
+        cum[i, :, :] = cum[i, :, :] - cum[i, refy1s, refx1s]
+    vel = vel - vel[refy1s, refx1s]
+    vconst = vconst - vconst[refy1s, refx1s]
+
+    ### Save image
+    rms_cum_wrt_med_file = os.path.join(resultsdir, 'rms_cum_wrt_med')
+    with open(rms_cum_wrt_med_file, 'w') as f:
+        rms_cum_wrt_med.tofile(f)
+
+    pngfile = os.path.join(resultsdir, 'rms_cum_wrt_med.png')
+    plot_lib.make_im_png(rms_cum_wrt_med, pngfile, cmap_noise_r, 'RMS of cum wrt median (mm)', np.nanpercentile(rms_cum_wrt_med, 1), np.nanpercentile(rms_cum_wrt_med, 99))
+
+    ### Save ref
+    cumh5.create_dataset('refarea', data='{}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s))
+    refsfile = os.path.join(infodir, 'ref_stable.txt')
+    with open(refsfile, 'w') as f:
+        print('{}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s), file=f)
+
+    if width == width_geo and length == length_geo: ## Geocoded
+        ### Make ref_stable.kml
+        reflat = lat1+dlat*refy1
+        reflon = lon1+dlon*refx1
+        make_point_kml(reflat, reflon, os.path.join(infodir, 'ref_stable.kml'))
+
+
     #%% Close h5 file
     cumh5.close()
+
 
     #%% Output png images
     print('\nOutput png images...', flush=True)

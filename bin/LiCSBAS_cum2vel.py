@@ -16,7 +16,7 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
  -e  End date of period to calculate velocity (Default: last date)
  -i  Path to input cum file (Default: cum_filt.h5)
  -o  Output vel file (Default: yyyymmdd_yyyymmdd.vel[.mskd])
- -r  Reference area (Default: same as info/ref.txt)
+ -r  Reference area (Default: same as info/ref_stable.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
  --vstd  Calculate vstd (Default: No)
  --sin   Add sin (annual) funcsion to linear model (Default: No)
