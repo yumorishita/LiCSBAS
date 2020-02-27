@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+v1.1 20200227 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -22,6 +22,8 @@ LiCSBAS_cum2tstxt.py [-p x/y] [-g lon/lat] [-i cumfile] [-o tsfile] [-r x1:x2/y1
 """
 #%% Change log
 '''
+v1.1 20200227 Yu Morishita, Uni of Leeds and GSI
+ - Add hgt_linear_flag
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementationf
 '''
@@ -51,7 +53,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.0; date=20190730; author="Y. Morishita"
+    ver=1.1; date=20200227; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -108,21 +110,30 @@ def main(argv=None):
     imdates = cumh5['imdates'][()].astype(str).tolist()
     n_im, length, width = cum.shape
 
-    try:
+    if 'corner_lat' in list(cumh5.keys()):
         geocod_flag = True
         lat1 = float(cumh5['corner_lat'][()])
         lon1 = float(cumh5['corner_lon'][()])
         dlat = float(cumh5['post_lat'][()])
         dlon = float(cumh5['post_lon'][()])
-    except:
+    else:
         geocod_flag = False
     
-    try:
+    if 'deramp_flag' in list(cumh5.keys()):
         deramp_flag = cumh5['deramp_flag'][()]
+    else:
+        deramp_flag = None
+
+    if 'hgt_linear_flag' in list(cumh5.keys()):
+        hgt_linear_flag = cumh5['hgt_linear_flag'][()]
+    else:
+        hgt_linear_flag = None
+
+    if 'filtwidth_km' in list(cumh5.keys()):
         filtwidth_km = float(cumh5['filtwidth_km'][()])
         filtwidth_yr = float(cumh5['filtwidth_yr'][()])
-    except:
-        deramp_flag = filtwidth_km = filtwidth_yr = None
+    else:
+        filtwidth_km = filtwidth_yr = None
 
 
     #%% Set info
@@ -208,7 +219,7 @@ def main(argv=None):
     ts_dif = ts_dif-ts_dif[0] ## Make first date zero
 
     ### Make txt
-    io_lib.make_tstxt(x, y, imdates, ts_dif, tsfile, refx1, refx2, refy1, refy2, gap1, lat=lat, lon=lon, reflat1=reflat1, reflat2=reflat2, reflon1=reflon1, reflon2=reflon2, deramp_flag=deramp_flag, filtwidth_km=filtwidth_km, filtwidth_yr=filtwidth_yr)
+    io_lib.make_tstxt(x, y, imdates, ts_dif, tsfile, refx1, refx2, refy1, refy2, gap1, lat=lat, lon=lon, reflat1=reflat1, reflat2=reflat2, reflon1=reflon1, reflon2=reflon2, deramp_flag=deramp_flag, hgt_linear_flag=hgt_linear_flag, filtwidth_km=filtwidth_km, filtwidth_yr=filtwidth_yr)
 
 
     #%% Finish

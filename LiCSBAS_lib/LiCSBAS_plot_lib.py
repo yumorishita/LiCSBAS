@@ -8,8 +8,9 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
-v1.2 20200225 Yu Morioshita, Uni of Leeds and GSI
+v1.1 20200227 Yu Morioshita, Uni of Leeds and GSI
  - Remove pdf option in plot_network
+ - Add plot_hgt_corr
 v1.0 20190729 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
 
@@ -94,6 +95,49 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
     plt.savefig(pngfile)
     plt.close()
    
+    return 
+
+
+#%%
+def plot_hgt_corr(data_bf, fit_hgt, hgt, title, pngfile):
+    """
+    """
+    bool_nan = np.isnan(data_bf)
+    data_af = data_bf - fit_hgt ### Correction
+    ix_hgt0 = np.nanargmin(hgt[~bool_nan])
+    ix_hgt1 = np.nanargmax(hgt[~bool_nan])
+    hgt0 = hgt[~bool_nan][ix_hgt0]
+    hgt1 = hgt[~bool_nan][ix_hgt1]
+    fit_hgt0 = fit_hgt[~bool_nan][ix_hgt0]
+    fit_hgt1 = fit_hgt[~bool_nan][ix_hgt1]
+    
+    ### Downsample data to plot large number of scatters fast
+    hgt_data_bf = np.stack((np.round(hgt[~bool_nan]), np.round(data_bf[~bool_nan], 1))).T  ## Round values
+    hgt_data_bf = np.unique(hgt_data_bf, axis = 0)  ## Keep only uniques
+    hgt_data_af = np.stack((np.round(hgt[~bool_nan]), np.round(data_af[~bool_nan], 1))).T  ## Round values
+    hgt_data_af = np.unique(hgt_data_af, axis = 0)  ## Keep only uniques
+
+    ### Plot    
+    figsize = (5, 4)
+    sbf, cbf, mbf, zbf, lbf = 0.2, '0.5', 'p', 4, 'Before'
+    saf, caf, maf, zaf, laf = 0.2, 'c', 'p', 6, 'After'
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+
+    ax.scatter(hgt_data_bf[:, 0], hgt_data_bf[:, 1], s=sbf, c=cbf, marker=mbf, zorder=zbf, label=lbf)
+    ax.scatter(hgt_data_af[:, 0], hgt_data_af[:, 1], s=saf, c=caf, marker=maf, zorder=zaf, label=laf)
+    ax.plot([hgt0, hgt1], [fit_hgt0, fit_hgt1], linewidth=2, color='k', alpha=0.8, zorder=8, label='Correction')
+
+    ax.grid(zorder=0)
+    ax.set_title(title, fontsize=10)
+    ax.set_xlabel('Height (m)')
+    ax.set_ylabel('Displacement (mm)')
+
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(pngfile)
+    plt.close()
+
     return 
 
 
@@ -186,3 +230,5 @@ def plot_network(ifgdates, bperp, rm_ifgdates, pngfile, plot_bad=True):
     ### Save
     plt.savefig(pngfile)
     plt.close()
+
+

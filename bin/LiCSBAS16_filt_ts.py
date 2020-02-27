@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
 ========
-This script applies spatial-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramp can also be applied if specified by -r option.
+This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1d, bilinear, or 2d polinomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering.
 
 ===============
 Input & output files
@@ -13,16 +13,21 @@ Input & output files
 Inputs in TS_GEOCml* :
  - cum.h5
  - results/mask
+ - results/hgt (if --hgt_linear option is used)
  - info/13parameters.txt
  
 Outputs in TS_GEOCml* directory
  - cum_filt.h5
  - 16filt_cum
    - yyyymmdd_filt.png
-  [- yyyymmdd_deramp.png]
+  [- yyyymmdd_deramp.png] (if -r option is used)
+  [- yyyymmdd_hgt_linear.png] (if --hgt_linear option is used)
+  [- yyyymmdd_hgt_corr.png] (if --hgt_linear option is used)
  - 16filt_increment
    - yyyymmdd_yyyymmdd_filt.png
-  [- yyyymmdd_yyyymmdd_deramp.png]
+  [- yyyymmdd_yyyymmdd_deramp.png] (if -r option is used)
+  [- yyyymmdd_yyyymmdd_hgt_linear.png] (if --hgt_linear option is used)
+  [- yyyymmdd_yyyymmdd_hgt_corr.png] (if --hgt_linear option is used)
  - results/vel.filt[.mskd][.png]
  - results/vintercept.filt.mskd[.png]
  - info/16parameters.txt
@@ -30,22 +35,28 @@ Outputs in TS_GEOCml* directory
 =====
 Usage
 =====
-LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--nomask]
+LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--hgt_linear] [--hgt_min int] [--hgt_max int] [--nomask]
 
  -t  Path to the TS_GEOCml* dir.
  -s  Width of spatial filter in km (Default: 2 km)
  -y  Width of temporal filter in yr (Default: auto, avg_interval*3)
  -r  Degree of deramp [1, bl, 2] (Default: no deramp)
      1: 1d ramp, bl: bilinear, 2: 2d polynomial
- --nomask  Not mask (Default: use mask)
+ --hgt_linear Subtract topography-correlated component using a linear method 
+              (Default: Not apply)
+ --hgt_min    Minumum hgt to take into account in hgt-linear (Default: 200m)
+ --hgt_max    Maximum hgt to take into account in hgt-linear (Default: 10000m, no effect)
+ --nomask     Apply filter to unmasked data (Default: apply to masked)
   
 """
 #%% Change log
 '''
-v1.2 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
  - Divide 16filt dir to 16filt_increment and 16filt_cum
  - Change color of png
  - Update about parameters.txt
+ - Add --hgt_linear and hgt_min option
+ - Bag fix for deramp (mask was not applyed)
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum_filt.h5 if exists before creation
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
@@ -58,7 +69,7 @@ import os
 os.environ['QT_QPA_PLATFORM']='offscreen'
 import sys
 import time
-import glob
+import shutil
 import warnings
 import numpy as np
 import datetime as dt
@@ -84,7 +95,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200224; author="Y. Morishita"
+    ver=1.2; date=20200227; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -94,6 +105,9 @@ def main(argv=None):
     filtwidth_km = 2
     filtwidth_yr = []
     deg_ramp = []
+    hgt_linearflag = False
+    hgt_min = 200 ## meter
+    hgt_max = 10000 ## meter
     maskflag = True
     
     cumname = 'cum.h5'
@@ -103,7 +117,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:s:y:r:", ["help", "nomask"])
+            opts, args = getopt.getopt(argv[1:], "ht:s:y:r:", ["help", "hgt_linear", "hgt_min=", "hgt_max=", "nomask"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -118,6 +132,12 @@ def main(argv=None):
                 filtwidth_yr = float(a)
             elif o == '-r':
                 deg_ramp = a
+            elif o == '--hgt_linear':
+                hgt_linearflag = True
+            elif o == '--hgt_min':
+                hgt_min = int(a)
+            elif o == '--hgt_max':
+                hgt_max = int(a)
             elif o == '--nomask':
                 maskflag = False
 
@@ -158,9 +178,11 @@ def main(argv=None):
         cycle = 3 # 3*2pi/cycle for comparison png
 
     filtincdir = os.path.join(tsadir, '16filt_increment')
-    if not os.path.exists(filtincdir): os.mkdir(filtincdir)
+    if os.path.exists(filtincdir): shutil.rmtree(filtincdir)
+    os.mkdir(filtincdir)
     filtcumdir = os.path.join(tsadir, '16filt_cum')
-    if not os.path.exists(filtcumdir): os.mkdir(filtcumdir)
+    if os.path.exists(filtcumdir): shutil.rmtree(filtcumdir)
+    os.mkdir(filtcumdir)
     
     cumffile = os.path.join(tsadir, 'cum_filt.h5')
 
@@ -203,6 +225,18 @@ def main(argv=None):
     if not filtwidth_yr and filtwidth_yr != 0:
         filtwidth_yr = dt_cum[-1]/(n_im-1)*3 ## avg interval*3
 
+    ### hgt
+    if hgt_linearflag:
+        hgtfile = os.path.join(resultsdir, 'hgt')
+        if not os.path.exists(hgtfile):
+            print('\nERROR: No hgt file exist in results dir!', file=sys.stderr)
+            print('--hgt_linear option cannot be used.', file=sys.stderr)
+            return 2
+        hgt = io_lib.read_img(hgtfile, length, width)
+        hgt[np.isnan(hgt)] = 0
+    else:
+        hgt = []   
+
 
     #%% Display settings
     print('')
@@ -211,6 +245,10 @@ def main(argv=None):
     print('Width of filter in space : {} km ({:.1f}x{:.1f} pixel)'.format(filtwidth_km, x_stddev, y_stddev))
     print('Width of filter in time  : {:.3f} yr ({} days)'.format(filtwidth_yr, int(filtwidth_yr*365.25)))
     print('Deramp flag              : {}'.format(deg_ramp), flush=True)
+    print('hgt-linear flag          : {}'.format(hgt_linearflag), flush=True)
+    if hgt_linearflag:
+        print('Minimum hgt              : {} m'.format(hgt_min), flush=True)
+        print('Maximum hgt              : {} m'.format(hgt_max), flush=True)
 
     with open(outparmfile, "w") as f:
         print('filtwidth_km:  {}'.format(filtwidth_km), file=f)
@@ -219,6 +257,9 @@ def main(argv=None):
         print('filtwidth_yr:  {:.3f}'.format(filtwidth_yr), file=f)
         print('filtwidth_day:  {}'.format(int(filtwidth_yr*365.25)), file=f)
         print('deg_ramp:  {}'.format(deg_ramp), file=f)
+        print('hgt_linear:  {}'.format(hgt_linearflag*1), file=f)
+        print('hgt_min: {}'.format(hgt_min), file=f)
+        print('hgt_max: {}'.format(hgt_max), file=f)
 
 
     #%% Load Mask (1: unmask, 0: mask, nan: no cum data)
@@ -231,41 +272,83 @@ def main(argv=None):
         mask[np.isnan(cum_org[0, :, :])] = np.nan
 
 
-    #%% First, deramp if indicated
+    #%% First, deramp and hgt-linear if indicated
     cum = np.zeros((cum_org.shape), dtype=np.float32)*np.nan
-    if not deg_ramp:
+    if not deg_ramp and not hgt_linearflag:
         cum = cum_org[()]
-        ## Remove past *_deramp.png if exist
-        for png in glob.glob(os.path.join(filtincdir, '*_deramp.png')):
-            os.remove(png)
-        for png in glob.glob(os.path.join(filtcumdir, '*_deramp.png')):
-            os.remove(png)
-        
+
     else:
-        print('\nDeramp ifgs with the degree of {}...'.format(deg_ramp), flush=True)
-        ramp1 = []
+        if not deg_ramp:
+            print('\nEstimate hgt-linear component...', flush=True)
+        elif not hgt_linearflag:
+            print('\nDeramp ifgs with the degree of {}...'.format(deg_ramp), flush=True)
+        else:
+            print('\nDeramp ifgs with the degree of {} and hgt-linear...'.format(deg_ramp), flush=True)
+
+        ramp1 = []  ## backup last ramp to plot increment
+        fit_hgt1 = []  ## backup last fit_hgt to plot increment
+        model1 = []
+        deramp_title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{})'.format(deg_ramp), 'After deramp ({}pi/cycle)'.format(cycle*2)]
 
         for i in range(n_im):
             if np.mod(i, 10) == 0:
                 print("  {0:3}/{1:3}th image...".format(i, n_im), flush=True)
             
-            ramp, _ = tools_lib.fit2d(cum_org[i, :, :], deg=deg_ramp)
-            cum[i, :, :] = cum_org[i, :, :]-ramp
+            fit, model = tools_lib.fit2dh(cum_org[i, :, :]*mask, deg_ramp, hgt, hgt_min, hgt_max)
+            cum[i, :, :] = cum_org[i, :, :]-fit
 
-            ## Output comparison image of deramp
-            data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum_org[i, :, :]*mask, ramp, cum[i, :, :]*mask]]
-            title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{}, {}pi/cycle)'.format(deg_ramp, cycle*2), 'After deramp ({}pi/cycle)'.format(cycle*2)]
-            pngfile = os.path.join(filtcumdir, imdates[i]+'_deramp.png')
-            plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
-
-            ## Output comparison image of deramp for increment
-            if i != 0:
-                data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [(cum_org[i, :, :]-cum_org[i-1, :, :])*mask, ramp-ramp1, (cum[i, :, :]-cum[i-1, :, :])*mask]]
-                title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{}, {}pi/cycle)'.format(deg_ramp, cycle*2), 'After deramp ({}pi/cycle)'.format(cycle*2)]
-                pngfile = os.path.join(filtincdir, '{}_{}_deramp.png'.format(imdates[i-1], imdates[i]))
+            if hgt_linearflag:
+                fit_hgt = hgt*model[-1]  ## extract only hgt-linear component
+                cum_bf = cum[i, :, :]*mask+fit_hgt ## After deramp before hgt-linear
+            
+                ## Output comparison image of hgt_linear
+                std_before = np.nanstd(cum_bf)
+                std_after = np.nanstd(cum[i, :, :]*mask)
+                data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum_bf, fit_hgt, cum[i, :, :]*mask]]
+                title3 = ['Before hgt-linear (STD: {:.1f}mm)'.format(std_before), 'hgt-linear phase ({:.1f}mm/km)'.format(model[-1]*1000), 'After hgt-linear (STD: {:.1f}mm)'.format(std_after)]
+                pngfile = os.path.join(filtcumdir, imdates[i]+'_hgt_linear.png')
                 plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+                
+                pngfile = os.path.join(filtcumdir, imdates[i]+'_hgt_corr.png')
+                title = '{} ({:.1f}mm/km, based on {}<=hgt<={})'.format(imdates[i], model[-1]*1000, hgt_min, hgt_max)
+                plot_lib.plot_hgt_corr(cum_bf, fit_hgt, hgt, title, pngfile)
+                
+                ## Output comparison image of hgt_linear for increment
+                if i != 0: ## first image has no increment
+                    inc = (cum[i, :, :]-cum[i-1, :, :])*mask
+                    std_before = np.nanstd(inc+fit_hgt-fit_hgt1)
+                    std_after = np.nanstd(inc)
+                    data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [inc+fit_hgt-fit_hgt1, fit_hgt-fit_hgt1, inc]]
+                    title3 = ['Before hgt-linear (STD: {:.1f}mm)'.format(std_before), 'hgt-linear phase ({:.1f}mm/km)'.format((model[-1]-model1)*1000), 'After hgt-linear (STD: {:.1f}mm)'.format(std_after)]
+                    pngfile = os.path.join(filtincdir, '{}_{}_hgt_linear.png'.format(imdates[i-1], imdates[i]))
+                    plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
-            ramp1 = ramp.copy() ## backup last ramp        
+                    pngfile = os.path.join(filtincdir, '{}_{}_hgt_corr.png'.format(imdates[i-1], imdates[i]))
+                    title = '{}_{} ({:.1f}mm/km, based on {}<=hgt<={})'.format(imdates[i-1], imdates[i], (model[-1]-model1)*1000, hgt_min, hgt_max)
+                    plot_lib.plot_hgt_corr(inc+fit_hgt-fit_hgt1, fit_hgt-fit_hgt1, hgt, title, pngfile)
+                    
+                fit_hgt1 = fit_hgt.copy() ## backup last fit_hgt
+                model1 = model[-1]
+
+            else:
+                fit_hgt = 0  ## for plot deframp
+            
+            if deg_ramp:
+                ramp = fit-fit_hgt
+                
+                ## Output comparison image of deramp
+                data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum_org[i, :, :]*mask, ramp, cum_org[i, :, :]*mask-ramp]]
+                pngfile = os.path.join(filtcumdir, imdates[i]+'_deramp.png')
+                plot_lib.make_3im_png(data3, pngfile, 'insar', deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+
+                ## Output comparison image of deramp for increment
+                if i != 0: ## first image has no increment
+                    inc_org = (cum_org[i, :, :]-cum_org[i-1, :, :])*mask
+                    data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [inc_org, ramp-ramp1, inc_org-(ramp-ramp1)]]
+                    pngfile = os.path.join(filtincdir, '{}_{}_deramp.png'.format(imdates[i-1], imdates[i]))
+                    plot_lib.make_3im_png(data3, pngfile, 'insar', deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+
+                ramp1 = ramp.copy() ## backup last ramp
 
 
     #%% Filter each image
@@ -376,6 +459,7 @@ def main(argv=None):
     cumfh5.create_dataset('filtwidth_yr', data=filtwidth_yr)
     cumfh5.create_dataset('filtwidth_km', data=filtwidth_km)
     cumfh5.create_dataset('deramp_flag', data=deg_ramp)
+    cumfh5.create_dataset('hgt_linear_flag', data=hgt_linearflag*1)
     
     cumh5.close()
     cumfh5.close()

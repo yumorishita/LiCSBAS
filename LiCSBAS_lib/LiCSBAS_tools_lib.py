@@ -8,8 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
-v1.2 20200225 Yu Morioshita, Uni of Leeds and GSI
- - Add read_point
+v1.2 20200227 Yu Morioshita, Uni of Leeds and GSI
+ - Add read_point and fit2dh
 v1.1 20190916 Yu Morioshita, Uni of Leeds and GSI
  - Add read_range_line and read_range_line_geo
 v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
@@ -143,6 +143,69 @@ def fit2d(A,w=None,deg="1"):
     Afit = np.float32(results.predict().reshape((length,width)))
 
     return Afit,m
+
+
+#%%
+def fit2dh(A, deg, hgt, hgt_min, hgt_max):
+    """
+    Estimate best fit 2d ramp and topography-correlated component simultaneously.
+    
+    Inputs:
+        A   : Input ndarray (can include nan)
+        deg : degree of polynomial for fitting ramp
+          - 1  -> a+bx+cy (ramp, default)
+          - bl -> a+bx+cy+dxy (biliner)
+          - 2  -> a+bx+cy+dxy+ex**2_fy**2 (2d polynomial)
+          - []  -> a (must be used with hgt)
+        hgt : Input hgt to estimate coefficient of topo-corr component
+              If blank, don*t estimate topo-corr component.
+        hgt_min : Minimum hgt to take into account in hgt-linear
+        hgt_max : Maximum hgt to take into account in hgt-linear
+    
+    Returns:
+        Afit : Best fit solution with the same demention as A
+        m    : Set of parameters of best fit plain (a,b,c...)
+    
+    """
+
+    ### Make design matrix G
+    length, width = A.shape
+    Xgrid, Ygrid = np.meshgrid(np.arange(width),np.arange(length))
+    Xgrid1 = Xgrid.ravel()
+    Ygrid1 = Ygrid.ravel()
+
+    if not deg:
+        G = np.ones((length*width))
+    else:
+        if str(deg) == "1":
+            G = np.stack((Xgrid1, Ygrid1)).T
+        elif str(deg) == "bl":
+            G = np.stack((Xgrid1, Ygrid1, Xgrid1*Ygrid1)).T
+        elif str(deg) == "2":
+            G = np.stack((Xgrid1, Ygrid1, Xgrid1*Ygrid1, Xgrid1**2, Ygrid1**2)).T
+        else:
+            print('\nERROR: Not proper deg ({}) is used\n'.format(deg), file=sys.stderr)
+            return False
+        G = sm.add_constant(G)
+    
+    if len(hgt) > 0:
+        _hgt = hgt.copy()  ## Not to overwrite hgt in main
+        _hgt[np.isnan(_hgt)] = 0
+        _hgt[_hgt<hgt_min] = 0
+        _hgt[_hgt>hgt_max] = 0
+        G2 = np.vstack((G.T, hgt.ravel())).T ## for Afit
+        G = np.vstack((G.T, _hgt.ravel())).T
+    else:
+        G2 = G
+
+    ### Invert
+    results = sm.OLS(A.ravel(), G, missing='drop').fit()
+    m = results.params
+
+    Afit = np.float32((G2@m).reshape(((length,width))))
+    Afit[np.isnan(A)] = np.nan
+
+    return Afit, m
 
 
 #%%

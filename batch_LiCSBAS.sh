@@ -51,8 +51,8 @@ p15_n_loop_err_thre=""	# default: 5
 p15_resid_rms_thre=""	# default: 2 mm
 p16_filtwidth_km=""	# default: 2 km
 p16_filtwidth_yr=""	# default: avg_interval*3 yr
-p16_deg_deramp=""	#1, bl, or 2. default: no deramp
-
+p16_deg_deramp=""	# 1, bl, or 2. default: no deramp
+p16_hgt_linear="n"	# y/n. default: n
 
 ### Less frequently used options. If blank, use default. ###
 p01_frame=""	# e.g. 021D_04972_131213 
@@ -88,6 +88,8 @@ p15_vmax=""	# default: auto (mm/yr)
 p15_keep_isolated="n"	# y/n. default: n
 p15_noautoadjust="n" # y/n. default: n
 p16_TSdir=""    # default: TS_$GEOCmldir
+p16_hgt_min=""	# default: 200 (m)
+p16_hgt_max=""  # default: 10000 (m)
 p16_nomask="n"	# y/n. default: n
 
 
@@ -303,6 +305,9 @@ if [ $start_step -le 16 -a $end_step -ge 16 ];then
   if [ ! -z $p16_filtwidth_km ];then p16_op="$p16_op -s $p16_filtwidth_km"; fi
   if [ ! -z $p16_filtwidth_yr ];then p16_op="$p16_op -y $p16_filtwidth_yr"; fi
   if [ ! -z $p16_deg_deramp ];then p16_op="$p16_op -r $p16_deg_deramp"; fi
+  if [ $p16_hgt_linear == "y" ];then p16_op="$p16_op --hgt_linear"; fi
+  if [ ! -z $p16_hgt_min ];then p16_op="$p16_op --hgt_min $p16_hgt_min"; fi
+  if [ ! -z $p16_hgt_max ];then p16_op="$p16_op --hgt_max $p16_hgt_max"; fi
   if [ $p16_nomask == "y" ];then p16_op="$p16_op --nomask"; fi
 
   if [ $check_only == "y" ];then

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.7 20200227 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -41,10 +41,11 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
 """
 #%% Change log
 '''
-v1.7 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.7 20200227 Yu Morishita, Uni of Leeds and GSI
  - Use SCM instead of SCM5
  - Change option from --cmap to -c
  - Add initial point selection option for time series plot
+ - Read hgt_linear flag
 v1.6 20200210 Yu Morishita, Uni of Leeds and GSI
  - Adjust figure size and ax location
 v1.5 20200203 Yu Morishita, Uni of Leeds and GSI
@@ -133,7 +134,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.7; date=20200224; author="Y. Morishita"
+    ver=1.7; date=20200227; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -317,6 +318,11 @@ if __name__ == "__main__":
             deramp = ''
         else:
             deramp = ', drmp={}'.format(deramp_flag)
+
+        if 'hgt_linear_flag' in list(cumh5.keys()):
+            if cumh5['hgt_linear_flag'][()] == 1:
+                deramp = deramp+', hgt-linear'
+            
         filtwidth_km = float(cumh5['filtwidth_km'][()])
         filtwidth_yr = float(cumh5['filtwidth_yr'][()])
         filtwidth_day = int(np.round(filtwidth_yr*365.25))
@@ -715,7 +721,7 @@ if __name__ == "__main__":
 
         ### If masked
         if np.isnan(mask[ii, jj]):
-            axts.set_title('NaN @({}, {})'.format(jj, ii))
+            axts.set_title('NaN @({}, {})'.format(jj, ii), fontsize=10)
             pts.canvas.draw()
             return
 
@@ -744,7 +750,7 @@ if __name__ == "__main__":
             lines1[model], = axts.plot(xvalues, yvalues, 'b-', visible=vis, alpha=0.6, zorder=3)
 
         axts.scatter(imdates_dt, dph, label=label1, c='b', alpha=0.6, zorder=5)
-        axts.set_title('vel = {:.1f} mm/yr @({}, {})'.format(vel1p, jj, ii))
+        axts.set_title('vel = {:.1f} mm/yr @({}, {})'.format(vel1p, jj, ii), fontsize=10)
 
         ### cumfile2
         if cumfile2:
@@ -759,7 +765,7 @@ if __name__ == "__main__":
                 lines2[model], = axts.plot(xvalues, yvalues, 'r-', visible=vis, alpha=0.6, zorder=2)
                 
             axts.scatter(imdates_dt, dphf, c='r', label=label2, alpha=0.6, zorder=4)
-            axts.set_title('vel(1) = {:.1f} mm/yr, vel(2) = {:.1f} mm/yr @({}, {})'.format(vel1p, vel2p, jj, ii))
+            axts.set_title('vel(1) = {:.1f} mm/yr, vel(2) = {:.1f} mm/yr @({}, {})'.format(vel1p, vel2p, jj, ii), fontsize=10)
 
         ## gap
         if gap:
