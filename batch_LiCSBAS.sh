@@ -61,6 +61,7 @@ p01_get_gacos="y" # y/n
 p02_GEOCdir=""	# default: GEOC
 p02_GEOCmldir=""	# default: GEOCml$nlook
 p02_frame=""	# e.g. 021D_04972_131213
+order_op03_05="03 04 05"	# can change order e.g., 05 03 04
 p03_inGEOCmldir=""	# default: $GEOCmldir
 p03_outGEOCmldir_suffix="" # default: GACOS
 p03_fillhole="y"	# y/n. default: n
@@ -136,7 +137,10 @@ if [ $start_step -le 02 -a $end_step -ge 02 ];then
   fi
 fi
 
-if [ $start_step -le 03 -a $end_step -ge 03 ];then
+## Optional steps
+for step in $order_op03_05; do ##1
+
+if [ $step -eq 03 -a $start_step -le 03 -a $end_step -ge 03 ];then
   if [ $do03op_GACOS == "y" ]; then
     p03_op=""
     if [ ! -z $p03_inGEOCmldir ];then inGEOCmldir="$p03_inGEOCmldir";
@@ -145,7 +149,7 @@ if [ $start_step -le 03 -a $end_step -ge 03 ];then
     if [ ! -z $p03_outGEOCmldir_suffix ];then outGEOCmldir="$inGEOCmldir$p03_outGEOCmldir_suffix";
       else outGEOCmldir="${inGEOCmldir}GACOS"; fi
     p03_op="$p03_op -o $outGEOCmldir"
-    if [ ! -z $p03_gacosdir ];then p03_op="$p03_op -g $p03_ztddir"; fi
+    if [ ! -z $p03_gacosdir ];then p03_op="$p03_op -g $p03_gacosdir"; fi
     if [ $p03_fillhole == "y" ];then p03_op="$p03_op --fillhole"; fi
 
     if [ $check_only == "y" ];then
@@ -159,7 +163,7 @@ if [ $start_step -le 03 -a $end_step -ge 03 ];then
   fi
 fi
 
-if [ $start_step -le 04 -a $end_step -ge 04 ];then
+if [ $step -eq 04 -a $start_step -le 04 -a $end_step -ge 04 ];then
   if [ $do04op_mask == "y" ]; then
     p04_op=""
     if [ ! -z $p04_inGEOCmldir ];then inGEOCmldir="$p04_inGEOCmldir";
@@ -172,7 +176,7 @@ if [ $start_step -le 04 -a $end_step -ge 04 ];then
     if [ ! -z $p04_mask_range_file ];then p04_op="$p04_op -f $p04_mask_range_file"; fi
 
     if [ $check_only == "y" ];then
-      echo "LiCSBAS.py $p04_op"
+      echo "LiCSBAS04op_mask_unw.py $p04_op"
     else
       LiCSBAS04op_mask_unw.py $p04_op 2>&1 | tee -a $log
       if [ ${PIPESTATUS[0]} -ne 0 ];then exit 1; fi
@@ -182,7 +186,7 @@ if [ $start_step -le 04 -a $end_step -ge 04 ];then
   fi
 fi
 
-if [ $start_step -le 05 -a $end_step -ge 05 ];then
+if [ $step -eq 05 -a $start_step -le 05 -a $end_step -ge 05 ];then
   if [ $do05op_clip == "y" ]; then
     p05_op=""
     if [ ! -z $p05_inGEOCmldir ];then inGEOCmldir="$p05_inGEOCmldir";
@@ -204,6 +208,8 @@ if [ $start_step -le 05 -a $end_step -ge 05 ];then
     GEOCmldir="$outGEOCmldir"
   fi
 fi
+
+done ##1
 
 ### Determine name of TSdir
 TSdir="TS_$GEOCmldir"
