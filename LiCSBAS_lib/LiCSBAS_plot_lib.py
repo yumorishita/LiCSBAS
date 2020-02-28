@@ -8,9 +8,10 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
-v1.1 20200227 Yu Morioshita, Uni of Leeds and GSI
+v1.1 20200228 Yu Morioshita, Uni of Leeds and GSI
  - Remove pdf option in plot_network
  - Add plot_hgt_corr
+ - Add plot_gacos_info
 v1.0 20190729 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
 
@@ -79,7 +80,7 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
     length, width = data3[0].shape
     figsizex = 12
     xmergin = 4 if cbar else 0
-    figsizey = int((figsizex-xmergin)/3*length/width)+1
+    figsizey = int((figsizex-xmergin)/3*length/width)+2
     
     fig = plt.figure(figsize = (figsizex, figsizey))
 
@@ -96,6 +97,58 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
     plt.close()
    
     return 
+
+
+#%% 
+def plot_gacos_info(gacos_infofile, pngfile):
+    figsize = (7, 3) #3x7
+    sizec, colorc, markerc, alphac = 2, 'k', 'o', 0.8
+    
+    ### Figure
+    fig = plt.figure(figsize=figsize)
+    ax1 = fig.add_subplot(1, 2, 1) #index start from 1
+    ax2 = fig.add_subplot(1, 2, 2) #index start from 1
+    
+    ### Read data
+    with open(gacos_infofile, "r") as f:
+        info = f.readlines()[1:]
+
+    std_bf, std_af, rate = [], [], []; 
+    
+    for line in info:
+        date, std_bf1, std_af1, rate1 = line.split()
+        if std_bf1=='0.0' or std_bf1=='nan' or std_af1=='0.0' or std_af1=='nan':
+            continue
+        std_bf.append(float(std_bf1))
+        std_af.append(float(std_af1))
+        rate.append(float(rate1[:-1]))
+    
+    std_bf = np.array(std_bf)
+    std_af = np.array(std_af)
+    rate = np.array(rate)
+    rate[rate>99] = 99
+    rate[rate< -99] = -99
+
+    ### Plot
+    xylim1 = np.max(np.concatenate((std_bf, std_af)))+1
+    ax1.scatter(std_bf, std_af, s=sizec, c=colorc, marker=markerc, alpha=alphac, zorder=4)
+    ax1.set_xlim(0, xylim1)
+    ax1.set_ylim(0, xylim1)
+    ax1.plot([0, xylim1], [0, xylim1], linewidth=2, color='grey', alpha=0.5, zorder=2)
+    ax1.grid(zorder=0)
+    ax1.set_xlabel('STD before GACOS (rad)')
+    ax1.set_ylabel('STD after GACOS (rad)')
+
+    ### Plot
+    ax2.scatter(std_bf, rate, s=sizec, c=colorc, marker=markerc, alpha=alphac, zorder=4)
+    ax2.plot([0, xylim1], [0, 0], linewidth=2, color='grey', alpha=0.5, zorder=2)
+    ax2.grid(zorder=0)
+    ax2.set_xlim(0, xylim1)
+    ax2.set_xlabel('STD before GACOS (rad)')
+    ax2.set_ylabel('STD reduction rate (%)')
+
+    fig.tight_layout()
+    fig.savefig(pngfile)
 
 
 #%%

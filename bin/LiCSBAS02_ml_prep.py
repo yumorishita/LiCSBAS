@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200228 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -18,6 +18,7 @@ Inputs:
   [- yyyymmdd.geo.mli.tif]
   [- *.geo.[ENU].tif] (if not exist, try to download from LiCSAR portal)
   [- baselines] (if not exist, try to download from LiCSAR portal or make dummy)
+  [- metadata.txt]
 
 Outputs in GEOCml? directory (downsampled if indicated):
  - yyyymmdd_yyyymmdd
@@ -46,8 +47,9 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f FRAME]
 """
 #%% Change log
 '''
-v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200228 Yu Morishita, Uni of Leeds and GSI
  - Change format of output cc from float32 to uint8
+ - Add center_time into slc.mli.par
 v1.3 20191115 Yu Morishita, Uni of Leeds and GSI
  - Use mli and hgt
 v1.2 20191014 Yu Morishita, Uni of Leeds and GSI
@@ -70,6 +72,7 @@ import shutil
 import gdal
 import glob
 import numpy as np
+import subprocess as subp
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -88,7 +91,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.4; date=20200225; author="Y. Morishita"
+    ver=1.4; date=20200228; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -140,8 +143,6 @@ def main(argv=None):
         outdir = os.path.join(os.path.dirname(geocdir), 'GEOCml{}'.format(nlook))
     if not os.path.exists(outdir): os.mkdir(outdir)
 
-#    mlifile = os.path.join(outdir, 'slc.mli')
-
     mlipar = os.path.join(outdir, 'slc.mli.par')
     dempar = os.path.join(outdir, 'EQA.dem_par')
 
@@ -150,6 +151,12 @@ def main(argv=None):
 
     bperp_file_in = os.path.join(geocdir, 'baselines')
     bperp_file_out = os.path.join(outdir, 'baselines')
+
+    metadata_file = os.path.join(geocdir, 'metadata.txt')
+    if os.path.exists(metadata_file):
+        center_time = subp.check_output(['grep', 'center_time', metadata_file]).decode().split('=')[1].strip()
+    else:
+        center_time = None
 
     LiCSARweb = 'http://gws-access.ceda.ac.uk/public/nceo_geohazards/LiCSAR_products/'
 
@@ -354,6 +361,8 @@ def main(argv=None):
             print('range_samples:   {}'.format(width), file=f)
             print('azimuth_lines:   {}'.format(length), file=f)
             print('radar_frequency: {} Hz'.format(radar_freq), file=f)
+            if center_time is not None:
+                print('center_time: {}'.format(center_time), file=f)
 
     if not os.path.exists(dempar):
         print('\nCreate EQA.dem_par', flush=True)

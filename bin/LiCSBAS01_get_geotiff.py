@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -10,29 +10,36 @@ This script downloads geotiff files of unw (unwrapped interferogram) and cc (coh
 ============
 Output files
 ============
- - GEOC/    
+ - GEOC/
    - yyyymmdd_yyyymmdd
      - yyyymmdd_yyyymmdd.geo.unw.tif
      - yyyymmdd_yyyymmdd.geo.cc.tif
-   - *.geo.mli.tif (using just one first epoch)
+  [- *.geo.mli.tif (using just one first epoch)]
    - *.geo.E.tif
    - *.geo.N.tif
    - *.geo.U.tif
    - *.geo.hgt.tif
    - baselines
-
+   - metadata.txt
+[- GACOS/]
+  [- yyyymmdd.sltd.geo.tif]
+  
 =====
 Usage
 =====
-LiCSBAS01_get_geotiff.py [-f FRAME] [-s start_date] [-e end_date]
+LiCSBAS01_get_geotiff.py [-f FRAME] [-s start_date] [-e end_date] [--get_gacos]
 
  -f  Frame ID (e.g., 021D_04972_131213). (Default: Read from directory name)
  -s  Start date (Default: 20141001)
  -e  End date (Default: Today)
+ --get_gacos  Download GACOS data as well if available
  
 """
 #%% Change log
 '''
+v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
+ - Compatible with new LiCSAR file structure (backward-compatible)
+ - Add --get_gacos option
 v1.1 20191115 Yu Morishita, Uni of Leeds and GSI
  - Download mli and hgt
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
@@ -66,7 +73,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20191115; author="Y. Morishita"
+    ver=1.2; date=20200227; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -75,12 +82,13 @@ def main(argv=None):
     frameID = []
     startdate = 20141001
     enddate = int(dt.date.today().strftime("%Y%m%d"))
+    get_gacos = False
 
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hf:s:e:", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hf:s:e:", ["help", "get_gacos"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -93,6 +101,8 @@ def main(argv=None):
                 startdate = int(a)
             elif o == '-e':
                 enddate = int(a)
+            elif o == '--get_gacos':
+                get_gacos = True
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -138,25 +148,40 @@ def main(argv=None):
             print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
             continue
 
-    #%% baselines
+    #%% baselines and metadata.txt
     print('Download baselines', flush=True)
     url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'baselines')
     if not tools_lib.download_data(url, 'baselines'):
         print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
 
+    print('Download metadata.txt', flush=True)
+    url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'metadata.txt')
+    if not tools_lib.download_data(url, 'metadata.txt'):
+        print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
+
 
     #%% mli
     ### Get available dates
-    url = os.path.join(LiCSARweb, trackID, frameID, 'products', 'epochs')
+    url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
     response = requests.get(url)
+    if not response.ok:  ## Try old structure
+        url = os.path.join(LiCSARweb, trackID, frameID, 'products', 'epochs')
+        response = requests.get(url)
+    
     response.encoding = response.apparent_encoding #avoid garble
     html_doc = response.text
     soup = BeautifulSoup(html_doc, "html.parser")
     tags = soup.find_all(href=re.compile(r"\d{8}"))
     imdates_all = [tag.get("href")[0:8] for tag in tags]
+    _imdates = np.int32(np.array(imdates_all))
+    _imdates = (_imdates[(_imdates>=startdate)*(_imdates<=enddate)]).astype('str').tolist()
+    
+    ## Find earliest date in which mli is available
     imd1 = []
-    for imd in imdates_all: ## Find first dates during specified period
-        if int(imd) >= startdate and int(imd) <= enddate:
+    for imd in _imdates: 
+        url_mli = os.path.join(url, imd, imd+'.geo.mli.tif')
+        response = requests.get(url_mli)
+        if  response.ok:
             imd1 = imd
             break
 
@@ -173,11 +198,57 @@ def main(argv=None):
         print('No mli available on {}'.format(url), file=sys.stderr, flush=True)
 
 
+    #%% GACOS if specified
+    if get_gacos:
+        gacosdir = os.path.join(wd, 'GACOS')
+        if not os.path.exists(gacosdir): os.mkdir(gacosdir)
+
+        ### Get available dates
+        print('\nDownload GACOS data', flush=True)
+        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
+        response = requests.get(url)
+        response.encoding = response.apparent_encoding #avoid garble
+        html_doc = response.text
+        soup = BeautifulSoup(html_doc, "html.parser")
+        tags = soup.find_all(href=re.compile(r"\d{8}"))
+        imdates_all = [tag.get("href")[0:8] for tag in tags]
+        _imdates = np.int32(np.array(imdates_all))
+        _imdates = (_imdates[(_imdates>=startdate)*(_imdates<=enddate)]).astype('str').tolist()
+
+        ### Extract available dates
+        imdates = []
+        for imd in _imdates:
+            url_sltd = os.path.join(url, imd, imd+'.sltd.geo.tif')
+            response = requests.get(url_sltd)
+            if response.ok:
+                imdates.append(imd)
+
+        n_im = len(imdates)
+        if n_im > 0:
+            print('{} GACOS data available from {} to {}'.format(n_im, imdates[0], imdates[-1]), flush=True)
+        else:
+            print('No GACOS data available from {} to {}'.format(startdate, enddate), flush=True)
+        
+        ### Download
+        for i, imd in enumerate(imdates):
+            print('  Donwnloading {} ({}/{})...'.format(imd, i+1, n_im), flush=True)
+            url_sltd = os.path.join(url, imd, imd+'.sltd.geo.tif')
+            path_sltd = os.path.join(gacosdir, imd+'.sltd.geo.tif')
+            if os.path.exists(path_sltd):
+                print('    {}.sltd.geo.tif already exist. Skip'.format(imd), flush=True)
+            elif not tools_lib.download_data(url_sltd, path_sltd):
+                print('    Error while downloading from {}'.format(url_sltd), file=sys.stderr, flush=True)
+    
+
     #%% unw and cc
     ### Get available dates
     print('\nDownload geotiff of unw and cc', flush=True)
-    url = os.path.join(LiCSARweb, trackID, frameID, 'products')
+    url = os.path.join(LiCSARweb, trackID, frameID, 'interferograms')
     response = requests.get(url)
+    if not response.ok:  ## Try old structure
+        url = os.path.join(LiCSARweb, trackID, frameID, 'products')
+        response = requests.get(url)
+    
     response.encoding = response.apparent_encoding #avoid garble
     html_doc = response.text
     soup = BeautifulSoup(html_doc, "html.parser")

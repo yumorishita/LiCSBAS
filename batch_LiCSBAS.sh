@@ -30,7 +30,6 @@ log="$logdir/$(date +%Y%m%d%H%M)$(basename $0 .sh)_${start_step}_${end_step}.log
 do03op_GACOS="n"	# y/n
 do04op_mask="n"	# y/n
 do05op_clip="n"	# y/n
-p03_ztddir="GACOS"	# Path to the dir containing GACOS data (*.ztd and *.ztd.rsc)
 p04_mask_range=""	# e.g. 10:100/20:200 (ix start from 0)
 p04_mask_range_file=""	# Name of file containing range list
 p05_clip_range=""	# e.g. 10:100/20:200 (ix start from 0)
@@ -58,12 +57,14 @@ p16_hgt_linear="n"	# y/n. default: n
 p01_frame=""	# e.g. 021D_04972_131213 
 p01_start_date=""	# default: 20141001
 p01_end_date=""	# default: today
+p01_get_gacos="y" # y/n 
 p02_GEOCdir=""	# default: GEOC
 p02_GEOCmldir=""	# default: GEOCml$nlook
 p02_frame=""	# e.g. 021D_04972_131213
 p03_inGEOCmldir=""	# default: $GEOCmldir
 p03_outGEOCmldir_suffix="" # default: GACOS
-p03_fillhole="n"	# y/n. default: n
+p03_fillhole="y"	# y/n. default: n
+p03_gacosdir=""	# default: GACOS
 p04_inGEOCmldir=""	# default: $GEOCmldir
 p04_outGEOCmldir_suffix="" # default: mask
 p05_inGEOCmldir=""      # default: $GEOCmldir
@@ -109,6 +110,7 @@ if [ $start_step -le 01 -a $end_step -ge 01 ];then
   if [ ! -z $p01_frame ];then p01_op="$p01_op -f $p01_frame"; fi
   if [ ! -z $p01_start_date ];then p01_op="$p01_op -s $p01_start_date"; fi
   if [ ! -z $p01_end_date ];then p01_op="$p01_op -e $p01_end_date"; fi
+  if [ $p01_get_gacos == "y" ];then p01_op="$p01_op --get_gacos"; fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS01_get_geotiff.py $p01_op"
@@ -143,7 +145,7 @@ if [ $start_step -le 03 -a $end_step -ge 03 ];then
     if [ ! -z $p03_outGEOCmldir_suffix ];then outGEOCmldir="$inGEOCmldir$p03_outGEOCmldir_suffix";
       else outGEOCmldir="${inGEOCmldir}GACOS"; fi
     p03_op="$p03_op -o $outGEOCmldir"
-    if [ ! -z $p03_ztddir ];then p03_op="$p03_op -z $p03_ztddir"; fi
+    if [ ! -z $p03_gacosdir ];then p03_op="$p03_op -g $p03_ztddir"; fi
     if [ $p03_fillhole == "y" ];then p03_op="$p03_op --fillhole"; fi
 
     if [ $check_only == "y" ];then

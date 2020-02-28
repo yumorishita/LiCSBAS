@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-v1.1 20190812 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
 ========
-This script applies a tropospheric correction to unw data using GACOS data. GACOS data must be prepared beforehand by requesting on GACOS web. This step is optional.
+This script applies a tropospheric correction to unw data using GACOS data. GACOS data can be automatically downloaded from LiCSAR-portal at step01 (if available), or should be externaly obtained by requesting on a GACOS web.
+The impact of the correction can be visually checked by showing GACOS_info.png and */*.gacos.png.
+This step is optional.
 
 ===============
 Input & output files
@@ -17,31 +19,42 @@ Inputs in GEOCml* :
  - EQA.dem_par
  - slc.mli.par
 
-Inputs in ztddir :
+Inputs in GACOS dir :
+ - yyyymmdd.sltd.geo.tif
+ and/or 
  - yyyymmdd.ztd[.rsc]
 
 Outputs in GEOCml*GACOS directory
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw[.png] (Corrected)
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.gacos.png (Comparison)
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc (Symbolic link)
- - GACOS_info.txt (List of noise reduction rates)
- - no_gacos_ifg.txt (List of removed ifg because no GACOS data available)
- - sltd (Slantrange tropospheric delay in rad taking into account incidence angle)
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw[.png] : Corrected unw
+   - yyyymmdd_yyyymmdd.gacos.png : Comparison image
+   - yyyymmdd_yyyymmdd.cc        : Coherence (symbolic link)
+ - GACOS_info.txt : List of noise reduction rates
+ - GACOS_info.png : Correlation diagram of STD between before and after
+ - no_gacos_ifg.txt : List of removed ifg because no GACOS data available
+ - no_gacos_im.txt  : List of images with no available GACOS data
+ - sltd/
+   - yyyymmdd.sltd.geo : Slantrange tropospheric delay in rad
  - other files needed for following time series analysis
 
 =====
 Usage
 =====
-LiCSBAS03op_GACOS.py -i in_dir -o out_dir -z ztddir [--fillhole]
+LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole]
 
- -i  Path to the GEOCml* dir containing stack of unw data.
- -o  Path to the output dir.
- -z  Path to the dir containing ztd files.
- --fillhole  Fill holes of GACOS data at hgt=0 in SRTM3 by averaging surrounding pixels (Default: no filling)
+ -i  Path to the GEOCml* dir containing stack of unw data
+ -o  Path to the output dir
+ -g  Path to the dir containing GACOS data (Default: GACOS)
+ --fillhole  Fill holes of GACOS data at hgt=0 in SRTM3 by averaging surrounding pixels
 
 """
 #%% Change log
 '''
+v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
+ - Compatible with GACOS data provided from LiCSAR-portal
+ - Output correlation plot
+ - Output no_gacos_im.txt
+ - Change option from -z (still available) to -g and set GACOS as default
 v1.1 20190812 Yu Morishita, Uni of Leeds and GSI
  - Add fillhole option
 v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
@@ -99,6 +112,31 @@ def fillhole(ztd):
     return ztd
 
 
+#%% make_hdr
+def make_hdr(ztdpar, hdrfile):
+    ### Get ztd info. Grid registration
+    width_ztd = int(io_lib.get_param_par(ztdpar, 'WIDTH'))
+    length_ztd = int(io_lib.get_param_par(ztdpar, 'FILE_LENGTH'))
+    dlat_ztd = float(io_lib.get_param_par(ztdpar, 'Y_STEP')) #minus
+    dlon_ztd = float(io_lib.get_param_par(ztdpar, 'X_STEP'))
+    latn_ztd = float(io_lib.get_param_par(ztdpar, 'Y_FIRST'))
+    lonw_ztd = float(io_lib.get_param_par(ztdpar, 'X_FIRST'))
+
+    ### Make hdr file of ztd
+    strings = ["NROWS          {}".format(length_ztd),
+               "NCOLS          {}".format(width_ztd),
+               "NBITS          32",
+               "PIXELTYPE      FLOAT",
+               "BYTEORDER      I",
+               "LAYOUT         BIL",
+               "ULXMAP         {}".format(lonw_ztd),
+               "ULYMAP         {}".format(latn_ztd),
+               "XDIM           {}".format(dlon_ztd),
+               "YDIM           {}".format(np.abs(dlat_ztd))]
+    with open(hdrfile, "w") as f:
+        f.write("\n".join(strings))
+
+
 #%% Main
 def main(argv=None):
     
@@ -107,7 +145,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20190812; author="Y. Morishita"
+    ver=1.2; date=20200228; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -115,7 +153,7 @@ def main(argv=None):
     #%% Set default
     in_dir = []
     out_dir = []
-    ztddir = []
+    gacosdir = 'GACOS'
     resampleAlg = 'cubicspline'# None # 'cubic' 
     fillholeflag = False
 
@@ -123,7 +161,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:z:", ["fillhole", "help"])
+            opts, args = getopt.getopt(argv[1:], "hi:o:g:z:", ["fillhole", "help"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -134,8 +172,10 @@ def main(argv=None):
                 in_dir = a
             elif o == '-o':
                 out_dir = a
-            elif o == '-z':
-                ztddir = a
+            elif o == '-z': ## for backward-compatible
+                gacosdir = a
+            elif o == '-g':
+                gacosdir = a
             elif o == "--fillhole":
                 fillholeflag = True
 
@@ -147,10 +187,8 @@ def main(argv=None):
             raise Usage('No slc.mli.par file exists in {}!'.format(in_dir))
         if not out_dir:
             raise Usage('No output directory given, -o is not optional!')
-        elif not ztddir:
-            raise Usage('No ztd directory given, -z is not optional!')
-        elif not os.path.isdir(ztddir):
-            raise Usage('No {} dir exists!'.format(ztddir))
+        if not os.path.isdir(gacosdir):
+            raise Usage('No {} dir exists!'.format(gacosdir))
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -162,7 +200,7 @@ def main(argv=None):
     #%% Read data information
     ### Directory
     in_dir = os.path.abspath(in_dir)
-    ztddir = os.path.abspath(ztddir)
+    gacosdir = os.path.abspath(gacosdir)
 
     out_dir = os.path.abspath(out_dir)
     if not os.path.exists(out_dir): os.mkdir(out_dir)
@@ -201,15 +239,6 @@ def main(argv=None):
         print('Not supported.\n'.format(in_dir), file=sys.stderr)
         return 1
 
-    ### Get ztd info. Grid registration
-    ztdpar = glob.glob(os.path.join(ztddir, '*.ztd.rsc'))[0]
-    width_ztd = int(io_lib.get_param_par(ztdpar, 'WIDTH'))
-    length_ztd = int(io_lib.get_param_par(ztdpar, 'FILE_LENGTH'))
-    dlat_ztd = float(io_lib.get_param_par(ztdpar, 'Y_STEP')) #minus
-    dlon_ztd = float(io_lib.get_param_par(ztdpar, 'X_STEP'))
-    latn_ztd = float(io_lib.get_param_par(ztdpar, 'Y_FIRST'))
-    lonw_ztd = float(io_lib.get_param_par(ztdpar, 'X_FIRST'))
-
     ### Calc incidence angle from U.geo
     ufile = os.path.join(in_dir, 'U.geo')
     LOSu = io_lib.read_img(ufile, length_geo, width_geo)
@@ -222,24 +251,8 @@ def main(argv=None):
     n_im = len(imdates)
 
 
-    #%% Make hdr file of ztd
-    hdrfile1 = os.path.join(sltddir, 'ztd.hdr')
-    strings = ["NROWS          {}".format(length_ztd),
-               "NCOLS          {}".format(width_ztd),
-               "NBITS          32",
-               "PIXELTYPE      FLOAT",
-               "BYTEORDER      I",
-               "LAYOUT         BIL",
-               "ULXMAP         {}".format(lonw_ztd),
-               "ULYMAP         {}".format(latn_ztd),
-               "XDIM           {}".format(dlon_ztd),
-               "YDIM           {}".format(np.abs(dlat_ztd))]
-    with open(hdrfile1, "w") as f:
-        f.write("\n".join(strings))
-
-
     #%% Process ztd files 
-    print('\nConvert ztd files to sltd files...', flush=True)
+    print('\nConvert ztd/sltd.geo.tif files to sltd.geo files...', flush=True)
     ### First check if sltd already exist
     imdates2 = []
     for imd in imdates:
@@ -250,33 +263,56 @@ def main(argv=None):
     n_im2 = len(imdates2)
     if n_im-n_im2 > 0:
         print("  {0:3}/{1:3} sltd already exist. Skip".format(n_im-n_im2, n_im), flush=True)
+
+    no_gacos_imfile = os.path.join(out_dir, 'no_gacos_im.txt')
+    if os.path.exists(no_gacos_imfile): os.remove(no_gacos_imfile)
     
     for ix_im, imd in enumerate(imdates2):
         if np.mod(ix_im, 10)==0:
-            print('  Finished {0:4}/{1:4}th ztd...'.format(ix_im, n_im2), flush=True)
+            print('  Finished {0:4}/{1:4}th sltd...'.format(ix_im, n_im2), flush=True)
 
-        ztdfile = os.path.join(ztddir, imd+'.ztd')
-        if not os.path.exists(ztdfile):
-            print('  There is no {}!'.format(ztdfile), flush=True)
+        ztdfile = os.path.join(gacosdir, imd+'.ztd')
+        sltdtiffile = os.path.join(gacosdir, imd+'.sltd.geo.tif')
+
+        if os.path.exists(sltdtiffile):
+            infile = os.path.basename(sltdtiffile)
+            try: ### Cut and resapmle. Already in rad.
+                sltd_geo = gdal.Warp("", sltdtiffile, format='MEM', outputBounds=(lonw_geo, lats_geo, lone_geo, latn_geo), width=width_geo, height=length_geo, resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
+            except: ## if broken
+                print ('  {} cannot open. Skip'.format(infile), flush=True)
+                with open(no_gacos_imfile, mode='a') as fnogacos:
+                    print('{}'.format(imd), file=fnogacos)
+                continue
+
+        elif os.path.exists(ztdfile):
+            infile = os.path.basename(ztdfile)
+            hdrfile = os.path.join(sltddir, imd+'.hdr')
+            bilfile = os.path.join(sltddir, imd+'.bil')
+            if os.path.exists(hdrfile): os.remove(hdrfile)
+            if os.path.exists(bilfile): os.remove(bilfile)
+            make_hdr(ztdfile+'.rsc', hdrfile)
+            os.symlink(os.path.relpath(ztdfile, sltddir), bilfile)
+    
+            ### Cut and resapmle ztd to geo
+            ztd_geo = gdal.Warp("", bilfile, format='MEM', outputBounds=(lonw_geo, lats_geo, lone_geo, latn_geo), width=width_geo, height=length_geo, resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
+            os.remove(hdrfile)
+            os.remove(bilfile)
+    
+            ### Meter to rad, slantrange
+            sltd_geo = ztd_geo/LOSu*m2r_coef ## LOSu=cos(inc)
+
+        else:
+            print('  There is no ztd|sltd.geo.tif for {}!'.format(imd), flush=True)
+            with open(no_gacos_imfile, mode='a') as fnogacos:
+                print('{}'.format(imd), file=fnogacos)
             continue ## Next imd
-        
-        hdrfile = os.path.join(sltddir, imd+'.hdr')
-        bilfile = os.path.join(sltddir, imd+'.bil')
-        if os.path.exists(hdrfile): os.remove(hdrfile)
-        if os.path.exists(bilfile): os.remove(bilfile)
-        os.symlink(os.path.relpath(hdrfile1, sltddir), hdrfile)
-        os.symlink(os.path.relpath(ztdfile, sltddir), bilfile)
-
-        ### Cut and resapmle ztd to geo
-        ztd_geo = gdal.Warp("", bilfile, format='MEM', outputBounds=(lonw_geo, lats_geo, lone_geo, latn_geo), width=width_geo, height=length_geo, resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
 
         ### Skip if no data in the area
-        if np.all(ztd_geo==0):
-            print('  There is no valid data in {}!'.format(ztdfile), flush=True)
+        if np.all((sltd_geo==0)|np.isnan(sltd_geo)):
+            print('  There is no valid data in {}!'.format(infile), flush=True)
+            with open(no_gacos_imfile, mode='a') as fnogacos:
+                print('{}'.format(imd), file=fnogacos)
             continue ## Next imd
-
-        ### Meter to rad, slantrange
-        sltd_geo = ztd_geo*m2r_coef/LOSu ## LOSu=cos(inc)
 
         ### Fill hole is specified
         if fillholeflag:
@@ -285,9 +321,6 @@ def main(argv=None):
         ### Output as sltd.geo
         sltd_geofile = os.path.join(sltddir, imd+'.sltd.geo')
         sltd_geo.tofile(sltd_geofile)
-
-        os.remove(hdrfile)
-        os.remove(bilfile)
 
     
     #%% Correct unw files
@@ -366,7 +399,6 @@ def main(argv=None):
         ### Link cc
         if not os.path.exists(os.path.join(out_dir1, ifgd+'.cc')):
             os.symlink(os.path.relpath(os.path.join(in_dir1, ifgd+'.cc'), out_dir1), os.path.join(out_dir1, ifgd+'.cc'))
-   
             
         ### Output png for comparison
         data3 = [np.angle(np.exp(1j*(data/cycle))*cycle) for data in [unw, unw_cor, dsltd]]
@@ -380,6 +412,12 @@ def main(argv=None):
         plot_lib.make_im_png(np.angle(np.exp(1j*unw_cor/cycle)*cycle), pngfile, 'insar', title, -np.pi, np.pi, cbar=False)
 
     print("", flush=True)
+    
+    
+    #%% Create correlation png
+    pngfile = os.path.join(out_dir, 'GACOS_info.png')
+    plot_lib.plot_gacos_info(gacinfofile, pngfile)
+    
     
     #%% Copy other files
     files = glob.glob(os.path.join(in_dir, '*'))
@@ -406,6 +444,12 @@ def main(argv=None):
                 print(line, end='')
         print('')
 
+    if os.path.exists(no_gacos_imfile):
+        print('GACOS data for the following dates are missing:')
+        with open(no_gacos_imfile) as f:
+            for line in f:
+                print(line, end='')
+        print('')
 
 #%% main
 if __name__ == "__main__":
