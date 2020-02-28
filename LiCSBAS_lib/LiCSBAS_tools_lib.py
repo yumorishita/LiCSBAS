@@ -203,7 +203,6 @@ def fit2dh(A, deg, hgt, hgt_min, hgt_max):
     m = results.params
 
     Afit = np.float32((G2@m).reshape(((length,width))))
-    Afit[np.isnan(A)] = np.nan
 
     return Afit, m
 

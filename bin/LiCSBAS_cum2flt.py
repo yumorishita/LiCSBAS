@@ -16,7 +16,7 @@ LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/
  -i  Path to input cum file (Default: cum_filt.h5)
  -o  Output flt file (Default: yyyymmdd_yyyymmdd.cum)
  -m  Master (reference) date (Default: first date)
- -r  Reference area (Default: same as info/ref_stable.txt)
+ -r  Reference area (Default: same as info/*ref.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
  --mask  Path to maskfile (Default: No mask)
  --png   Make png file (Default: No)

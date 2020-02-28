@@ -16,7 +16,7 @@ LiCSBAS_cum2tstxt.py [-p x/y] [-g lon/lat] [-i cumfile] [-o tsfile] [-r x1:x2/y1
  -g  Lon/Lat of a point to be output
  -i  Input cum*.h5 file (Default: cum_filt.h5)
  -o  Output txt file of time series (Default: ts_[x]_[y].txt)
- -r  Reference area (Default: same as info/ref_stable.txt)
+ -r  Reference area (Default: same as info/*ref.txt)
  --mask  Path to maskfile for ref calculation (Default: No mask)
 
 """

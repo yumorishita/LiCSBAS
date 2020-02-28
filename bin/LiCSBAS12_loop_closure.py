@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -27,9 +27,10 @@ Outputs in TS_GEOCml* :
    - bad_loop_png/*_loop.png : png images of bad loop phase closure
    - bad_loop_cand_png/*_loop.png: png images of bad loop candidates in which
                                    bad ifgs were not identified
-
+   - loop_ph_rms_masked[.png] : RMS of loop phases used for ref selection
+   
  - info/
-   - ref_prelim.txt      : Preliminaly ref point for SB inversion (X/Y)
+   - 12ref.txt           : Preliminaly ref point for SB inversion (X/Y)
    - 12removed_image.txt : List of images to be removed in further processing
    - 12bad_ifg.txt       : List of bad ifgs to be removed in further processing
    - 12network_gap_info.txt : Information of gaps in network
@@ -59,11 +60,12 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
 """
 #%% Change log
 '''
-v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Improve bad loop cand identification
  - Change color of png
  - Deal with cc file in uint8 format
+ - Change ref.txt name
 v1.1 20191106 Yu Morishita, Uni of Leeds and GSI
  - Add iteration during ref search when no ref found
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -347,8 +349,8 @@ def main(argv=None):
     refx1 = refyx[1][0]
     refx2 = refyx[1][0]+1
 
-    ### Save ref_prelim.txt
-    reffile = os.path.join(infodir, 'ref_prelim.txt')
+    ### Save 12ref.txt
+    reffile = os.path.join(infodir, '12ref.txt')
     with open(reffile, 'w') as f:
         print('{0}:{1}/{2}:{3}'.format(refx1, refx2, refy1, refy2), file=f)
 

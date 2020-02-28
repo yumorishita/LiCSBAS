@@ -19,9 +19,9 @@ Inputs in GEOCml* :
  - baselines (can be dummy)
 
 Inputs in TS_GEOCml*/info :
- - ref[_prelim].txt
  - 11bad_ifg.txt
  - 12bad_ifg.txt
+ - 12ref.txt
  
 Outputs in TS_GEOCml* directory
  - cum.h5             : Cumulative displacement (time-seires) in mm
@@ -36,7 +36,8 @@ Outputs in TS_GEOCml* directory
    - 13parameters.txt   : Used parameters
    - 13used_image.txt : List of used images
    - 13resid.txt      : List of RMS of residual for each ifg
-   - ref_stable[.txt|.kml]   : Auto-determined stable ref point
+   - 13ref.txt[kml]   : Auto-determined stable ref point
+   - 13rms_cum_wrt_med[.png] : RMS of cum wrt median used for ref selection
  - 13increment/yyyymmdd_yyyymmdd.inc_comp.png
                       : Estimated incremental displacement and daisy chain IFG
  - 13resid/yyyymmdd_yyyymmdd.res.png : Residual for each ifg
@@ -58,12 +59,12 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --gamma      Gamma value for NSBAS inversion (Default: 0.0001)
  --n_core     Number of cores for parallel processing (Default: 1)
  --n_unw_r_thre
-              Threshold of n_unw (number of used unwrap data)
-              (Note this value is ratio to the number of images; i.e., 1.5*n_im)
-              Larger number (e.g. 2.5) makes processing faster but result sparser.
-              (Default: 1 and 0.5 for C- and L-band, respectively)
+     Threshold of n_unw (number of used unwrap data)
+     (Note this value is ratio to the number of images; i.e., 1.5*n_im)
+     Larger number (e.g. 2.5) makes processing faster but result sparser.
+     (Default: 1 and 0.5 for C- and L-band, respectively)
  --keep_incfile
-              Not remove inc and resid files (Default: remove them)
+     Not remove inc and resid files (Default: remove them)
 
 """
 #%% Change log
@@ -101,10 +102,6 @@ class Usage(Exception):
     def __init__(self, msg):
         self.msg = msg
 
-#%%
-def make_point_kml(lat, lon, kmlfile):
-    with open(kmlfile, "w") as f:
-        print('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document><Placemark><Point>\n<coordinates>{},{}</coordinates>\n</Point></Placemark></Document>\n</kml>'.format(lon, lat), file=f)
 
 
 #%% Main
@@ -193,7 +190,7 @@ def main(argv=None):
 
     bad_ifg11file = os.path.join(infodir, '11bad_ifg.txt')
     bad_ifg12file = os.path.join(infodir, '12bad_ifg.txt')
-    reffile = os.path.join(infodir, 'ref_prelim.txt')
+    reffile = os.path.join(infodir, '12ref.txt')
     if not os.path.exists(reffile): ## for old LiCSBAS12 < v1.1
         reffile = os.path.join(infodir, 'ref.txt')
 
@@ -214,7 +211,7 @@ def main(argv=None):
         if not os.path.exists(bad_ifg12file):
             raise Usage('No 12bad_ifg.txt file exists in {}!'.format(infodir))
         if not os.path.exists(reffile):
-            raise Usage('No ref[_prelim].txt file exists in {}!'.format(infodir))
+            raise Usage('No 12ref.txt file exists in {}!'.format(infodir))
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
@@ -376,7 +373,7 @@ def main(argv=None):
         print('pixel_spacing_a: {:.2f} m'.format(pixsp_a), file=f)
 
 
-#%% Ref phase for inversion
+    #%% Ref phase for inversion
     lengththis = refy2-refy1
     countf = width*refy1
     countl = width*lengththis # Number to be read
@@ -647,24 +644,24 @@ def main(argv=None):
     vconst = vconst - vconst[refy1s, refx1s]
 
     ### Save image
-    rms_cum_wrt_med_file = os.path.join(resultsdir, 'rms_cum_wrt_med')
+    rms_cum_wrt_med_file = os.path.join(infodir, '13rms_cum_wrt_med')
     with open(rms_cum_wrt_med_file, 'w') as f:
         rms_cum_wrt_med.tofile(f)
 
-    pngfile = os.path.join(resultsdir, 'rms_cum_wrt_med.png')
+    pngfile = os.path.join(infodir, '13rms_cum_wrt_med.png')
     plot_lib.make_im_png(rms_cum_wrt_med, pngfile, cmap_noise_r, 'RMS of cum wrt median (mm)', np.nanpercentile(rms_cum_wrt_med, 1), np.nanpercentile(rms_cum_wrt_med, 99))
 
     ### Save ref
     cumh5.create_dataset('refarea', data='{}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s))
-    refsfile = os.path.join(infodir, 'ref_stable.txt')
+    refsfile = os.path.join(infodir, '13ref.txt')
     with open(refsfile, 'w') as f:
         print('{}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s), file=f)
 
     if width == width_geo and length == length_geo: ## Geocoded
         ### Make ref_stable.kml
-        reflat = lat1+dlat*refy1
-        reflon = lon1+dlon*refx1
-        make_point_kml(reflat, reflon, os.path.join(infodir, 'ref_stable.kml'))
+        reflat = lat1+dlat*refy1s
+        reflon = lon1+dlon*refx1s
+        io_lib.make_point_kml(reflat, reflon, os.path.join(infodir, '13ref.kml'))
 
 
     #%% Close h5 file

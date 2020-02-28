@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
 ========
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1d, bilinear, or 2d polinomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering.
+A stable reference point is determined as well as step13.
 
 ===============
 Input & output files
@@ -18,19 +19,23 @@ Inputs in TS_GEOCml* :
  
 Outputs in TS_GEOCml* directory
  - cum_filt.h5
- - 16filt_cum
+ - 16filt_cum/
    - yyyymmdd_filt.png
   [- yyyymmdd_deramp.png] (if -r option is used)
   [- yyyymmdd_hgt_linear.png] (if --hgt_linear option is used)
   [- yyyymmdd_hgt_corr.png] (if --hgt_linear option is used)
- - 16filt_increment
+ - 16filt_increment/
    - yyyymmdd_yyyymmdd_filt.png
   [- yyyymmdd_yyyymmdd_deramp.png] (if -r option is used)
   [- yyyymmdd_yyyymmdd_hgt_linear.png] (if --hgt_linear option is used)
   [- yyyymmdd_yyyymmdd_hgt_corr.png] (if --hgt_linear option is used)
- - results/vel.filt[.mskd][.png]
- - results/vintercept.filt.mskd[.png]
- - info/16parameters.txt
+ - results/
+   - vel.filt[.mskd][.png]
+   - vintercept.filt.mskd[.png]
+ - info/
+   - 16parameters.txt
+   - 16ref.txt[.kml]
+   - 16rms_cum_wrt_med[.png] : RMS of cum wrt median used for ref selection
 
 =====
 Usage
@@ -51,12 +56,13 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--h
 """
 #%% Change log
 '''
-v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
  - Divide 16filt dir to 16filt_increment and 16filt_cum
  - Change color of png
  - Update about parameters.txt
- - Add --hgt_linear and hgt_min option
+ - Add --hgt_linear and related options
  - Bag fix for deramp (mask was not applyed)
+ - Automatically find stable reference point
 v1.1 20190829 Yu Morishita, Uni of Leeds and GSI
  - Remove cum_filt.h5 if exists before creation
 v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
@@ -95,7 +101,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200227; author="Y. Morishita"
+    ver=1.2; date=20200228; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -113,6 +119,7 @@ def main(argv=None):
     cumname = 'cum.h5'
     
     cmap_vel = SCM.roma.reversed()
+    cmap_noise_r = 'viridis_r'
 
     #%% Read options
     try:
@@ -159,10 +166,11 @@ def main(argv=None):
     tsadir = os.path.abspath(tsadir)
     cumfile = os.path.join(tsadir, cumname)
     resultsdir = os.path.join(tsadir, 'results')
-    inparmfile = os.path.join(tsadir, 'info',  '13parameters.txt')
+    infodir = os.path.join(tsadir, 'info')
+    inparmfile = os.path.join(infodir,  '13parameters.txt')
     if not os.path.exists(inparmfile):  ## for old LiCSBAS13 <v1.2
-        inparmfile = os.path.join(tsadir, 'info', 'parameters.txt')
-    outparmfile = os.path.join(tsadir, 'info',  '16parameters.txt')
+        inparmfile = os.path.join(infodir, 'parameters.txt')
+    outparmfile = os.path.join(infodir,  '16parameters.txt')
 
     pixsp_r = float(io_lib.get_param_par(inparmfile, 'pixel_spacing_r'))
     pixsp_a = float(io_lib.get_param_par(inparmfile, 'pixel_spacing_a'))
@@ -204,28 +212,31 @@ def main(argv=None):
     imdates_dt = ([dt.datetime.strptime(imd, '%Y%m%d').toordinal() for imd in imdates])
     dt_cum = np.float32((np.array(imdates_dt)-imdates_dt[0])/365.25)
 
-    ### Save dates and refarea into cumf
+    ### Save dates and other info into cumf
     cumfh5.create_dataset('imdates', data=cumh5['imdates'])
-    cumfh5.create_dataset('refarea', data=cumh5['refarea'])
     cumfh5.create_dataset('gap', data=cumh5['gap'])
-    try: ## if dummy, no bperp field
+    if 'bperp' in list(cumh5.keys()): ## if dummy, no bperp field
         cumfh5.create_dataset('bperp', data=cumh5['bperp'])
-    except:
+    else:
         print('No bperp field found in {}. Skip.'.format(cumname))
 
-    try: 
+    if 'corner_lat' in list(cumh5.keys()):
+        lat1 = float(cumh5['corner_lat'][()])
+        lon1 = float(cumh5['corner_lon'][()])
+        dlat = float(cumh5['post_lat'][()])
+        dlon = float(cumh5['post_lon'][()])
         cumfh5.create_dataset('corner_lat', data=cumh5['corner_lat'])
         cumfh5.create_dataset('corner_lon', data=cumh5['corner_lon'])
         cumfh5.create_dataset('post_lat', data=cumh5['post_lat'])
         cumfh5.create_dataset('post_lon', data=cumh5['post_lon'])
-    except: ## not geocoded
+    else: ## not geocoded
         print('No latlon field found in {}. Skip.'.format(cumname))
 
     ### temporal filter width
     if not filtwidth_yr and filtwidth_yr != 0:
         filtwidth_yr = dt_cum[-1]/(n_im-1)*3 ## avg interval*3
 
-    ### hgt
+    ### hgt_linear
     if hgt_linearflag:
         hgtfile = os.path.join(resultsdir, 'hgt')
         if not os.path.exists(hgtfile):
@@ -294,12 +305,12 @@ def main(argv=None):
             if np.mod(i, 10) == 0:
                 print("  {0:3}/{1:3}th image...".format(i, n_im), flush=True)
             
-            fit, model = tools_lib.fit2dh(cum_org[i, :, :]*mask, deg_ramp, hgt, hgt_min, hgt_max)
+            fit, model = tools_lib.fit2dh(cum_org[i, :, :]*mask, deg_ramp, hgt, hgt_min, hgt_max)  ## fit is not masked
             cum[i, :, :] = cum_org[i, :, :]-fit
 
             if hgt_linearflag:
-                fit_hgt = hgt*model[-1]  ## extract only hgt-linear component
-                cum_bf = cum[i, :, :]*mask+fit_hgt ## After deramp before hgt-linear
+                fit_hgt = hgt*model[-1]*mask  ## extract only hgt-linear component
+                cum_bf = cum[i, :, :]+fit_hgt ## After deramp before hgt-linear
             
                 ## Output comparison image of hgt_linear
                 std_before = np.nanstd(cum_bf)
@@ -334,7 +345,7 @@ def main(argv=None):
                 fit_hgt = 0  ## for plot deframp
             
             if deg_ramp:
-                ramp = fit-fit_hgt
+                ramp = (fit-fit_hgt)*mask
                 
                 ## Output comparison image of deramp
                 data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum_org[i, :, :]*mask, ramp, cum_org[i, :, :]*mask-ramp]]
@@ -415,6 +426,53 @@ def main(argv=None):
             plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
         cum_hptlps1 = cum_hptlps.copy() ## backup last filt phase
+
+
+    #%% Find stable ref point
+    print('\nFind stable reference point...', flush=True)
+    ### Compute RMS of time series with reference to all points
+    sumsq_cum_wrt_med = np.zeros((length, width), dtype=np.float32)
+    for i in range(n_im):
+        sumsq_cum_wrt_med = sumsq_cum_wrt_med + (cum_filt[i, :, :]-np.nanmedian(cum_filt[i, :, :]))**2
+    rms_cum_wrt_med = np.sqrt(sumsq_cum_wrt_med/n_im)*mask
+
+    ### Mask by minimum n_gap
+    n_gap = io_lib.read_img(os.path.join(resultsdir, 'n_gap'), length, width)
+    min_n_gap = np.nanmin(n_gap)
+    mask_n_gap = np.float32(n_gap==min_n_gap)
+    mask_n_gap[mask_n_gap==0] = np.nan
+    rms_cum_wrt_med = rms_cum_wrt_med*mask_n_gap
+    
+    ### Find stable reference
+    min_rms = np.nanmin(rms_cum_wrt_med)
+    refy1s, refx1s = np.where(rms_cum_wrt_med==min_rms)
+    refy1s, refx1s = refy1s[0], refx1s[0] ## Only first index
+    refy2s, refx2s = refy1s+1, refx1s+1
+    print('Selected ref: {}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s), flush=True)
+
+    ### Rerferencing cumulative displacement to new stable ref
+    for i in range(n_im):
+        cum_filt[i, :, :] = cum_filt[i, :, :] - cum[i, refy1s, refx1s]
+
+    ### Save image
+    rms_cum_wrt_med_file = os.path.join(infodir, '16rms_cum_wrt_med')
+    with open(rms_cum_wrt_med_file, 'w') as f:
+        rms_cum_wrt_med.tofile(f)
+
+    pngfile = os.path.join(infodir, '16rms_cum_wrt_med.png')
+    plot_lib.make_im_png(rms_cum_wrt_med, pngfile, cmap_noise_r, 'RMS of cum wrt median (mm)', np.nanpercentile(rms_cum_wrt_med, 1), np.nanpercentile(rms_cum_wrt_med, 99))
+
+    ### Save ref
+    cumfh5.create_dataset('refarea', data='{}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s))
+    refsfile = os.path.join(infodir, '16ref.txt')
+    with open(refsfile, 'w') as f:
+        print('{}:{}/{}:{}'.format(refx1s, refx2s, refy1s, refy2s), file=f)
+
+    if 'corner_lat' in list(cumh5.keys()): ## Geocoded
+        ### Make ref_stable.kml
+        reflat = lat1+dlat*refy1s
+        reflon = lon1+dlon*refx1s
+        io_lib.make_point_kml(reflat, reflon, os.path.join(infodir, '16ref.kml'))
 
 
     #%% Calc filtered velocity

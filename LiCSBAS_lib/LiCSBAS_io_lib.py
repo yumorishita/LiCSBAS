@@ -10,6 +10,7 @@ Changelog
 =========
 v1.1 20200227 Yu Morioshita, Uni of Leeds and GSI
  - Add hgt_linear_flag to make_tstxt
+ - Add make_point_kml
 v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
  - Original implementation
 
@@ -34,6 +35,12 @@ def make_dummy_bperp(bperp_file, imdates):
             ifg_dt = dt.datetime.strptime(imd, '%Y%m%d').toordinal() - dt.datetime.strptime(imdates[0], '%Y%m%d').toordinal()
             
             print('{:3d} {} {} {:5.2f} {:4d} {} {:4d} {} {:5.2f}'.format(i, imdates[0], imd, bp, ifg_dt, 0, ifg_dt, 0, bp), file=f)
+
+
+#%%
+def make_point_kml(lat, lon, kmlfile):
+    with open(kmlfile, "w") as f:
+        print('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document><Placemark><Point>\n<coordinates>{},{}</coordinates>\n</Point></Placemark></Document>\n</kml>'.format(lon, lat), file=f)
 
 
 #%%
