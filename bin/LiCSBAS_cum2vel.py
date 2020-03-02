@@ -5,7 +5,7 @@ v1.2 20190807 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script calculates velocity and its standard deviation from cum*.h5 and outputs them as a float file.
+This script calculates velocity and its standard deviation from cum*.h5 and outputs them as a float32 file. Amplitude and time offset of the annual displacement can also be calculated by --sin option.
 
 =====
 Usage
@@ -18,11 +18,12 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
  -o  Output vel file (Default: yyyymmdd_yyyymmdd.vel[.mskd])
  -r  Reference area (Default: same as info/*ref.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
+     0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  --vstd  Calculate vstd (Default: No)
  --sin   Add sin (annual) funcsion to linear model (Default: No)
          *.amp and *.dt (time difference wrt Jan 1) are output
- --mask  Path to maskfile (Default: No mask)
- --png   Make png file (Default: No)
+ --mask  Path to mask file for ref phase calculation (Default: No mask)
+ --png   Make png file (Default: Not make png)
 
 """
 #%% Change log

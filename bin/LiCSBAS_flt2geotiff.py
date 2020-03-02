@@ -5,13 +5,12 @@ v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script makes a GeoTIFF file from an image file (only in float format). The geotiff file can be read by a GIS software (e.g., QGIS) and used to make a figure. Nan will be regarded as NoDataValue as default. 0 can be replaced with nan.
-Note: gdal must be installed.
+This script makes a GeoTIFF file from an image file (only in float32 format). The geotiff file can be read by a GIS software (e.g., QGIS) and used to make a figure. Nan will be regarded as NoDataValue as default. 0 can be replaced with nan.
 
 =====
 Usage
 =====
-LiCSBAS_flt2geotiff.py -i infile -p dempar [-o outfile] [--zero2nan] [--nan2zero] [--a_nodata nodata_value] [--bigendian]
+LiCSBAS_flt2geotiff.py -i infile -p dempar [-o outfile] [--zero2nan] [--nan2zero] [--a_nodata num] [--bigendian]
 
  -i  Path to input file (float, little endian)
  -p  Path to dem parameter file (EQA.dem_par)

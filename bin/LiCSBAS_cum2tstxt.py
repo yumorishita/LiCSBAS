@@ -17,7 +17,11 @@ LiCSBAS_cum2tstxt.py [-p x/y] [-g lon/lat] [-i cumfile] [-o tsfile] [-r x1:x2/y1
  -i  Input cum*.h5 file (Default: cum_filt.h5)
  -o  Output txt file of time series (Default: ts_[x]_[y].txt)
  -r  Reference area (Default: same as info/*ref.txt)
- --mask  Path to maskfile for ref calculation (Default: No mask)
+     Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
+     0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ --mask  Path to mask file for ref calculation (Default: No mask)
+
+ Note: either -p or -g must be specified.
 
 """
 #%% Change log

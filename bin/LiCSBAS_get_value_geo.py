@@ -5,12 +5,12 @@ v1.1 20191218 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script gets values from a float file at specified points in geographical coordinates. Average values in a boxcar window are also output.
+This script gets values (and x/y coordinates) from a float32 file at specified points in geographical coordinates. Average values in a boxcar window are also output.
 
 =====
 Usage
 =====
-LiCSBAS_get_value_geo.py -i infile -p dempar -l locfile [-o outfile] [--win_size 3] [--bigendian]
+LiCSBAS_get_value_geo.py -i infile -p dempar -l locfile [-o outfile] [--win_size int] [--bigendian]
 
  -i  Input file (float, little endian, geocoded)
  -p  Dem parameter file (EQA.dem_par)

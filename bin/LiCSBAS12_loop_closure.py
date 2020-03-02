@@ -5,28 +5,29 @@ v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script identifies bad data by checking loop closure. A tentative reference point that has all valid unw data and the smallest RMS of loop phases is also determined.
+This script identifies bad unw by checking loop closure. A preliminary reference point that has all valid unw data and the smallest RMS of loop phases is also determined.
 
 ===============
 Input & output files
 ===============
-Inputs in GEOCml* :
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw[.png]
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc
- - slc.mli.par (single master only, to get parameters of width etc.)
- - baselines (can be dummy)
+Inputs in GEOCml*/ :
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw[.png]
+   - yyyymmdd_yyyymmdd.cc
+ - slc.mli.par
+ - baselines (may be dummy)
 
-Inputs in TS_GEOCml* :
- - info/11bad_ifg.txt  : List of bad ifgs identified in LiCSBAS11
+Inputs in TS_GEOCml*/ :
+ - info/11bad_ifg.txt  : List of bad ifgs identified in step11
  
-Outputs in TS_GEOCml* :
+Outputs in TS_GEOCml*/ :
  - 12loop/
    - loop_info.txt : Statistical information of loop phase closure
    - bad_ifg_*.txt : List of bad ifgs identified by loop closure
-   - good_loop_png/*_loop.png: png images of good loop phase closure
-   - bad_loop_png/*_loop.png : png images of bad loop phase closure
-   - bad_loop_cand_png/*_loop.png: png images of bad loop candidates in which
-                                   bad ifgs were not identified
+   - good_loop_png/*.png : png images of good loop phase closure
+   - bad_loop_png/*.png  : png images of bad loop phase closure
+   - bad_loop_cand_png/*.png : png images of bad loop candidates in which
+                               bad ifgs were not identified
    - loop_ph_rms_masked[.png] : RMS of loop phases used for ref selection
    
  - info/
@@ -38,14 +39,13 @@ Outputs in TS_GEOCml* :
                            Recommend to check the quality manually.
  - results/
    - n_unw[.png]      : Number of available unwrapped data to be used
-   - coh_avg[.png]    : Average of coherence
-   - n_loop_err[.png] : Number of loop errors (>pi) in data to be used
- - 12ifg_ras          : Ras images (link) of unwrapped data to be used
- - 12bad_ifg_cand_ras : Ras images (link) of unwrapped data to be used
-                        but candidates of bad data
- - 12bad_ifg_ras      : Ras images (link) of unwrapped data to be removed
- - 12no_loop_ifg_ras  : Ras images (link) of unwrapped data of no_loop_ifg
- - network/network12*.png : Figures of the network
+   - coh_avg[.png]    : Average coherence
+   - n_loop_err[.png] : Number of remaining loop errors (>pi) in data to be used
+ - 12ifg_ras/*.png     : png (link) of unw to be used
+ - 12bad_ifg_cand_ras/*.png : png (link) of unw to be used but candidates of bad
+ - 12bad_ifg_ras/*.png : png (link) of unw to be removed
+ - 12no_loop_ifg_ras/*.png : png (link) of unw with no loop
+ - network/network12*.png  : Figures of the network
 
 =====
 Usage
@@ -54,8 +54,7 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
- -l  Loop with smaller RMS than this is listed as closed loop.
-     (Default: 1.5 [rad])
+ -l  Threshold of RMS of loop phase (Default: 1.5 rad)
 
 """
 #%% Change log
@@ -103,7 +102,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200225; author="Y. Morishita"
+    ver=1.2; date=20200228; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

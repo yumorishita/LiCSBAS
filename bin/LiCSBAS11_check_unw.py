@@ -5,29 +5,31 @@ v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script checks quality of unw data and identifies bad interferograms based on average coherence and coverage of the unw data. This also prepares a time series working directory.
+This script checks quality of unw data and identifies bad interferograms based on average coherence and coverage of the unw data. This also prepares a time series working directory (overwrite if already exists).
 
 ===============
 Input & output files
 ===============
-Inputs in GEOCml* :
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw[.png]
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc
- - slc.mli[.par|.png] (single master only, to get parameters of width etc.)
+Inputs in GEOCml*/ :
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw[.png]
+   - yyyymmdd_yyyymmdd.cc
+ - slc.mli[.par|.png]
  - baselines (can be dummy)
  - EQA.dem_par
 
- Outputs in TS_GEOCml* directory
+ Outputs in TS_GEOCml*/ :
  - info/
-   - 11bad_ifg.txt : List of bad ifgs discarded from further processing
+   - 11bad_ifg.txt    : List of bad ifgs discarded from further processing
    - 11ifg_stats.txt  : Statistics of interferograms
    - EQA.dem_par (copy)
    - slc.mli.par (copy)
- - results/slc.mli[.png] (copy, if exist)
- - results/hgt[.png] (copy, if exist)
- - 11bad_ifg_ras/yyyymmdd_yyyymmdd.unw[.bmp|.png] : Ras images of bad ifgs
- - 11ifg_ras/yyyymmdd_yyyymmdd.unw[.bmp|.png] : Ras images other than bad ifgs
- - network/network11*.png    : Figures of baseline configuration
+ - results/
+   - slc.mli[.png] (copy, if exist)
+   - hgt[.png] (copy, if exist)
+ - 11bad_ifg_ras/yyyymmdd_yyyymmdd.unw.png : png of bad ifgs
+ - 11ifg_ras/yyyymmdd_yyyymmdd.unw.png     : png of good ifgs
+ - network/network11*.png  : Figures of baseline configuration
 
 =====
 Usage
@@ -35,11 +37,9 @@ Usage
 LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
- -t  Path to the output TS_[IFG|GEOC]ml?? dir. (Default: TS_GEOCml*)
- -c  IFGs with smaller average coherence than this value are listed as bad data.
-     (Default: 0.1)
- -u  IFGs with smaller coverage than this value are listed as bad data.
-     (Default: 0.5)
+ -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
+ -c  Threshold of average coherence (Default: 0.1)
+ -u  Threshold of coverage of unw data (Default: 0.5)
 
 """
 #%% Change log

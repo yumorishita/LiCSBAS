@@ -84,7 +84,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.4; date=20200224; author="Y. Morishita"
+    ver=1.4; date=20200225; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

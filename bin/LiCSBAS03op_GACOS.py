@@ -5,26 +5,26 @@ v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script applies a tropospheric correction to unw data using GACOS data. GACOS data can be automatically downloaded from LiCSAR-portal at step01 (if available), or should be externaly obtained by requesting on a GACOS web.
-The impact of the correction can be visually checked by showing GACOS_info.png and */*.gacos.png.
-This step is optional.
+This script applies a tropospheric correction to unw data using GACOS data. GACOS data may be automatically downloaded from COMET-LiCS web at step01 (if available), or could be externally obtained by requesting on a GACOS web. 
+If you request the GACOS data through the GACOS web, the dates and time of interest can be found in baselines and slc.mli.par, respectively. These are also available on the COMET-LiCS web portal. Once the GACOS data are ready, download the tar.gz, uncompress it, and put into GACOS dir. 
+Existing files are not re-created to save time, i.e., only the newly available data will be processed. The impact of the correction can be visually checked by showing GACOS_info.png and */*.gacos.png. This step is optional.
 
 ===============
 Input & output files
 ===============
-Inputs in GEOCml* :
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc
+Inputs in GEOCml*/ :
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw
+   - yyyymmdd_yyyymmdd.cc
  - U.geo
  - EQA.dem_par
  - slc.mli.par
 
-Inputs in GACOS dir :
- - yyyymmdd.sltd.geo.tif
- and/or 
+Inputs in GACOS/ :
+ - yyyymmdd.sltd.geo.tif  and/or 
  - yyyymmdd.ztd[.rsc]
 
-Outputs in GEOCml*GACOS directory
+Outputs in GEOCml*GACOS/
  - yyyymmdd_yyyymmdd/
    - yyyymmdd_yyyymmdd.unw[.png] : Corrected unw
    - yyyymmdd_yyyymmdd.gacos.png : Comparison image

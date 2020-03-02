@@ -5,26 +5,30 @@ v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script makes a mask for time series using several noise indices.
+This script makes a mask for time series using several noise indices. The pixel is masked if any of the values of the noise indices for a pixel is worse (larger or smaller) than a specified threshold.
 
 ===============
 Input & output files
 ===============
-Inputs in TS_GEOCml* :
+Inputs in TS_GEOCml*/ :
  - results/[vel, coh_avg, n_unw, vstd, maxTlen, n_gap, stc,
             n_ifg_noloop, n_loop_err, resid_rms]
  - info/13parameters.txt
  
-Outputs in TS_GEOCml* directory
- - mask_ts[_mskd].png
- - results/vel.mskd[.png]
- - results/mask[.png]
- - info/15parameters.txt
+Outputs in TS_GEOCml*/
+ - mask_ts[_mskd].png : Quick-look image of mask and noise indices
+ - results/
+   - vel.mskd[.png]   : Masked velocity
+   - mask[.png]       : Mask
+ - info/15parameters.txt : List of used parameters
 
 =====
 Usage
 =====
-LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre] [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin float] [--vmax float] [--keep_isolated] [--noautoadjust]
+LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
+  [-T maxTlen_thre] [-g n_gap_thre] [-s stc_thre] [-i n_ifg_noloop_thre]
+  [-l n_loop_err_thre] [-r resid_rms_thre] [--vmin float] [--vmax float]
+  [--keep_isolated] [--noautoadjust]
 
  -t  Path to the TS_GEOCml* dir.
  -c  Threshold of coh_avg (average coherence)
@@ -39,7 +43,7 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre] [-
  -r  Threshold of resid_rms (RMS of residuals in inversion (mm))
  --v[min|max]  Min|Max value for output figure of velocity (Default: auto)
  --keep_isolated  Keep (not mask) isolated pixels
-                  (Default: they are masked using STC)
+                  (Default: they are masked by stc)
  --noautoadjust  Do not auto adjust threshold when all pixels are masked
                  (Default: do auto adjust)
  

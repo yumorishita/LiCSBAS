@@ -5,7 +5,7 @@ v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script masks a float file using a mask file.
+This script masks a float32 file using a mask file.
 
 =====
 Usage

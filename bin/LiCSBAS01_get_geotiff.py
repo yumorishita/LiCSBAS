@@ -5,13 +5,13 @@ v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script downloads geotiff files of unw (unwrapped interferogram) and cc (coherence) for the specified frame ID from COMET-LiCS web. The -f option is not necessary when the frame ID can be automatically identified from the name of the working directory.
+This script downloads GeoTIFF files of unw (unwrapped interferogram) and cc (coherence) in the specified frame ID from COMET-LiCS web portal. The -f option is not necessary when the frame ID can be automatically identified from the name of the working directory. GACOS data can also be downloaded if available. Existing GeoTIFF files are not re-downloaded to save time, i.e., only the newly available data will be downloaded.
 
 ============
 Output files
 ============
  - GEOC/
-   - yyyymmdd_yyyymmdd
+   - yyyymmdd_yyyymmdd/
      - yyyymmdd_yyyymmdd.geo.unw.tif
      - yyyymmdd_yyyymmdd.geo.cc.tif
   [- *.geo.mli.tif (using just one first epoch)]
@@ -21,13 +21,13 @@ Output files
    - *.geo.hgt.tif
    - baselines
    - metadata.txt
-[- GACOS/]
+[- GACOS/] (if --get_gacos is used and GACOS data available on COMET-LiCS web)
   [- yyyymmdd.sltd.geo.tif]
-  
+
 =====
 Usage
 =====
-LiCSBAS01_get_geotiff.py [-f FRAME] [-s start_date] [-e end_date] [--get_gacos]
+LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos]
 
  -f  Frame ID (e.g., 021D_04972_131213). (Default: Read from directory name)
  -s  Start date (Default: 20141001)

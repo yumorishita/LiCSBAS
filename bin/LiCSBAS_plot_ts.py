@@ -25,12 +25,13 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
  -d    Directory containing noise indices (e.g., mask, coh_avg, etc.)
        (Default: "results" at the same dir as cum[_filt].h5)
  -r    Initial reference area (Default: same as info/*ref.txt)
- -p    Initial selected point for time series plot (Default: left top of ref)
+       0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ -p    Initial selected point for time series plot (Default: ref point)
  -c    Color map for velocity and cumulative displacement
        - https://matplotlib.org/tutorials/colors/colormaps.html
        - http://www.fabiocrameri.ch/colourmaps.php
        (Default: SCM.roma_r, reverse of SCM.roma)
- --nomask     Not mask (Default: use mask)
+ --nomask     Not use mask (Default: use mask)
  --vmin|vmax  Min|max values of color for velocity map (Default: auto)
  --dmin|dmax  Min|max values of color for cumulative displacement map
               (Default: auto)
@@ -650,7 +651,7 @@ if __name__ == "__main__":
 
 
     ### Fit function for time series
-    fitbox = pts.add_axes([0.83, 0.15, 0.16, 0.25])
+    fitbox = pts.add_axes([0.83, 0.10, 0.16, 0.25])
     models = ['Linear', 'Annual+L', 'Quad', 'Annual+Q']
     visibilities = [True, True, False, False]
     fitcheck = CheckButtons(fitbox, models, visibilities)

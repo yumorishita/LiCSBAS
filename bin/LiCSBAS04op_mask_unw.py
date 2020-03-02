@@ -5,19 +5,21 @@ v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script masks some parts of unw data. The masking is effective when the unw data include areas which have many unwrapping errors and are not of interest, and can improve the result of step 12 (loop closure).
+This script masks specified areas in the unw data. The masking is effective when the unw data include areas which have many unwrapping errors and are not of interest, and can improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
 
 ===============
 Input & output files
 ===============
-Inputs in GEOCml* directory:
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc
+Inputs in GEOCml*/:
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw
+   - yyyymmdd_yyyymmdd.cc
  - slc.mli.par
  
-Outputs in output directory
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw[.png]
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc (symbolic link)
+Outputs in GEOCml*mask/
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw[.png]
+   - yyyymmdd_yyyymmdd.cc (symbolic link)
  - Other files in input directory
 
 =====

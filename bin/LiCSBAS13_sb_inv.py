@@ -5,25 +5,26 @@ v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script inverts the small baseline network of ifgs to get the time series of displacement and velocity using the NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
-A stable reference point is determined after the inversion. RMS of the time series wrt median among all points as tentative reference is calculated for each point. Then the point with minimum RMS and minumum n_gap is selected as new stable reference point.
+This script inverts the SB network of unw to obtain the time series and velocity using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
+A stable reference point is determined after the inversion. RMS of the time series wrt median among all points is calculated for each point. Then the point with minimum RMS and minimum n_gap is selected as new stable reference point.
 
 ===============
 Input & output files
 ===============
-Inputs in GEOCml* :
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc
+Inputs in GEOCml*/ :
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw
+   - yyyymmdd_yyyymmdd.cc
  - EQA.dem_par
  - slc.mli.par
- - baselines (can be dummy)
+ - baselines (may be dummy)
 
-Inputs in TS_GEOCml*/info :
+Inputs in TS_GEOCml*/info/ :
  - 11bad_ifg.txt
  - 12bad_ifg.txt
  - 12ref.txt
- 
-Outputs in TS_GEOCml* directory
+
+Outputs in TS_GEOCml*/ :
  - cum.h5             : Cumulative displacement (time-seires) in mm
  - results/
    - vel[.png]        : Velocity in mm/yr (positive means LOS decrease; uplift)
@@ -33,13 +34,13 @@ Outputs in TS_GEOCml* directory
    - n_ifg_noloop[.png] :  Number of ifgs with no loop
    - maxTlen[.png]    : Max length of continous SB network in year
  - info/
-   - 13parameters.txt   : Used parameters
+   - 13parameters.txt : List of used parameters
    - 13used_image.txt : List of used images
    - 13resid.txt      : List of RMS of residual for each ifg
    - 13ref.txt[kml]   : Auto-determined stable ref point
    - 13rms_cum_wrt_med[.png] : RMS of cum wrt median used for ref selection
- - 13increment/yyyymmdd_yyyymmdd.inc_comp.png
-                      : Estimated incremental displacement and daisy chain IFG
+ - 13increment/yyyymmdd_yyyymmdd.increment.png
+     : Comparison between unw and inverted incremental displacement
  - 13resid/yyyymmdd_yyyymmdd.res.png : Residual for each ifg
  - network/network13*.png : Figures of the network
 
@@ -50,7 +51,6 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
-
  --inv_alg    Inversion algolism (Default: LS)
    LS :       NSBAS Least Square with no weight
    WLS:       NSBAS Weighted Least Square (not well tested)

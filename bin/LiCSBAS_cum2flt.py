@@ -5,7 +5,7 @@ v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script outputs a float file of cumulative displacement from cum*.h5.
+This script outputs a float32 file of cumulative displacement from cum*.h5.
 
 =====
 Usage
@@ -14,12 +14,13 @@ LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/
 
  -d  Date to be output
  -i  Path to input cum file (Default: cum_filt.h5)
- -o  Output flt file (Default: yyyymmdd_yyyymmdd.cum)
+ -o  Output float32 file (Default: yyyymmdd_yyyymmdd.cum)
  -m  Master (reference) date (Default: first date)
  -r  Reference area (Default: same as info/*ref.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
- --mask  Path to maskfile (Default: No mask)
- --png   Make png file (Default: No)
+     0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ --mask  Path to mask file for ref phase calculation (Default: No mask)
+ --png   Make png file (Default: Not make png)
 
 """
 #%% Change log

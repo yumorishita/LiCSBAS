@@ -5,38 +5,37 @@ v1.4 20200228 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script converts geotiff files to float format for further time series analysis, and also downsamples (multilooks) data if specified.
+This script converts GeoTIFF files of unw and cc to float32 and uint8 format, respectively, for further time series analysis, and also downsamples (multilooks) data if specified. Existing files are not re-created to save time, i.e., only the newly available data will be processed.
 
 ===============
 Input & output files
 ===============
 Inputs:
  - GEOC/    
-   - yyyymmdd_yyyymmdd
+   - yyyymmdd_yyyymmdd/
      - yyyymmdd_yyyymmdd.geo.unw.tif
      - yyyymmdd_yyyymmdd.geo.cc.tif
-  [- yyyymmdd.geo.mli.tif]
-  [- *.geo.[ENU].tif] (if not exist, try to download from LiCSAR portal)
-  [- baselines] (if not exist, try to download from LiCSAR portal or make dummy)
+  [- *.geo.mli.tif]
+  [- *.geo.hgt.tif]
+  [- *.geo.[E|N|U].tif] (if not exist, try to download from COMET-LiCS web)
+  [- baselines] (if not exist, try to download from COMET-LiCS web)
   [- metadata.txt]
 
-Outputs in GEOCml? directory (downsampled if indicated):
- - yyyymmdd_yyyymmdd
+Outputs in GEOCml*/ (downsampled if indicated):
+ - yyyymmdd_yyyymmdd/
    - yyyymmdd_yyyymmdd.unw[.png] (float32)
    - yyyymmdd_yyyymmdd.cc (uint8)
  - baselines (may be dummy)
  - EQA.dem_par
  - slc.mli[.par|.png]
  - hgt[.png]
- - E.geo (if exist)
- - N.geo (if exist)
- - U.geo (if exist)
- - no_unw_list.txt (if there are unavailable unw|cc exists)
+ - [E|N|U].geo (if exist)
+ - no_unw_list.txt (if there are unavailable unw|cc)
 
 =====
 Usage
 =====
-LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f FRAME]
+LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f frameID]
 
  -i  Path to the input GEOC dir containing stack of geotiff data
  -o  Path to the output GEOCml dir (Default: GEOCml[nlook])

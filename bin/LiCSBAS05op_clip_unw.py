@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
 """
-v1.1 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.1 20200302 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
 ========
-This script clips a specified rectangular area of interest from unw and cc data. The clipping can make the data size smaller and processing faster, and improve the result of step 12 (loop closure).
+This script clips a specified rectangular area of interest from unw and cc data. The clipping can make the data size smaller and processing faster, and improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
 
 ===============
 Input & output files
 ===============
-Inputs in GEOCml* directory:
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc
+Inputs in GEOCml*/ :
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw
+   - yyyymmdd_yyyymmdd.cc
  - slc.mli[.par|.png]
  - EQA.dem.par
  - Others (baselines, [E|N|U].geo, hgt[.png])
  
-Outputs in output directory:
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.unw[.png] (clipped)
- - yyyymmdd_yyyymmdd/yyyymmdd_yyyymmdd.cc (clipped)
+Outputs in GEOCml*clip/ :
+ - yyyymmdd_yyyymmdd/
+   - yyyymmdd_yyyymmdd.unw[.png] (clipped)
+   - yyyymmdd_yyyymmdd.cc (clipped)
  - slc.mli[.par|.png] (clipped)
  - EQA.dem.par (clipped)
  - Other files in input directory if exist (copy or clipped)
@@ -39,8 +41,8 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
 """
 #%% Change log
 '''
-v1.1 20200225 Yu Morishita, Uni of Leeds and GSI
- - Bag fix for hgt.png
+v1.1 20200302 Yu Morishita, Uni of Leeds and GSI
+ - Bag fix for hgt.png and glob
  - Deal with cc file in uint8 format
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
@@ -73,7 +75,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20200225; author="Y. Morishita"
+    ver=1.1; date=20200302; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -210,7 +212,7 @@ def main(argv=None):
 
 
     #%% Clip or copy other files than unw and cc
-    files = glob.glob(os.path.join(in_dir, '*'))
+    files = sorted(glob.glob(os.path.join(in_dir, '*')))
     for file in files:
         if os.path.isdir(file):
             continue  #not copy directory

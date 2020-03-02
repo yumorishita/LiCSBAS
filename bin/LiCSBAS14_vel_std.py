@@ -5,24 +5,24 @@ v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script calculates the standard deviation of the velocity by bootstrap and STC (spatio-temporal consistency; Hanssen et al., 2008, Terrafirma).
+This script calculates the standard deviation of the velocity by the bootstrap method and STC (spatio-temporal consistency; Hanssen et al., 2008).
 
 ===============
 Input & output files
 ===============
-Inputs in TS_GEOCml* directory :
+Inputs in TS_GEOCml*/ :
  - cum.h5 : Cumulative displacement (time-series) in mm
  
-Outputs in TS_GEOCml*/results directory
+Outputs in TS_GEOCml*/results/ :
  - vstd[.png] : Std of velocity in mm/yr
  - stc[.png]  : Spatio-temporal consistency in mm
 
 =====
 Usage
 =====
-LiCSBAS14_vel_std.py -t tsadir [--mem_size mem_size]
+LiCSBAS14_vel_std.py -t tsadir [--mem_size float]
 
- -t  Path to the TS_[IFG|GEOC]ml?? dir.
+ -t  Path to the TS_GEOCml* dir.
  --mem_size   Max memory size for each patch in MB. (Default: 4000)
 
 """

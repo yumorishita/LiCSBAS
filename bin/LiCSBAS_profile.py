@@ -21,6 +21,8 @@ LiCSBAS_profile.py -i infile -p dempar [-r x1,y1/x2,y2] [-g lon1,lat1/lon2,lat2]
  --bigendian  If input file is in big endian
  --nodisplay  Not display quick look images
 
+ Note: either -r or -g must be specified.
+
 """
 #%% Change log
 '''

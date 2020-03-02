@@ -5,36 +5,36 @@ v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
 ========
 Overview
 ========
-This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1d, bilinear, or 2d polinomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering.
-A stable reference point is determined as well as step13.
+This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
 ===============
 Input & output files
 ===============
-Inputs in TS_GEOCml* :
+Inputs in TS_GEOCml*/ :
  - cum.h5
- - results/mask
- - results/hgt (if --hgt_linear option is used)
+ - results
+   - mask
+   - hgt (if --hgt_linear option is used)
  - info/13parameters.txt
  
-Outputs in TS_GEOCml* directory
+Outputs in TS_GEOCml*/ :
  - cum_filt.h5
  - 16filt_cum/
    - yyyymmdd_filt.png
-  [- yyyymmdd_deramp.png] (if -r option is used)
+  [- yyyymmdd_deramp.png]     (if -r option is used)
   [- yyyymmdd_hgt_linear.png] (if --hgt_linear option is used)
-  [- yyyymmdd_hgt_corr.png] (if --hgt_linear option is used)
+  [- yyyymmdd_hgt_corr.png]   (if --hgt_linear option is used)
  - 16filt_increment/
    - yyyymmdd_yyyymmdd_filt.png
-  [- yyyymmdd_yyyymmdd_deramp.png] (if -r option is used)
+  [- yyyymmdd_yyyymmdd_deramp.png]     (if -r option is used)
   [- yyyymmdd_yyyymmdd_hgt_linear.png] (if --hgt_linear option is used)
-  [- yyyymmdd_yyyymmdd_hgt_corr.png] (if --hgt_linear option is used)
+  [- yyyymmdd_yyyymmdd_hgt_corr.png]   (if --hgt_linear option is used)
  - results/
-   - vel.filt[.mskd][.png]
+   - vel.filt[.mskd][.png]   : Filtered velocity
    - vintercept.filt.mskd[.png]
  - info/
-   - 16parameters.txt
-   - 16ref.txt[.kml]
+   - 16parameters.txt        : List of used parameters
+   - 16ref.txt[.kml]         : Auto-determined stable ref point
    - 16rms_cum_wrt_med[.png] : RMS of cum wrt median used for ref selection
 
 =====
