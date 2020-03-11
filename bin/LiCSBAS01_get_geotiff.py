@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200302 Yu Morishita, Uni of Leeds and GSI
+v1.3 20200311 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -37,6 +37,8 @@ LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos]
 """
 #%% Change log
 '''
+v1.3 2020031 Yu Morishita, Uni of Leeds and GSI
+ - Deal with only new LiCSAR file structure
 v1.2 20200302 Yu Morishita, Uni of Leeds and GSI
  - Compatible with new LiCSAR file structure (backward-compatible)
  - Add --get_gacos option
@@ -162,11 +164,8 @@ def main(argv=None):
 
     #%% mli
     ### Get available dates
-    url = os.path.join(LiCSARweb, trackID, frameID, 'products', 'epochs')
+    url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
     response = requests.get(url)
-    if not response.ok:  ## Try new structure
-        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
-        response = requests.get(url)
     
     response.encoding = response.apparent_encoding #avoid garble
     html_doc = response.text
@@ -243,11 +242,8 @@ def main(argv=None):
     #%% unw and cc
     ### Get available dates
     print('\nDownload geotiff of unw and cc', flush=True)
-    url = os.path.join(LiCSARweb, trackID, frameID, 'products')
+    url = os.path.join(LiCSARweb, trackID, frameID, 'interferograms')
     response = requests.get(url)
-    if not response.ok:  ## Try new structure
-        url = os.path.join(LiCSARweb, trackID, frameID, 'interferograms')
-        response = requests.get(url)
     
     response.encoding = response.apparent_encoding #avoid garble
     html_doc = response.text
