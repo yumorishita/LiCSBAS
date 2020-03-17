@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.5 20200317 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -31,6 +31,9 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax f
 
 #%% Change log
 '''
+v1.5 20200317 Yu Morishita, Uni of Leeds and GSI
+ - Add offscreen when kmz or png for working with bsub on Jasmin
+ - Add name and description (cbar) tag in kmz
 v1.4 20200225 Yu Morishita, Uni of Leeds and GSI
  - Use SCM instead of SCM5
  - Support uint8
@@ -50,6 +53,7 @@ import getopt
 import sys
 import os
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 import subprocess as subp
 import SCM
@@ -64,15 +68,17 @@ class Usage(Exception):
         self.msg = msg
 
 #%%
-def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile):
+def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
     kmlfile = kmzfile.replace('.kmz', '.kml')
-        
+    name = os.path.basename(kmzfile).replace('.kmz', '')
+
     with open(kmlfile, "w") as f:
-        print('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">/n<Document><GroundOverlay><Icon>\n<href>{}</href>\n</Icon>\n<altitude>0</altitude>\n<tessellate>0</tessellate>\n<altitudeMode>clampToGround</altitudeMode>\n<LatLonBox><south>{}</south><north>{}</north><west>{}</west><east>{}</east></LatLonBox>\n</GroundOverlay></Document></kml>'.format(pngfile, lat1, lat2, lon1, lon2), file=f)
+        print('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document><GroundOverlay>\n<name>{}</name>\n<description>{}</description>\n<Icon><href>{}</href></Icon>\n<altitude>0</altitude>\n<tessellate>0</tessellate>\n<altitudeMode>clampToGround</altitudeMode>\n<LatLonBox><south>{}</south><north>{}</north><west>{}</west><east>{}</east></LatLonBox>\n</GroundOverlay></Document></kml>'.format(name, description, pngfile, lat1, lat2, lon1, lon2), file=f)
         
     with zipfile.ZipFile(kmzfile, 'w', compression=zipfile.ZIP_DEFLATED) as f:
         f.write(kmlfile)
         f.write(pngfile)
+        if pngcfile: f.write(pngcfile)
 
     os.remove(kmlfile)
 
@@ -84,7 +90,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.4; date=20200225; author="Y. Morishita"
+    ver=1.5; date=20200316; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -201,9 +207,12 @@ if __name__ == "__main__":
         data = io_lib.read_img(infile, length, width, endian=endian)
     
     if cmap_name == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
+        cyclic= True
         data = np.angle(np.exp(1j*(data/cycle))*cycle)
         cmin = -np.pi
         cmax = np.pi
+    else:
+        cyclic= False
 
 
     #%% Set color range for displacement and vel
@@ -218,6 +227,8 @@ if __name__ == "__main__":
 
     #%% Output kmz
     if kmzname:
+        ### Make png
+        os.environ['QT_QPA_PLATFORM']='offscreen'
         dpi = 100
         figsize2 = (width/dpi, length/dpi)
         plt.figure(figsize=figsize2, dpi=dpi)
@@ -227,23 +238,41 @@ if __name__ == "__main__":
         pngnametmp = kmzname.replace('.kmz', '_tmp.png')
         plt.savefig(pngnametmp, dpi=dpi, transparent=True)
         plt.close()
-          
-        make_kmz(lat_s_p, lat_n_p, lon_w_p, lon_e_p, pngnametmp, kmzname)
+
+        ### Make cbar png
+        if cyclic:
+            description = '{}*2pi/cycle'.format(cycle)
+            pngcfile = []
+        else:
+            fig, ax = plt.subplots(figsize=(3, 1))
+            norm = mpl.colors.Normalize(cmin, cmax)
+            mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+            pngcfile = kmzname.replace('.kmz', '_ctmp.png')
+            plt.tight_layout()
+            plt.savefig(pngcfile, transparent=True)
+            plt.close()
+            description = '<![CDATA[<img style="max-width:200px;" src="{}">]]>'.format(os.path.basename(pngcfile))
+
+        make_kmz(lat_s_p, lat_n_p, lon_w_p, lon_e_p, pngnametmp, kmzname, pngcfile, description)
         
         os.remove(pngnametmp)
+        if pngcfile:
+            os.remove(pngcfile)
         print('\nOutput: {}\n'.format(kmzname))
         
         sys.exit(0)
 
 
     #%% Plot figure
+    if pngname: os.environ['QT_QPA_PLATFORM']='offscreen'
+
     figsize_x = 6 if length > width else 8
     figsize = (figsize_x, ((figsize_x-2)*length/width))
     plt.figure('{}'.format(infile), figsize)
     plt.imshow(data, clim=[cmin, cmax], cmap=cmap)
-    if cmap == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
+    if cyclic:
         plt.title('{}*2pi/cycle'.format(cycle))
-    else:  ### Not cyclic
+    else:
         plt.colorbar()
     plt.tight_layout()
     
