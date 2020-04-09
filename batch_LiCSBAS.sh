@@ -30,6 +30,7 @@ log="$logdir/$(date +%Y%m%d%H%M)$(basename $0 .sh)_${start_step}_${end_step}.log
 do03op_GACOS="n"	# y/n
 do04op_mask="n"	# y/n
 do05op_clip="n"	# y/n
+p04_mask_coh_thre=""	# e.g. 0.2
 p04_mask_range=""	# e.g. 10:100/20:200 (ix start from 0)
 p04_mask_range_file=""	# Name of file containing range list
 p05_clip_range=""	# e.g. 10:100/20:200 (ix start from 0)
@@ -172,6 +173,7 @@ if [ $step -eq 04 -a $start_step -le 04 -a $end_step -ge 04 ];then
     if [ ! -z $p04_outGEOCmldir_suffix ];then outGEOCmldir="$inGEOCmldir$p04_outGEOCmldir_suffix";
       else outGEOCmldir="${inGEOCmldir}mask"; fi
     p04_op="$p04_op -o $outGEOCmldir"
+    if [ ! -z $p04_mask_coh_thre ];then p04_op="$p04_op -c $p04_mask_coh_thre"; fi
     if [ ! -z $p04_mask_range ];then p04_op="$p04_op -r $p04_mask_range"; fi
     if [ ! -z $p04_mask_range_file ];then p04_op="$p04_op -f $p04_mask_range_file"; fi
 

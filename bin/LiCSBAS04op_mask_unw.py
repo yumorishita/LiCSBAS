@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+v1.1 20200409 Yu Morishita, GSI
 
 ========
 Overview
 ========
-This script masks specified areas in the unw data. The masking is effective when the unw data include areas which have many unwrapping errors and are not of interest, and can improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
+This script masks specified areas or low coherence areas in the unw data. The masking is effective when the unw data include areas which have many unwrapping errors and are not of interest, and can improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
 
 ===============
 Input & output files
@@ -20,22 +20,29 @@ Outputs in GEOCml*mask/
  - yyyymmdd_yyyymmdd/
    - yyyymmdd_yyyymmdd.unw[.png]
    - yyyymmdd_yyyymmdd.cc (symbolic link)
+ - mask[.png]
+[- coh_avg[.png]] (if -c is used)
  - Other files in input directory
 
 =====
 Usage
 =====
-LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-f txtfile]
+LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f txtfile]
 
  -i  Path to the GEOCml* dir containing stack of unw data.
  -o  Path to the output dir.
+ -c  Threshold for average coherence (e.g., 0.2)
  -r  Range to be masked. Index starts from 0.
      0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  -f  Text file of a list of ranges to be masked (format is x1:x2/y1:y2)
 
+ Note: either -c, -r or -f must be specified.
+
 """
 #%% Change log
 '''
+v1.1 20200409 Yu Morishita, GSI
+ - Add -c (coherence based mask) option
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 '''
@@ -65,7 +72,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.0; date=20190730; author="Y. Morishita"
+    ver=1.1; date=20200409; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -73,14 +80,17 @@ def main(argv=None):
     #%% Set default
     in_dir = []
     out_dir = []
+    coh_thre = []
     ex_range_str = []
     ex_range_file = []
+
+    cmap_noise = 'viridis'
 
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:r:f:", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hi:o:c:r:f:", ["help"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -91,6 +101,8 @@ def main(argv=None):
                 in_dir = a
             elif o == '-o':
                 out_dir = a
+            elif o == '-c':
+                coh_thre = float(a)
             elif o == '-r':
                 ex_range_str = a
             elif o == '-f':
@@ -100,7 +112,7 @@ def main(argv=None):
             raise Usage('No input directory given, -i is not optional!')
         if not out_dir:
             raise Usage('No output directory given, -o is not optional!')
-        if not ex_range_str and not ex_range_file:
+        if not coh_thre and not ex_range_str and not ex_range_file:
             raise Usage('Neither -r nor -f option is given!')
         elif not os.path.isdir(in_dir):
             raise Usage('No {} dir exists!'.format(in_dir))
@@ -114,7 +126,7 @@ def main(argv=None):
         return 2
 
     
-#%% Read info and make dir
+    #%% Read info and make dir
     in_dir = os.path.abspath(in_dir)
     out_dir = os.path.abspath(out_dir)
 
@@ -133,20 +145,52 @@ def main(argv=None):
     else: ## C-band
         cycle = 3  # 2pi*3/cycle for png
 
-
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
 
+    bool_mask = np.zeros((length, width), dtype=np.bool)
 
-    #%% Check and set range to be masked
+
+    #%% Check and set pixels to be masked based on coherence
+    if coh_thre:
+        ### Calc coh_avg
+        print("\nCalculate coh_avg and define mask (<={})".format(coh_thre), flush=True)
+        coh_avg = np.zeros((length, width), dtype=np.float32)
+        n_coh = np.zeros((length, width), dtype=np.int16)
+        for ifgix, ifgd in enumerate(ifgdates): 
+            ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
+            if os.path.getsize(ccfile) == length*width:
+                coh = io_lib.read_img(ccfile, length, width, np.uint8)
+                coh = coh.astype(np.float32)/255
+            else:
+                coh = io_lib.read_img(ccfile, length, width)
+                coh[np.isnan(coh)] = 0 # Fill nan with 0
+
+            coh_avg += coh
+            n_coh += (coh!=0)
+
+        n_coh[n_coh==0] = 99999 #to avoid zero division
+        coh_avg = coh_avg/n_coh
+
+        ### Set mask
+        bool_mask[coh_avg <= coh_thre] = True
+
+        ### Save image
+        coh_avgfile = os.path.join(out_dir, 'coh_avg')
+        coh_avg.tofile(coh_avgfile)
+        title = 'Average coherence'
+        plot_lib.make_im_png(coh_avg, coh_avgfile+'.png', cmap_noise, title)
+
+
+    #%% Check and set range to be masked based on specified area
     ### Read -r option
-    ex_range_list_list = []
     if ex_range_str:
         if not tools_lib.read_range(ex_range_str, width, length):
             print('ERROR in {}\n'.format(ex_range_str))
             return 1
         else:
-            ex_range_list_list.append(tools_lib.read_range(ex_range_str, width, length))
+            x1, x2, y1, y2 = tools_lib.read_range(ex_range_str, width, length)
+            bool_mask[y1:y2, x1:x2] = True
     
     ### Read -f option
     if ex_range_file:
@@ -158,11 +202,20 @@ def main(argv=None):
                 print('ERROR in {}\n'.format(ex_range_str1))
                 return 1
             else:
-                ex_range_list_list.append(tools_lib.read_range(ex_range_str1, width, length))
-
-    print("\nArea to be masked:", flush=True)
-    print(ex_range_list_list, flush=True)
+                x1, x2, y1, y2 = tools_lib.read_range(ex_range_str1, width, length)
+                bool_mask[y1:y2, x1:x2] = True
     
+    ### Save image of mask
+    mask = np.float32(~bool_mask)
+    maskfile = os.path.join(out_dir, 'mask')
+    mask.tofile(maskfile)
+
+    pngfile = maskfile+'.png'
+    title = 'Mask'
+    plot_lib.make_im_png(mask, pngfile, cmap_noise, title, 0, 1)
+    
+    print('\nMask defined.')
+
 
     #%% Mask unw
     print('\nMask unw and link cc', flush=True)
@@ -188,9 +241,7 @@ def main(argv=None):
         unw = io_lib.read_img(unwfile, length, width)
 
         ### Mask
-        for ex_range_list in ex_range_list_list:
-            x1, x2, y1, y2 = ex_range_list
-            unw[y1:y2, x1:x2] = np.nan
+        unw[bool_mask] = np.nan
 
         ### Output
         out_dir1 = os.path.join(out_dir, ifgd)
@@ -216,6 +267,9 @@ def main(argv=None):
         if not os.path.isdir(file): #not copy directory, only file
             print('Copy {}'.format(os.path.basename(file)), flush=True)
             shutil.copy(file, out_dir)
+
+    print('\nMasked area can be check in:')
+    print('{}'.format(os.path.relpath(pngfile)), flush=True)
 
 
     #%% Finish
