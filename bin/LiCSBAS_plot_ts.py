@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7 20200227 Yu Morishita, Uni of Leeds and GSI
+v1.8 20200408 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -42,6 +42,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
 """
 #%% Change log
 '''
+v1.8 20200408 Yu Morishita, GSI
+ - Avoid garbled characters in ja_JP environment
 v1.7 20200227 Yu Morishita, Uni of Leeds and GSI
  - Use SCM instead of SCM5
  - Change option from --cmap to -c
@@ -83,6 +85,8 @@ import SCM
 import warnings
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
+
+os.environ['LANG'] = 'en_US.UTF-8'
 
 try:
     from pandas.plotting import register_matplotlib_converters
@@ -135,7 +139,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.7; date=20200227; author="Y. Morishita"
+    ver=1.8; date=20200408; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
