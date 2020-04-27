@@ -43,6 +43,13 @@ The [Scientific Colour Maps](http://www.fabiocrameri.ch/colourmaps.php) ([Cramer
 
 ## Significant Updates
 
+##### April 2020
+
+- Add -c (coherence based mask) option in Step 0-4.
+- Add `LiCSBAS_color_geotiff.py` which creates a colored GeoTIFF from a data GeoTIFF.
+- Add `LiCSBAS_contour.py` which creates a contour GeoJSON from a data GeoTIFF.
+- Add `edit_batch_LiCSBAS.sh` for easy edit of batch_LiCSBAS.sh.
+
 ##### 2 March, 2020
 
 - Add an option to remove topography-correlated tropospheric noise at Step 1-6. 
