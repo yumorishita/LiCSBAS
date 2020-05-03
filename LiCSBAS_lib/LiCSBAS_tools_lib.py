@@ -8,6 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.3 20200503 Yu Morioshita, GSI
+ - Update download_data (thanks to sahitono)
 v1.2 20200227 Yu Morioshita, Uni of Leeds and GSI
  - Add read_point and fit2dh
 v1.1 20190916 Yu Morioshita, Uni of Leeds and GSI
@@ -79,14 +81,20 @@ def cmap_insar():
 
 #%% 
 def download_data(url, file):
-    response = requests.get(url)
-    if response.status_code != 200:
-        return False    
-    
-    with open(file, "wb") as f:
-        f.write(response.content)
-    
-    return True
+    try:
+        with requests.get(url) as res:
+            res.raise_for_status()
+            with open(file, "wb") as output:
+                output.write(res.content)
+
+#    except requests.exceptions.RequestException as error:
+    except:
+        print(
+            "    Error while downloading from {}".format(url),
+            file=sys.stderr,
+            flush=True,
+        )
+#        raise SystemExit(error)
 
 
 #%%

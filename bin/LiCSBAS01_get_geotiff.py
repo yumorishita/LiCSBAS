@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200311 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200503 Yu Morishita, GSI
 
 ========
 Overview
@@ -37,7 +37,9 @@ LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos]
 """
 #%% Change log
 '''
-v1.3 2020031 Yu Morishita, Uni of Leeds and GSI
+v1.4 20200503 Yu Morishita, GSI
+ - Update download_data (thanks to sahitono)
+v1.3 20200311 Yu Morishita, Uni of Leeds and GSI
  - Deal with only new LiCSAR file structure
 v1.2 20200302 Yu Morishita, Uni of Leeds and GSI
  - Compatible with new LiCSAR file structure (backward-compatible)
@@ -146,20 +148,16 @@ def main(argv=None):
         print('Download {}'.format(enutif), flush=True)
 
         url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', enutif)
-        if not tools_lib.download_data(url, enutif):
-            print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
-            continue
+        tools_lib.download_data(url, enutif)
 
     #%% baselines and metadata.txt
     print('Download baselines', flush=True)
     url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'baselines')
-    if not tools_lib.download_data(url, 'baselines'):
-        print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
+    tools_lib.download_data(url, 'baselines')
 
     print('Download metadata.txt', flush=True)
     url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'metadata.txt')
-    if not tools_lib.download_data(url, 'metadata.txt'):
-        print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
+    tools_lib.download_data(url, 'metadata.txt')
 
 
     #%% mli
@@ -179,7 +177,7 @@ def main(argv=None):
     imd1 = []
     for imd in _imdates: 
         url_mli = os.path.join(url, imd, imd+'.geo.mli.tif')
-        response = requests.get(url_mli)
+        response = requests.head(url_mli)
         if  response.ok:
             imd1 = imd
             break
@@ -191,8 +189,8 @@ def main(argv=None):
         mlitif = frameID+'.geo.mli.tif'
         if os.path.exists(mlitif):
             print('    {} already exist. Skip'.format(mlitif), flush=True)
-        elif not tools_lib.download_data(url_mli, mlitif):
-            print('    Error while downloading from {}'.format(url_mli), file=sys.stderr, flush=True)
+        else:
+            tools_lib.download_data(url_mli, mlitif)
     else:
         print('No mli available on {}'.format(url), file=sys.stderr, flush=True)
 
@@ -235,8 +233,8 @@ def main(argv=None):
             path_sltd = os.path.join(gacosdir, imd+'.sltd.geo.tif')
             if os.path.exists(path_sltd):
                 print('    {}.sltd.geo.tif already exist. Skip'.format(imd), flush=True)
-            elif not tools_lib.download_data(url_sltd, path_sltd):
-                print('    Error while downloading from {}'.format(url_sltd), file=sys.stderr, flush=True)
+            else:
+                tools_lib.download_data(url_sltd, path_sltd)
     
 
     #%% unw and cc
@@ -271,15 +269,14 @@ def main(argv=None):
         if not os.path.exists(ifgd): os.mkdir(ifgd)
         if os.path.exists(path_unw):
             print('    {}.geo.unw.tif already exist. Skip'.format(ifgd), flush=True)
-        elif not tools_lib.download_data(url_unw, path_unw):
-            print('    Error while downloading from {}'.format(url_unw), file=sys.stderr, flush=True)
+        else:
+            tools_lib.download_data(url_unw, path_unw)
 
         url_cc = os.path.join(url, ifgd, ifgd+'.geo.cc.tif')
         path_cc = os.path.join(ifgd, ifgd+'.geo.cc.tif')
         if os.path.exists(path_cc):
             print('    {}.geo.cc.tif already exist. Skip.'.format(ifgd), flush=True)
-        if not tools_lib.download_data(url_cc, path_cc):
-            print('    Error while downloading from {}'.format(url_cc), file=sys.stderr, flush=True)
+        tools_lib.download_data(url_cc, path_cc)
    
 
     #%% Finish
