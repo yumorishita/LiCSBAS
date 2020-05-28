@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.8 20200408 Yu Morishita, Uni of Leeds and GSI
+v1.9 20200527 Yu Morishita, GSI
 
 ========
 Overview
@@ -16,7 +16,7 @@ Inputs
 =====
 Usage
 =====
-LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymmdd] [-r x1:x2/y1:y2] [-p x/y] [-c cmap] [--nomask] [--vmin float] [--vmax float] [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
+LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_dir] [-u U.geo] [-r x1:x2/y1:y2] [-p x/y] [-c cmap] [--nomask] [--vmin float] [--vmax float] [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
 
  -i    Input cum hdf5 file (Default: ./cum_filt.h5 or ./cum.h5)
  --i2  Input 2nd cum hdf5 file
@@ -24,6 +24,7 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
  -m    Master (reference) date for time-seires (Default: first date)
  -d    Directory containing noise indices (e.g., mask, coh_avg, etc.)
        (Default: "results" at the same dir as cum[_filt].h5)
+ -u    Input U.geo file to show incidence angle (Default: ../GEOCml*/U.geo)
  -r    Initial reference area (Default: same as info/*ref.txt)
        0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  -p    Initial selected point for time series plot (Default: ref point)
@@ -42,6 +43,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-d results_dir] [-m yyyymm
 """
 #%% Change log
 '''
+v1.9 20200527 Yu Morishita, GSI
+ - Add -u option to show incidence angle
 v1.8 20200408 Yu Morishita, GSI
  - Avoid garbled characters in ja_JP environment
 v1.7 20200227 Yu Morishita, Uni of Leeds and GSI
@@ -139,7 +142,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.8; date=20200408; author="Y. Morishita"
+    ver=1.9; date=20200527; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -147,6 +150,7 @@ if __name__ == "__main__":
     cumfile = []
     cumfile2 = []
     resultsdir = []
+    LOSufile = []
     mdate = []
     refarea = []
     point = []
@@ -162,7 +166,7 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:d:m:r:p:c:", ["help", "i2=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
+            opts, args = getopt.getopt(argv[1:], "hi:d:u:m:r:p:c:", ["help", "i2=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -171,12 +175,14 @@ if __name__ == "__main__":
                 sys.exit(0)
             elif o == '-i':
                 cumfile = a
-            elif o == '-d':
-                resultsdir = a
             elif o == '--i2':
                 cumfile2 = a
             elif o == '-m':
                 mdate = a
+            elif o == '-d':
+                resultsdir = a
+            elif o == '-u':
+                LOSufile = a
             elif o == '-r':
                 refarea = a
             elif o == '-p':
@@ -261,6 +267,17 @@ if __name__ == "__main__":
     stcfile = os.path.join(resultsdir, 'stc')
     mlifile = os.path.join(resultsdir, 'slc.mli')
     hgtfile = os.path.join(resultsdir, 'hgt')
+
+
+    ### U.geo
+    if not LOSufile: #if not given
+        LOSufile = os.path.join(os.path.dirname(cumdir), 
+           os.path.basename(cumdir).replace('TS_', ''), 'U.geo') ## Default
+    if not os.path.exists(LOSufile):
+        print('\nNo U.geo file found. Not use.')
+        LOSuflag = False
+    else:
+        LOSuflag = True
 
 
     #%% Read data
@@ -383,6 +400,13 @@ if __name__ == "__main__":
         mask = mask_vel
     else:
         mask = mask_base
+
+
+    #%% Read U.geo file
+    if LOSuflag:
+        print('Reading {}'.format(os.path.relpath(LOSufile)))
+        LOSu = io_lib.read_img(LOSufile, length, width)
+        inc_agl_deg = np.rad2deg(np.arccos(LOSu))
 
 
     #%% Read noise indecies
@@ -651,7 +675,7 @@ if __name__ == "__main__":
             label.set_horizontalalignment('right')
 
     ### Ref info at side
-    axtref = pts.text(0.83, 0.93, 'Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]), fontsize=8, va='top')
+    axtref = pts.text(0.83, 0.95, 'Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]), fontsize=8, va='top')
 
 
     ### Fit function for time series
@@ -705,7 +729,7 @@ if __name__ == "__main__":
         axts.set_xlabel('Time')
         axts.set_ylabel('Displacement (mm)')
 
-        ### Get values of noise indices
+        ### Get values of noise indices and incidence angle
         noisetxt = ''
         for key in mapdict_data:
             val = mapdict_data[key][ii, jj]
@@ -717,12 +741,16 @@ if __name__ == "__main__":
             else:
                 noisetxt = noisetxt+'{}: {:.2f} {}\n'.format(key, val, unit)
 
+        if LOSuflag:
+            noisetxt = noisetxt+'Inc_agl: {:.1f} deg\n'.format(inc_agl_deg[ii, jj])
+            noisetxt = noisetxt+'LOS u: {:.3f}\n'.format(LOSu[ii, jj])
+
         ### Get lat lon and show Ref info at side 
         if geocod_flag:
             lat, lon = tools_lib.xy2bl(jj, ii, lat1, dlat, lon1, dlon)
             axtref.set_text('Lat:{:.5f}\nLon:{:.5f}\n\nRef area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}\n\n{}'.format(lat, lon, refx1, refx2, refy1, refy2, imdates[ix_m], noisetxt))
         else: 
-            axtref.set_text('Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}'.format(refx1, refx2, refy1, refy2, imdates[ix_m]))
+            axtref.set_text('Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}\n\n{}'.format(refx1, refx2, refy1, refy2, imdates[ix_m], noisetxt))
 
         ### If masked
         if np.isnan(mask[ii, jj]):
