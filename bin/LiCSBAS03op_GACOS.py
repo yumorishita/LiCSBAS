@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
+v1.3 20200609 Yu Morishita, GSI
 
 ========
 Overview
@@ -50,6 +50,8 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole]
 """
 #%% Change log
 '''
+v1.3 20200609 Yu Morishita, GSI
+ - Avoid reading error of ztd (unkown cause) by addding subtle value
 v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
  - Compatible with GACOS data provided from LiCSAR-portal
  - Output correlation plot
@@ -145,7 +147,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200228; author="Y. Morishita"
+    ver=1.3; date=20200609; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -292,9 +294,21 @@ def main(argv=None):
             if os.path.exists(bilfile): os.remove(bilfile)
             make_hdr(ztdfile+'.rsc', hdrfile)
             os.symlink(os.path.relpath(ztdfile, sltddir), bilfile)
-    
+            
+            ## Check read error with unkown cause
+            if gdal.Info(bilfile) is None: 
+                ### Create new ztd by adding 0.0001m
+                print('{} cannot open, but trying minor update. You can ignore this error unless this script stops.'.format(ztdfile))
+                shutil.copy2(ztdfile, ztdfile+'.org') ## Backup
+                _ztd = np.fromfile(ztdfile, dtype=np.float32)
+                _ztd[_ztd!=0] = _ztd[_ztd!=0]+0.001
+                _ztd.tofile(ztdfile)
+
             ### Cut and resapmle ztd to geo
-            ztd_geo = gdal.Warp("", bilfile, format='MEM', outputBounds=(lonw_geo, lats_geo, lone_geo, latn_geo), width=width_geo, height=length_geo, resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
+            ztd_geo = gdal.Warp("", bilfile, format='MEM', \
+                outputBounds=(lonw_geo, lats_geo, lone_geo, latn_geo), \
+                width=width_geo, height=length_geo, \
+                resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
             os.remove(hdrfile)
             os.remove(bilfile)
     
