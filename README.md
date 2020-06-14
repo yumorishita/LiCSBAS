@@ -8,6 +8,8 @@ Users can easily derive the time series and velocity of the displacement if suff
 
 [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/comet-lics-web.png"  height="240">](https://comet.nerc.ac.uk/COMET-LiCS-portal/) <img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/sample_vel.png"  height="240">  <img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/sample_ts.png"  height="240">
 
+<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/LiCSBAS_plot_ts.py_demo_small.gif" alt="Demonstration Video" />
+
 THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS. USE AT YOUR OWN RISK.
 
 ## Documentation and Bug Reports
@@ -42,6 +44,10 @@ COMET is the UK Natural Environment Research Council's Centre for the Observatio
 The [Scientific Colour Maps](http://www.fabiocrameri.ch/colourmaps.php) ([Crameri, 2018](https://doi.org/10.5194/gmd-11-2541-2018)) is used in LiCSBAS.
 
 ## Significant Updates
+
+##### May 2020
+
+- Add `LiCSBAS_decomposeLOS.py` which decomposes 2 (or more) LOS displacement data to EW and UD components.
 
 ##### April 2020
 
