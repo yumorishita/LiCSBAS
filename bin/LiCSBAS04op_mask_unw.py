@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20200409 Yu Morishita, GSI
+v1.2 20200614 Yu Morishita, GSI
 
 ========
 Overview
@@ -41,6 +41,8 @@ LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f 
 """
 #%% Change log
 '''
+v1.2 20200614 Yu Morishita, GSI
+ - Wrong png name printing fixed
 v1.1 20200409 Yu Morishita, GSI
  - Add -c (coherence based mask) option
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -72,7 +74,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20200409; author="Y. Morishita"
+    ver=1.2; date=20200614; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -269,7 +271,7 @@ def main(argv=None):
             shutil.copy(file, out_dir)
 
     print('\nMasked area can be check in:')
-    print('{}'.format(os.path.relpath(pngfile)), flush=True)
+    print('{}'.format(os.path.relpath(maskfile+'.png')), flush=True)
 
 
     #%% Finish
