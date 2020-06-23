@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4 20200503 Yu Morishita, GSI
+v1.5 20200623 Yu Morishita, GSI
 
 ========
 Overview
@@ -37,6 +37,8 @@ LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos]
 """
 #%% Change log
 '''
+v1.5 20200623 Yu Morishita, GSI
+ - Speed up (small bug fix) when re-downloading
 v1.4 20200503 Yu Morishita, GSI
  - Update download_data (thanks to sahitono)
 v1.3 20200311 Yu Morishita, Uni of Leeds and GSI
@@ -77,7 +79,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200227; author="Y. Morishita"
+    ver=1.5; date=20200623; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -161,38 +163,46 @@ def main(argv=None):
 
 
     #%% mli
-    ### Get available dates
-    url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
-    response = requests.get(url)
-    
-    response.encoding = response.apparent_encoding #avoid garble
-    html_doc = response.text
-    soup = BeautifulSoup(html_doc, "html.parser")
-    tags = soup.find_all(href=re.compile(r"\d{8}"))
-    imdates_all = [tag.get("href")[0:8] for tag in tags]
-    _imdates = np.int32(np.array(imdates_all))
-    _imdates = (_imdates[(_imdates>=startdate)*(_imdates<=enddate)]).astype('str').tolist()
-    
-    ## Find earliest date in which mli is available
-    imd1 = []
-    for imd in _imdates: 
-        url_mli = os.path.join(url, imd, imd+'.geo.mli.tif')
-        response = requests.head(url_mli)
-        if  response.ok:
-            imd1 = imd
-            break
-
-    ### Download
-    if imd1:
-        print('Donwnloading {}.geo.mli.tif as {}.geo.mli.tif...'.format(imd1, frameID), flush=True)
-        url_mli = os.path.join(url, imd1, imd1+'.geo.mli.tif')
-        mlitif = frameID+'.geo.mli.tif'
-        if os.path.exists(mlitif):
-            print('    {} already exist. Skip'.format(mlitif), flush=True)
-        else:
-            tools_lib.download_data(url_mli, mlitif)
+    mlitif = frameID+'.geo.mli.tif'
+    if os.path.exists(mlitif):
+        print('{} already exist. Skip.'.format(mlitif), flush=True)
     else:
-        print('No mli available on {}'.format(url), file=sys.stderr, flush=True)
+        ### Get available dates
+        print('Searching earliest epoch for mli...', flush=True)
+        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
+        response = requests.get(url)
+        
+        response.encoding = response.apparent_encoding #avoid garble
+        html_doc = response.text
+        soup = BeautifulSoup(html_doc, "html.parser")
+        tags = soup.find_all(href=re.compile(r"\d{8}"))
+        imdates_all = [tag.get("href")[0:8] for tag in tags]
+        _imdates = np.int32(np.array(imdates_all))
+        _imdates = (_imdates[(_imdates>=startdate)*(_imdates<=enddate)]).astype('str').tolist()
+        
+        ## Find earliest date in which mli is available
+        imd1 = []
+        for i, imd in enumerate(_imdates):
+            if np.mod(i, 10) == 0:
+                print("\r  {0:3}/{1:3}".format(i, len(_imdates)), end='', flush=True)
+            url_epoch = os.path.join(url, imd)
+            response = requests.get(url_epoch)
+            response.encoding = response.apparent_encoding #avoid garble
+            html_doc = response.text
+            soup = BeautifulSoup(html_doc, "html.parser")
+            tag = soup.find(href=re.compile(r"\d{8}.geo.mli.tif"))
+            if tag is not None:
+                print('\n{} found as earliest.'.format(imd))
+                imd1 = imd
+                break
+    
+        ### Download
+        if imd1:
+            print('Donwnloading {}.geo.mli.tif as {}.geo.mli.tif...'.format(imd1, frameID), flush=True)
+            url_mli = os.path.join(url, imd1, imd1+'.geo.mli.tif')
+            tools_lib.download_data(url_mli, mlitif)
+        else:
+            print('\nNo mli available on {}'.format(url), file=sys.stderr, flush=True)
 
 
     #%% GACOS if specified
@@ -213,28 +223,47 @@ def main(argv=None):
         _imdates = (_imdates[(_imdates>=startdate)*(_imdates<=enddate)]).astype('str').tolist()
 
         ### Extract available dates
+        print('  Searching available and not downloaded epochs...', flush=True)
         imdates = []
-        for imd in _imdates:
-            url_sltd = os.path.join(url, imd, imd+'.sltd.geo.tif')
-            response = requests.get(url_sltd)
-            if response.ok:
-                imdates.append(imd)
+        n_im_existing = 0
+        for i, imd in enumerate(_imdates):
+            if np.mod(i, 10) == 0:
+                print("\r  {0:3}/{1:3}".format(i, len(_imdates)), end='', flush=True)
 
-        n_im = len(imdates)
-        if n_im > 0:
-            print('{} GACOS data available from {} to {}'.format(n_im, imdates[0], imdates[-1]), flush=True)
-        else:
-            print('No GACOS data available from {} to {}'.format(startdate, enddate), flush=True)
-        
-        ### Download
-        for i, imd in enumerate(imdates):
-            print('  Donwnloading {} ({}/{})...'.format(imd, i+1, n_im), flush=True)
-            url_sltd = os.path.join(url, imd, imd+'.sltd.geo.tif')
+            ### Check if already donwloaded
             path_sltd = os.path.join(gacosdir, imd+'.sltd.geo.tif')
             if os.path.exists(path_sltd):
-                print('    {}.sltd.geo.tif already exist. Skip'.format(imd), flush=True)
+                n_im_existing = n_im_existing + 1
+            ### If not donwloaded, check availability
             else:
+                url_epoch = os.path.join(url, imd)
+                response = requests.get(url_epoch)
+                response.encoding = response.apparent_encoding #avoid garble
+                html_doc = response.text
+                soup = BeautifulSoup(html_doc, "html.parser")
+                tag = soup.find(href=re.compile(r"\d{8}.sltd.geo.tif"))
+                if tag is not None:
+                    imdates.append(imd)
+
+        print('')
+        n_im = len(imdates)
+
+        if n_im_existing > 0:
+            print('{} GACOS data already downloaded'.format(n_im_existing), flush=True)
+
+        ### Download
+        if n_im > 0:
+            print('{} GACOS data will be downloaded'.format(n_im), flush=True)
+
+            ### Download
+            for i, imd in enumerate(imdates):
+                print('  Donwnloading {} ({}/{})...'.format(imd, i+1, n_im), flush=True)
+                url_sltd = os.path.join(url, imd, imd+'.sltd.geo.tif')
+                path_sltd = os.path.join(gacosdir, imd+'.sltd.geo.tif')
                 tools_lib.download_data(url_sltd, path_sltd)
+
+        else:
+            print('No GACOS data available from {} to {}'.format(startdate, enddate), flush=True)
     
 
     #%% unw and cc
@@ -260,15 +289,32 @@ def main(argv=None):
     n_ifg = len(ifgdates)
     imdates = tools_lib.ifgdates2imdates(ifgdates)
     print('{} IFGs available from {} to {}'.format(n_ifg, imdates[0], imdates[-1]), flush=True)
+
+    ### Check if both unw and cc already donwloaded
+    n_ifg_existing = 0
+    ifgdates_dl = []
+    for i, ifgd in enumerate(ifgdates):
+        path_unw = os.path.join(ifgd, ifgd+'.geo.unw.tif')
+        path_cc = os.path.join(ifgd, ifgd+'.geo.cc.tif')
+        if os.path.exists(path_unw) and os.path.exists(path_cc):
+            n_ifg_existing = n_ifg_existing + 1
+        else:
+            ifgdates_dl.append(ifgd)
+            
+    n_ifg_dl = len(ifgdates_dl)
+
+    if n_ifg_existing != 0:
+        print('{} IFGs already downloaded'.format(n_ifg_existing), flush=True)
+        print('{} IFGs will be downloaded'.format(n_ifg_dl), flush=True)
     
     ### Download
-    for i, ifgd in enumerate(ifgdates):
-        print('  Donwnloading {} ({}/{})...'.format(ifgd, i+1, n_ifg), flush=True)
+    for i, ifgd in enumerate(ifgdates_dl):
+        print('  Donwnloading {} ({}/{})...'.format(ifgd, i+1, n_ifg_dl), flush=True)
         url_unw = os.path.join(url, ifgd, ifgd+'.geo.unw.tif')
         path_unw = os.path.join(ifgd, ifgd+'.geo.unw.tif')
         if not os.path.exists(ifgd): os.mkdir(ifgd)
         if os.path.exists(path_unw):
-            print('    {}.geo.unw.tif already exist. Skip'.format(ifgd), flush=True)
+            print('    {}.geo.unw.tif already exist. Skip.'.format(ifgd), flush=True)
         else:
             tools_lib.download_data(url_unw, path_unw)
 
@@ -276,7 +322,8 @@ def main(argv=None):
         path_cc = os.path.join(ifgd, ifgd+'.geo.cc.tif')
         if os.path.exists(path_cc):
             print('    {}.geo.cc.tif already exist. Skip.'.format(ifgd), flush=True)
-        tools_lib.download_data(url_cc, path_cc)
+        else:
+            tools_lib.download_data(url_cc, path_cc)
    
 
     #%% Finish
