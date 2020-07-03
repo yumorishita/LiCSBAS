@@ -8,6 +8,8 @@ Python3 library of loop closure check functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.3 20200703 Yu Morioshita, GSI
+ - Replace problematic terms
 v1.2 20200224 Yu Morioshita, Uni of Leeds and GSI
  - Change color of loop phase
 v1.1 20190906 Yu Morioshita, Uni of Leeds and GSI
@@ -48,15 +50,15 @@ def make_loop_matrix(ifgdates):
     Aloop = []
 
     for ix_ifg12, ifgd12 in enumerate(ifgdates):
-        master12 = ifgd12[0:8]
-        slave12 = ifgd12[9:17]
-        ifgdates23 = [ ifgd for ifgd in ifgdates if ifgd.startswith(slave12)] # all candidates of ifg23
+        primary12 = ifgd12[0:8]
+        secondary12 = ifgd12[9:17]
+        ifgdates23 = [ ifgd for ifgd in ifgdates if ifgd.startswith(secondary12)] # all candidates of ifg23
 
         for ifgd23 in ifgdates23: # for each candidate of ifg23
-            slave23 = ifgd23[9:17]
+            secondary23 = ifgd23[9:17]
             try:
                 ## Search ifg13
-                ix_ifg13 = ifgdates.index(master12+'_'+slave23)
+                ix_ifg13 = ifgdates.index(primary12+'_'+secondary23)
             except: # no loop for this ifg23. Next.
                 continue
 

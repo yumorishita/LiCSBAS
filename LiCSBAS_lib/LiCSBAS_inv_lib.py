@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.4 20200703 Yu Morioshita, GSI
+ - Replace problematic terms
 v1.3 20200103 Yu Morioshita, Uni of Leeds and GSI
  - Bag fix in calc_stc (return nonzero even if two adjacent pixels have identical ts)
 v1.2 20190823 Yu Morioshita, Uni of Leeds and GSI
@@ -32,7 +34,7 @@ import LiCSBAS_tools_lib as tools_lib
 def make_sb_matrix(ifgdates):
     """
     Make small baseline incidence-like matrix.
-    Composed of 1 between master and slave. (n_ifg, n_im-1)
+    Composed of 1 between primary and secondary. (n_ifg, n_im-1)
     Unknown is incremental displacement.
     """
     imdates = tools_lib.ifgdates2imdates(ifgdates)
@@ -41,11 +43,11 @@ def make_sb_matrix(ifgdates):
 
     G = np.zeros((n_ifg, n_im-1), dtype=np.int16)
     for ifgix, ifgd in enumerate(ifgdates):
-        masterdate = ifgd[:8]
-        masterix = imdates.index(masterdate)
-        slavedate = ifgd[-8:]
-        slaveix = imdates.index(slavedate)
-        G[ifgix, masterix:slaveix] = 1
+        primarydate = ifgd[:8]
+        primaryix = imdates.index(primarydate)
+        secondarydate = ifgd[-8:]
+        secondaryix = imdates.index(secondarydate)
+        G[ifgix, primaryix:secondaryix] = 1
 
     return G
 
@@ -54,7 +56,7 @@ def make_sb_matrix(ifgdates):
 def make_sb_matrix2(ifgdates):
     """
     Make small baseline incidence-like matrix.
-    Composed of -1 at master and 1 at slave. (n_ifg, n_im)
+    Composed of -1 at primary and 1 at secondary. (n_ifg, n_im)
     Unknown is cumulative displacement.
     """
     imdates = tools_lib.ifgdates2imdates(ifgdates)
@@ -63,12 +65,12 @@ def make_sb_matrix2(ifgdates):
 
     A = np.zeros((n_ifg, n_im), dtype=np.int16)
     for ifgix, ifgd in enumerate(ifgdates):
-        masterdate = ifgd[:8]
-        masterix = imdates.index(masterdate)
-        slavedate = ifgd[-8:]
-        slaveix = imdates.index(slavedate)
-        A[ifgix, masterix] = -1
-        A[ifgix, slaveix] = 1
+        primarydate = ifgd[:8]
+        primaryix = imdates.index(primarydate)
+        secondarydate = ifgd[-8:]
+        secondaryix = imdates.index(secondarydate)
+        A[ifgix, primaryix] = -1
+        A[ifgix, secondaryix] = 1
     return A
 
 
@@ -81,7 +83,7 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core):
     Inputs:
       unw : Unwrapped data block for each point (n_pt, n_ifg)
             Still include nan to keep dimention
-      G    : Design matrix (1 between master and slave) (n_ifg, n_im-1)
+      G    : Design matrix (1 between primary and secondary) (n_ifg, n_im-1)
       dt_cum : Cumulative years(or days) for each image (n_im)
       gamma  : Gamma value for NSBAS inversion, should be small enough (e.g., 0.0001)
       n_core : Number of cores for parallel processing
@@ -164,7 +166,7 @@ def invert_nsbas_wls(unw, var, G, dt_cum, gamma, n_core):
       unw : Unwrapped data block for each point (n_pt, n_ifg)
             Still include nan to keep dimention
       var : Variance estimated from coherence (n_pt, n_ifg)
-      G    : Design matrix (1 between master and slave) (n_ifg, n_im-1)
+      G    : Design matrix (1 between primary and secondary) (n_ifg, n_im-1)
       dt_cum : Cumulative years(or days) for each image (n_im)
       gamma  : Gamma value for NSBAS inversion, should be small enough (e.g., 0.0001)
       n_core : Number of cores for parallel processing

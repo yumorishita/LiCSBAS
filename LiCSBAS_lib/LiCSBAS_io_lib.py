@@ -8,6 +8,8 @@ Python3 library of input/output functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.2 20200703 Yu Morioshita, GSI
+ - Replace problematic terms
 v1.1 20200227 Yu Morioshita, Uni of Leeds and GSI
  - Add hgt_linear_flag to make_tstxt
  - Add make_point_kml
@@ -94,12 +96,14 @@ def make_tstxt(x, y, imdates, ts, tsfile, refx1, refx2, refy1, refy2, gap, lat=N
 #%%
 def read_bperp_file(bperp_file, imdates):
     """
-    bperp_file (baselines) contains (m:master, s:slave, sm: single master):
+    bperp_file (baselines) contains (m: primary (master), s: secondary,
+                                     sm: single prime):
           smdate    sdate    bp    dt
         20170302 20170326 130.9  24.0
         20170302 20170314  32.4  12.0
 
-    Old bperp_file contains (m:master, s:slave, sm: single master):
+    Old bperp_file contains (m: primary (master), s:secondary,
+                             sm: single prime):
         num    mdate    sdate   bp   dt  dt_m_sm dt_s_sm bp_m_sm bp_s_sm 
           1 20170218 20170326 96.6 36.0    -12.0    24.0    34.2   130.9
           2 20170302 20170314 32.4 12.0      0.0    12.0     0.0    32.4
@@ -114,7 +118,7 @@ def read_bperp_file(bperp_file, imdates):
         line = f.readline().split() #list
 
     if len(line) == 4: ## new format
-        bperp_dict[line[0]] = '0.00' ## single master. unnecessary?
+        bperp_dict[line[0]] = '0.00' ## single prime. unnecessary?
         with open(bperp_file) as f:
             for l in f:
                 bperp_dict[l.split()[1]] = l.split()[2]

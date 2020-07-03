@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.3 20200703 Yu Morishita, GSI
 
 ========
 Overview
@@ -44,6 +44,8 @@ LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
 """
 #%% Change log
 '''
+v1.3 20200703 Yu Morioshita, GSI
+ - Replace problematic terms
 v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Deal with cc file in uint8 format
@@ -79,7 +81,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200225; author="Y. Morishita"
+    ver=1.3; date=20200703; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -267,9 +269,9 @@ def main(argv=None):
             rm_flag = ''
 
         ### For stats file
-        ix_master = imdates.index(ifgd[:8])
-        ix_slave = imdates.index(ifgd[-8:])
-        bperp_ifg = bperp[ix_slave]-bperp[ix_master]
+        ix_primary = imdates.index(ifgd[:8])
+        ix_secondary = imdates.index(ifgd[-8:])
+        bperp_ifg = bperp[ix_secondary]-bperp[ix_primary]
         mday = dt.datetime.strptime(ifgd[:8], '%Y%m%d').toordinal()
         sday = dt.datetime.strptime(ifgd[-8:], '%Y%m%d').toordinal()
         dt_ifg = sday-mday

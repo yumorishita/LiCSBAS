@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200609 Yu Morishita, GSI
+v1.4 20200703 Yu Morishita, GSI
 
 ========
 Overview
@@ -50,6 +50,8 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole]
 """
 #%% Change log
 '''
+v1.4 20200703 Yu Morioshita, GSI
+ - Replace problematic terms
 v1.3 20200609 Yu Morishita, GSI
  - Avoid reading error of ztd (unkown cause) by addding subtle value
 v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
@@ -147,7 +149,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200609; author="Y. Morishita"
+    ver=1.4; date=20200703; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -374,7 +376,7 @@ def main(argv=None):
         in_dir1 = os.path.join(in_dir, ifgd)
         out_dir1 = os.path.join(out_dir, ifgd)
         
-        ### Check if sltd available for both master and slave. If not continue
+        ### Check if sltd available for both primary and secondary. If not continue
         ## Not use in tsa because loop cannot be closed
         if not (os.path.exists(msltdfile) and os.path.exists(ssltdfile)):
             print('  ztd file not available for {}'.format(ifgd), flush=True)

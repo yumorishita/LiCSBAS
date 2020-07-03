@@ -8,6 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.4 20200703 Yu Morioshita, GSI
+ - Replace problematic terms
 v1.3 20200503 Yu Morioshita, GSI
  - Update download_data (thanks to sahitono)
 v1.2 20200227 Yu Morioshita, Uni of Leeds and GSI
@@ -261,13 +263,13 @@ def get_patchrow(width, length, n_data, memory_size):
 
 #%%
 def ifgdates2imdates(ifgdates):
-    masterlist = []
-    slavelist = []
+    primarylist = []
+    secondarylist = []
     for ifgd in ifgdates:
-        masterlist.append(ifgd[:8])
-        slavelist.append(ifgd[-8:])
+        primarylist.append(ifgd[:8])
+        secondarylist.append(ifgd[-8:])
 
-    imdates = list(set(masterlist+slavelist)) # set is a unique operator
+    imdates = list(set(primarylist+secondarylist)) # set is a unique operator
     imdates.sort()
 
     return imdates
