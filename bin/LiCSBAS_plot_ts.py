@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.9 20200527 Yu Morishita, GSI
+v1.10 20200703 Yu Morishita, GSI
 
 ========
 Overview
@@ -16,7 +16,10 @@ Inputs
 =====
 Usage
 =====
-LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_dir] [-u U.geo] [-r x1:x2/y1:y2] [-p x/y] [-c cmap] [--nomask] [--vmin float] [--vmax float] [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
+LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_dir]
+    [-u U.geo] [-r x1:x2/y1:y2] [--ref_geo lon1/lon2/lat1/lat2] [-p x/y] 
+    [--p_geo lon/lat] [-c cmap] [--nomask] [--vmin float] [--vmax float] 
+    [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
 
  -i    Input cum hdf5 file (Default: ./cum_filt.h5 or ./cum.h5)
  --i2  Input 2nd cum hdf5 file
@@ -27,7 +30,9 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
  -u    Input U.geo file to show incidence angle (Default: ../GEOCml*/U.geo)
  -r    Initial reference area (Default: same as info/*ref.txt)
        0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ --ref_geo   Initial reference area in geographical coordinates.
  -p    Initial selected point for time series plot (Default: ref point)
+ --p_geo     Initial selected point in geogrphical coordinates.
  -c    Color map for velocity and cumulative displacement
        - https://matplotlib.org/tutorials/colors/colormaps.html
        - http://www.fabiocrameri.ch/colourmaps.php
@@ -43,6 +48,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
 """
 #%% Change log
 '''
+v1.10 20200703 Yu Morishita, GSI
+ - Add --ref_geo and --p_geo options
 v1.9 20200527 Yu Morishita, GSI
  - Add -u option to show incidence angle
 v1.8 20200408 Yu Morishita, GSI
@@ -142,7 +149,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.9; date=20200527; author="Y. Morishita"
+    ver=1.10; date=20200703; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -153,7 +160,9 @@ if __name__ == "__main__":
     LOSufile = []
     mdate = []
     refarea = []
+    refarea_geo = []
     point = []
+    point_geo = []
     maskflag = True
     dmin = None
     dmax = None
@@ -166,7 +175,7 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:d:u:m:r:p:c:", ["help", "i2=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
+            opts, args = getopt.getopt(argv[1:], "hi:d:u:m:r:p:c:", ["help", "i2=", "ref_geo=", "p_geo=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -185,8 +194,12 @@ if __name__ == "__main__":
                 LOSufile = a
             elif o == '-r':
                 refarea = a
+            elif o == '--ref_geo':
+                refarea_geo = a
             elif o == '-p':
                 point = a
+            elif o == '--p_geo':
+                point_geo = a
             elif o == '-c':
                 cmap = a
             elif o == '--nomask':
@@ -308,29 +321,43 @@ if __name__ == "__main__":
         print('No latlon field found in {}. Skip.'.format(cumfile))
             
     ### Set initial ref area
-    if not refarea:
-        refarea = cumh5['refarea'][()]
-        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
-    else:
+    if refarea:
         if not tools_lib.read_range(refarea, width, length):
             print('\nERROR in {}\n'.format(refarea), file=sys.stderr)
             sys.exit(2)
         else:
             refx1, refx2, refy1, refy2 = tools_lib.read_range(refarea, width, length)
-    
+    elif refarea_geo and geocod_flag:
+        if not tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon):
+            print('\nERROR in {}\n'.format(refarea_geo), file=sys.stderr)
+            sys.exit(2)
+        else:
+            refx1, refx2, refy1, refy2 = tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon)
+    else:
+        refarea = cumh5['refarea'][()]
+        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
+
+
     refx1h = refx1-0.5; refx2h = refx2-0.5 ## Shift half for plot
     refy1h = refy1-0.5; refy2h = refy2-0.5
 
     ### Set initial point
-    if not point:
-        point_x = refx1
-        point_y = refy1
-    else:
+    if point:
         if not tools_lib.read_point(point, width, length):
             print('\nERROR in {}\n'.format(point), file=sys.stderr)
             sys.exit(2)
         else:
             point_x, point_y = tools_lib.read_point(point, width, length)
+    elif point_geo and geocod_flag:
+        point_lon, point_lat = [float(s) for s in re.split('[/]', point_geo)]
+        if not tools_lib.bl2xy(point_lon, point_lat, width, length, lat1, dlat, lon1, dlon):
+            print('\nERROR in {}\n'.format(point), file=sys.stderr)
+            sys.exit(2)
+        else:
+            point_x, point_y = tools_lib.bl2xy(point_lon, point_lat, width, length, lat1, dlat, lon1, dlon)
+    else:
+        point_x = refx1
+        point_y = refy1
     
 
     ### Filter info

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20190807 Yu Morishita, Uni of Leeds and GSI
+v1.3 20200703 Yu Morishita, GSI
 
 ========
 Overview
@@ -10,7 +10,8 @@ This script calculates velocity and its standard deviation from cum*.h5 and outp
 =====
 Usage
 =====
-LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x2/y1:y2] [--vstd] [--sin] [--mask maskfile] [--png] 
+LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x2/y1:y2]
+    [--ref_geo lon1/lon2/lat1/lat2] [--vstd] [--sin] [--mask maskfile] [--png] 
 
  -s  Start date of period to calculate velocity (Default: first date)
  -e  End date of period to calculate velocity (Default: last date)
@@ -19,6 +20,7 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
  -r  Reference area (Default: same as info/*ref.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
      0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ --ref_geo  Reference area in geographical coordinates.
  --vstd  Calculate vstd (Default: No)
  --sin   Add sin (annual) funcsion to linear model (Default: No)
          *.amp and *.dt (time difference wrt Jan 1) are output
@@ -28,6 +30,8 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
 """
 #%% Change log
 '''
+v1.3 20200703 Yu Morishita, GSI
+ - Add --ref_geo option
 v1.2 20190807 Yu Morishita, Uni of Leeds and GSI
  - Add sin option
 v1.1 20190802 Yu Morishita, Uni of Leeds and GSI
@@ -64,7 +68,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20190807; author="Y. Morishita"
+    ver=1.3; date=20200703; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -74,6 +78,7 @@ def main(argv=None):
     cumfile = 'cum_filt.h5'
     outfile = []
     refarea = []
+    refarea_geo = []
     maskfile = []
     vstdflag = False
     sinflag = False
@@ -83,7 +88,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hs:e:i:o:r:", ["help", "vstd", "sin", "png", "mask="])
+            opts, args = getopt.getopt(argv[1:], "hs:e:i:o:r:", ["help", "vstd", "sin", "png", "ref_geo=", "mask="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -100,6 +105,8 @@ def main(argv=None):
                 outfile = a
             elif o == '-r':
                 refarea = a
+            elif o == '--ref_geo':
+                refarea_geo = a
             elif o == '--vstd':
                 vstdflag = True
             elif o == '--sin':
@@ -126,15 +133,26 @@ def main(argv=None):
     cum = cumh5['cum']
     n_im_all, length, width = cum.shape
 
-    if not refarea:
-        refarea = cumh5['refarea'][()]
-        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
-    else:
+    if refarea:
         if not tools_lib.read_range(refarea, width, length):
             print('\nERROR in {}\n'.format(refarea), file=sys.stderr)
             return 2
         else:
             refx1, refx2, refy1, refy2 = tools_lib.read_range(refarea, width, length)
+    elif refarea_geo:
+        lat1 = float(cumh5['corner_lat'][()])
+        lon1 = float(cumh5['corner_lon'][()])
+        dlat = float(cumh5['post_lat'][()])
+        dlon = float(cumh5['post_lon'][()])
+        if not tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon):
+            print('\nERROR in {}\n'.format(refarea_geo), file=sys.stderr)
+            return 2
+        else:
+            refx1, refx2, refy1, refy2 = tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon)
+    else:
+        refarea = cumh5['refarea'][()]
+        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
+
     
     #%% Setting
     ### Dates

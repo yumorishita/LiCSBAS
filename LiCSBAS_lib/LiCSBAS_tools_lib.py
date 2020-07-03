@@ -10,6 +10,7 @@ Changelog
 =========
 v1.4 20200703 Yu Morioshita, GSI
  - Replace problematic terms
+ - Small bug (shift) fix in read_range_geo
 v1.3 20200503 Yu Morioshita, GSI
  - Update download_data (thanks to sahitono)
 v1.2 20200227 Yu Morioshita, Uni of Leeds and GSI
@@ -366,10 +367,10 @@ def read_range_geo(range_str, width, length, lat1, postlat, lon1, postlon):
     
     if re.match('[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?', range_str):
         lon_w, lon_e, lat_s, lat_n = [float(s) for s in range_str.split('/')]
-        x1 = int(np.floor((lon_w - lon1)/postlon)) if lon_w > lon1 else 0
-        x2 = int(np.ceil((lon_e - lon1)/postlon))+1 if lon_e < lon2 else width
-        y1 = int(np.floor((lat_n - lat1)/postlat)) if lat_n < lat1 else 0
-        y2 = int(np.ceil((lat_s - lat1)/postlat))+1 if lat_s > lat2 else length
+        x1 = int(np.round((lon_w - lon1)/postlon)) if lon_w > lon1 else 0
+        x2 = int(np.round((lon_e - lon1)/postlon))+1 if lon_e < lon2 else width
+        y1 = int(np.round((lat_n - lat1)/postlat)) if lat_n < lat1 else 0
+        y2 = int(np.round((lat_s - lat1)/postlat))+1 if lat_s > lat2 else length
     else:
         print("\nERROR:", file=sys.stderr)
         print("Range format seems to be wrong (should be lon1/lon2/lat1/lat2)", file=sys.stderr)

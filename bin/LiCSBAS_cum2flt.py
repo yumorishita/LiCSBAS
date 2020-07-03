@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200703 Yu Morishita, GSI
 
 ========
 Overview
@@ -10,7 +10,8 @@ This script outputs a float32 file of cumulative displacement from cum*.h5.
 =====
 Usage
 =====
-LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/y1:y2] [--mask maskfile] [--png] 
+LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/y1:y2]
+     [--ref_geo lon1/lon2/lat1/lat2] [--mask maskfile] [--png] 
 
  -d  Date to be output
  -i  Path to input cum file (Default: cum_filt.h5)
@@ -19,12 +20,15 @@ LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/
  -r  Reference area (Default: same as info/*ref.txt)
      Note: x1/y1 range 0 to width-1, while x2/y2 range 1 to width
      0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ --ref_geo  Reference area in geographical coordinates.
  --mask  Path to mask file for ref phase calculation (Default: No mask)
  --png   Make png file (Default: Not make png)
 
 """
 #%% Change log
 '''
+v1.2 20200703 Yu Morishita, GSI
+ - Add --ref_geo option
 v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
  - Bug fix about masking
 v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
@@ -57,7 +61,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20190813; author="Y. Morishita"
+    ver=1.2; date=20200703; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -68,6 +72,7 @@ def main(argv=None):
     outfile = []
     imd_m = []
     refarea = []
+    refarea_geo = []
     maskfile = []
     pngflag = False
 
@@ -75,7 +80,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:i:o:m:r:", ["help", "png", "mask="])
+            opts, args = getopt.getopt(argv[1:], "hd:i:o:m:r:", ["help", "png", "ref_geo=", "mask="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -92,6 +97,8 @@ def main(argv=None):
                 imd_m = a
             elif o == '-r':
                 refarea = a
+            elif o == '--ref_geo':
+                refarea_geo = a
             elif o == '--mask':
                 maskfile = a
             elif o == '--png':
@@ -116,15 +123,26 @@ def main(argv=None):
     cum = cumh5['cum']
     n_im, length, width = cum.shape
 
-    if not refarea:
-        refarea = cumh5['refarea'][()]
-        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
-    else:
+    ### Reference area
+    if refarea:
         if not tools_lib.read_range(refarea, width, length):
             print('\nERROR in {}\n'.format(refarea), file=sys.stderr)
             return 2
         else:
             refx1, refx2, refy1, refy2 = tools_lib.read_range(refarea, width, length)
+    elif refarea_geo:
+        lat1 = float(cumh5['corner_lat'][()])
+        lon1 = float(cumh5['corner_lon'][()])
+        dlat = float(cumh5['post_lat'][()])
+        dlon = float(cumh5['post_lon'][()])
+        if not tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon):
+            print('\nERROR in {}\n'.format(refarea_geo), file=sys.stderr)
+            return 2
+        else:
+            refx1, refx2, refy1, refy2 = tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon)
+    else:
+        refarea = cumh5['refarea'][()]
+        refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
     
     ### Master (reference) date
     if not imd_m:
