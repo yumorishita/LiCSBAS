@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0 20200409 Yu Morishita, GSI
+v1.1 20200703 Yu Morishita, GSI
 
 ========
 Overview
@@ -25,6 +25,8 @@ LiCSBAS_color_geotiff.py -i infile [-c cmap] [-o outfile] [--cmin float] [--cmax
 """
 #%% Change log
 '''
+v1.1 20200703 Yu Morishita, GSI
+ - Bug fix for using SCM without _r
 v1.0 20200409 Yu Morishita, GSI
  - Original implementationf
 '''
@@ -54,7 +56,7 @@ if __name__ == "__main__":
     argv = sys.argv
         
     start = time.time()
-    ver=1.0; date=20200409; author="Y. Morishita"
+    ver=1.1; date=20200703; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -111,10 +113,11 @@ if __name__ == "__main__":
 
     #%% Set cmap if SCM
     if cmap_name.startswith('SCM'):
+        cmap = [] ## Not necessary
         if cmap_name.endswith('_r'):
             exec("cmap = {}.reversed()".format(cmap_name[:-2]))
         else:
-            cmap = cmap_name
+            exec("cmap = {}".format(cmap_name))
         cmap_name = cmap_name.replace('SCM.', '')
         plt.register_cmap(name=cmap_name, cmap=cmap, lut=n_color)
     elif cmap_name == 'insar':
