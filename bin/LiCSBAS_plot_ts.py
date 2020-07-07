@@ -25,7 +25,7 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
  -i    Input cum hdf5 file (Default: ./cum_filt.h5 or ./cum.h5)
  --i2  Input 2nd cum hdf5 file
        (Default: cum.h5 if -i cum_filt.h5, otherwise none)
- -m    Master (reference) date for time-seires (Default: first date)
+ -m    Refereference (master) date for time series (Default: first date)
  -d    Directory containing noise indices (e.g., mask, coh_avg, etc.)
        (Default: "results" at the same dir as cum[_filt].h5)
  -u    Input U.geo file to show incidence angle (Default: ../GEOCml*/U.geo)
@@ -33,7 +33,7 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
        0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  --ref_geo   Initial reference area in geographical coordinates.
  -p    Initial selected point for time series plot (Default: ref point)
- --p_geo     Initial selected point in geogrphical coordinates.
+ --p_geo     Initial selected point in geographical coordinates.
  -c    Color map for velocity and cumulative displacement
        - https://matplotlib.org/tutorials/colors/colormaps.html
        - http://www.fabiocrameri.ch/colourmaps.php
@@ -42,10 +42,10 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
  --vmin|vmax  Min|max values of color for velocity map (Default: auto)
  --dmin|dmax  Min|max values of color for cumulative displacement map
               (Default: auto)
- --auto_crange  Percentage of color range used for automatic determinatin
+ --auto_crange  Percentage of color range used for automatic determination
               (Default: 99 %)
  --ylen       Y Length of time series plot in mm (Default: auto)
- --ts_png     Output png file of time seires plot (not display interactive viewers)
+ --ts_png     Output png file of time series plot (not display interactive viewers)
 
 """
 #%% Change log

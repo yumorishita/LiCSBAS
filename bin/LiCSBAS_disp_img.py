@@ -20,7 +20,7 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax f
      - insar
      (Default: SCM.roma_r, reverse of SCM.roma)
  --cmin|cmax    Min|max values of color (Default: None (auto))
- --auto_crange  % of color range used for automatic determinatin (Default: 99)
+ --auto_crange  % of color range used for automatic determination (Default: 99)
  --cycle        Value*2pi/cycle only if cyclic cmap (i.e., insar or SCM.*O*)
                 (Default: 3 (6pi/cycle))
  --bigendian    If input file is in big endian
