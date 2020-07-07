@@ -1,0 +1,13 @@
+name: licsbas
+channels:
+  - defaults
+dependencies:
+  - python>=3.6
+  - astropy
+  - beautifulsoup4
+  - gdal
+  - h5py
+  - matplotlib
+  - numpy
+  - requests
+  - statsmodels
