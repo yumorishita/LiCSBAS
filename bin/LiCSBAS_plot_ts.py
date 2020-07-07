@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.10 20200703 Yu Morishita, GSI
+v1.11 20200707 Yu Morishita, GSI
 
 ========
 Overview
@@ -20,6 +20,7 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
     [-u U.geo] [-r x1:x2/y1:y2] [--ref_geo lon1/lon2/lat1/lat2] [-p x/y] 
     [--p_geo lon/lat] [-c cmap] [--nomask] [--vmin float] [--vmax float] 
     [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
+    [--ts_png pngfile]
 
  -i    Input cum hdf5 file (Default: ./cum_filt.h5 or ./cum.h5)
  --i2  Input 2nd cum hdf5 file
@@ -44,10 +45,13 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
  --auto_crange  Percentage of color range used for automatic determinatin
               (Default: 99 %)
  --ylen       Y Length of time series plot in mm (Default: auto)
-              
+ --ts_png     Output png file of time seires plot (not display interactive viewers)
+
 """
 #%% Change log
 '''
+v1.11 20200707 Yu Morishita, GSI
+ - Add --ts_png option
 v1.10 20200703 Yu Morishita, GSI
  - Add --ref_geo and --p_geo options
 v1.9 20200527 Yu Morishita, GSI
@@ -149,7 +153,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.10; date=20200703; author="Y. Morishita"
+    ver=1.11; date=20200707; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -167,6 +171,7 @@ if __name__ == "__main__":
     dmin = None
     dmax = None
     ylen = []
+    ts_pngfile = []
     vmin = None
     vmax = None
     cmap = "SCM.roma_r"
@@ -175,7 +180,7 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:d:u:m:r:p:c:", ["help", "i2=", "ref_geo=", "p_geo=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen="])
+            opts, args = getopt.getopt(argv[1:], "hi:d:u:m:r:p:c:", ["help", "i2=", "ref_geo=", "p_geo=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen=", "ts_png="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -216,6 +221,8 @@ if __name__ == "__main__":
                 auto_crange = float(a)
             elif o == '--ylen':
                 ylen = float(a)
+            elif o == '--ts_png':
+                ts_pngfile = a
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -854,6 +861,12 @@ if __name__ == "__main__":
     event.dblclick = True
     lastevent = event
     printcoords(lastevent)
+
+    #%%
+    if ts_pngfile:
+        print('\nCreate {} for time seires plot\n'.format(ts_pngfile))
+        pts.savefig(ts_pngfile)
+        sys.exit(0)
 
 
     #%% Final linking of the canvas to the plots.
