@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5 20200317 Yu Morishita, Uni of Leeds and GSI
+v1.6 20200814 Yu Morishita, GSI
 
 ========
 Overview
@@ -10,7 +10,9 @@ This script displays an image file.
 =====
 Usage
 =====
-LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax float] [--auto_crange float]  [--cycle float] [--bigendian] [--png pngname] [--kmz kmzname]
+LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
+  [--cmax float] [--auto_crange float] [--cycle float] [--nodata float]
+  [--bigendian] [--png pngname] [--kmz kmzname]
 
  -i  Input image file in float32 or uint8
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
@@ -23,6 +25,7 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax f
  --auto_crange  % of color range used for automatic determination (Default: 99)
  --cycle        Value*2pi/cycle only if cyclic cmap (i.e., insar or SCM.*O*)
                 (Default: 3 (6pi/cycle))
+ --nodata       Nodata value (Default: 0)
  --bigendian    If input file is in big endian
  --png          Save png (pdf etc also available) instead of displaying
  --kmz          Save kmz (need EQA.dem_par for -p option)
@@ -31,6 +34,8 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float] [--cmax f
 
 #%% Change log
 '''
+v1.6 20200814 Yu Morishita, GSI
+ - Set 0 as nodata by default
 v1.5 20200317 Yu Morishita, Uni of Leeds and GSI
  - Add offscreen when kmz or png for working with bsub on Jasmin
  - Add name and description (cbar) tag in kmz
@@ -90,7 +95,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.5; date=20200316; author="Y. Morishita"
+    ver=1.6; date=20200814; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -102,6 +107,7 @@ if __name__ == "__main__":
     cmax = None
     auto_crange = 99.0
     cycle = 3.0
+    nodata = 0
     endian = 'little'
     pngname = []
     kmzname = []
@@ -109,7 +115,7 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "cycle=", "bigendian", "png=", "kmz="])
+            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "cycle=", "nodata=", "bigendian", "png=", "kmz="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -130,6 +136,8 @@ if __name__ == "__main__":
                 auto_crange = float(a)
             elif o == '--cycle':
                 cycle = float(a)
+            elif o == '--nodata':
+                nodata = float(a)
             elif o == '--bigendian':
                 endian = 'big'
             elif o == '--png':
@@ -206,6 +214,8 @@ if __name__ == "__main__":
     else:
         data = io_lib.read_img(infile, length, width, endian=endian)
     
+    data[data==nodata] = np.nan
+
     if cmap_name == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
         cyclic= True
         data = np.angle(np.exp(1j*(data/cycle))*cycle)
