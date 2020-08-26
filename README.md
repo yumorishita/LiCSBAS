@@ -67,8 +67,8 @@ The [Scientific Colour Maps](http://www.fabiocrameri.ch/colourmaps.php) ([Cramer
 
 
 *Yu Morishita (PhD)\
-JSPS Overseas Research Fellow (June 2018-June 2020)\
-Visiting Researcher, COMET, School of Earth and Environment, University of Leeds (June 2018-June 2020)\
+JSPS Overseas Research Fellow (June 2018-March 2020)\
+Visiting Researcher, COMET, School of Earth and Environment, University of Leeds (June 2018-March 2020)\
 Chief Researcher, Geography and Crustal Dynamics Research Center, Geospatial Information Authority of Japan (GSI)*
 
 [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/COMET_logo.png"  height="60">](https://comet.nerc.ac.uk/)   [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/logo-leeds.png"  height="60">](https://environment.leeds.ac.uk/see/)  [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/LiCS_logo.jpg"  height="60">](https://comet.nerc.ac.uk/COMET-LiCS-portal/)   [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/GSI_logo.png"  height="60">](https://www.gsi.go.jp/)
