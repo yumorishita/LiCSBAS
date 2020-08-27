@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
-v1.11 20200707 Yu Morishita, GSI
+v1.12 20200827 Yu Morishita, GSI
 
 ========
 Overview
 ========
-This script displays the velocity, cumulative displacement, and noise indices, and plots the time series of displacement. You can interactively change the displayed image/area and select a point for the time series plot. The reference area can also be changed by right dragging.
+This script displays the velocity, cumulative displacement, and noise indices,
+and plots the time series of displacement. You can interactively change the
+displayed image/area and select a point for the time series plot. The reference
+area can also be changed by right dragging.
 
 ===============
 Inputs
 ===============
  - cum_filt.h5 and/or cum.h5
-[- mask, coh_avg, n_unw, vstd, n_gap, n_ifg_noloop, n_loop_err, resid_rms, maxTlen, stc, scl.mli, hgt in results dir]
+[- mask, coh_avg, n_unw, vstd, n_gap, n_ifg_noloop, n_loop_err, resid_rms,
+   maxTlen, stc, scl.mli, hgt in results dir]
 
 =====
 Usage
@@ -50,6 +54,9 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
 """
 #%% Change log
 '''
+v1.12 20200827 Yu Morishita, GSI
+ - Bug fix for new matplotlib (>=3.3); shift epoch and use datetime instead of ordinal
+   (https://matplotlib.org/3.3.1/api/dates_api.html)
 v1.11 20200707 Yu Morishita, GSI
  - Add --ts_png option
 v1.10 20200703 Yu Morishita, GSI
@@ -137,10 +144,12 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
     if model == 3: # Annual+Q
         sin = np.sin(2*np.pi*imdates_years)
         cos = np.cos(2*np.pi*imdates_years)
-        A = np.concatenate((A, (imdates_years**2)[:, np.newaxis], sin[:, np.newaxis], cos[:, np.newaxis]), axis=1)
+        A = np.concatenate((A, (imdates_years**2)[:, np.newaxis], 
+                            sin[:, np.newaxis], cos[:, np.newaxis]), axis=1)
         sin = np.sin(2*np.pi*xvalues_years)
         cos = np.cos(2*np.pi*xvalues_years)
-        An = np.concatenate((An, (xvalues_years**2)[:, np.newaxis], sin[:, np.newaxis], cos[:, np.newaxis]), axis=1)
+        An = np.concatenate((An, (xvalues_years**2)[:, np.newaxis], 
+                             sin[:, np.newaxis], cos[:, np.newaxis]), axis=1)
 
     result = sm.OLS(dph, A, missing='drop').fit()
     yvalues = result.predict(An)
@@ -153,7 +162,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.11; date=20200707; author="Y. Morishita"
+    ver=1.12; date=20200827; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -180,7 +189,9 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:d:u:m:r:p:c:", ["help", "i2=", "ref_geo=", "p_geo=", "nomask", "dmin=", "dmax=", "vmin=", "vmax=", "auto_crange=", "ylen=", "ts_png="])
+            opts, args = getopt.getopt(argv[1:], "hi:d:u:m:r:p:c:",
+               ["help", "i2=", "ref_geo=", "p_geo=", "nomask", "dmin=", "dmax=",
+                "vmin=", "vmax=", "auto_crange=", "ylen=", "ts_png="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -446,9 +457,11 @@ if __name__ == "__main__":
     #%% Read noise indecies
     mapdict_data = {}
     mapdict_unit = {}
-    names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 'n_ifg_noloop', 'n_loop_err', 'resid', 'mli', 'hgt']
+    names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 
+             'n_ifg_noloop', 'n_loop_err', 'resid', 'mli', 'hgt']
     units = ['', '', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm', '', 'm']
-    files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile, stcfile, n_ifg_noloopfile, n_loop_errfile, residfile, mlifile, hgtfile]
+    files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile, 
+             stcfile, n_ifg_noloopfile, n_loop_errfile, residfile, mlifile, hgtfile]
 #    for name, file in zip(names, files):
     for i, name in enumerate(names):
         try:
@@ -463,10 +476,11 @@ if __name__ == "__main__":
     #%% Calc time in datetime and ordinal
     imdates_dt = np.array(([dt.datetime.strptime(imd, '%Y%m%d') for imd in imdates])) ##datetime
     imdates_ordinal = np.array(([dt.datetime.strptime(imd, '%Y%m%d').toordinal() for imd in imdates])) ##73????
-    
+    imdates_ordinal = imdates_ordinal + mdates.date2num(np.datetime64('0000-12-31'))
 
     #%% Set color range for displacement and vel
-    refvalue_lastcum = np.nanmean((cum[-1, refy1:refy2, refx1:refx2]-cum_ref[refy1:refy2, refx1:refx2])*mask[refy1:refy2, refx1:refx2])
+    refvalue_lastcum = np.nanmean((cum[-1, refy1:refy2, refx1:refx2]
+                                   -cum_ref[refy1:refy2, refx1:refx2])*mask[refy1:refy2, refx1:refx2])
     dmin_auto = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, 100-auto_crange)
     dmax_auto = np.nanpercentile((cum[-1, :, :]-cum_ref)*mask, auto_crange)
     if dmin is None and dmax is None: ## auto
@@ -653,7 +667,6 @@ if __name__ == "__main__":
     axtim = pv.add_axes([0.1, 0.08, 0.8, 0.05], yticks=[])
     tslider = Slider(axtim, 'yr', imdates_ordinal[0]-3, imdates_ordinal[-1]+3, valinit=imdates_ordinal[ix_m], valfmt='') #%0.0f
     tslider.ax.bar(imdates_ordinal, np.ones(len(imdates_ordinal)), facecolor='black', width=4)
-
     tslider.ax.bar(imdates_ordinal[ix_m], 1, facecolor='red', width=8)
 
     loc_tslider =  tslider.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
@@ -812,9 +825,11 @@ if __name__ == "__main__":
         ## fit function
         lines1 = [0, 0, 0, 0]
         xvalues = np.arange(imdates_ordinal[0], imdates_ordinal[-1], 10)
+        td10day = dt.timedelta(days=10)
+        xvalues_dt = np.arange(imdates_dt[0], imdates_dt[-1], td10day)
         for model, vis in enumerate(visibilities):
             yvalues = calc_model(dph, imdates_ordinal, xvalues, model)
-            lines1[model], = axts.plot(xvalues, yvalues, 'b-', visible=vis, alpha=0.6, zorder=3)
+            lines1[model], = axts.plot(xvalues_dt, yvalues, 'b-', visible=vis, alpha=0.6, zorder=3)
 
         axts.scatter(imdates_dt, dph, label=label1, c='b', alpha=0.6, zorder=5)
         axts.set_title('vel = {:.1f} mm/yr @({}, {})'.format(vel1p, jj, ii), fontsize=10)
@@ -829,7 +844,7 @@ if __name__ == "__main__":
             lines2 = [0, 0, 0, 0]
             for model, vis in enumerate(visibilities):
                 yvalues = calc_model(dphf, imdates_ordinal, xvalues, model)
-                lines2[model], = axts.plot(xvalues, yvalues, 'r-', visible=vis, alpha=0.6, zorder=2)
+                lines2[model], = axts.plot(xvalues_dt, yvalues, 'r-', visible=vis, alpha=0.6, zorder=2)
                 
             axts.scatter(imdates_dt, dphf, c='r', label=label2, alpha=0.6, zorder=4)
             axts.set_title('vel(1) = {:.1f} mm/yr, vel(2) = {:.1f} mm/yr @({}, {})'.format(vel1p, vel2p, jj, ii), fontsize=10)
@@ -838,8 +853,9 @@ if __name__ == "__main__":
         if gap:
             gap1p = (gap[:, ii, jj]==1) # n_im-1, bool
             if not np.all(~gap1p): ## Not plot if no gap
-                gap_ordinal = (imdates_ordinal[1:][gap1p]+imdates_ordinal[0:-1][gap1p])/2
-                axts.vlines(gap_ordinal, 0, 1, transform=axts.get_xaxis_transform(), zorder=1, label=label_gap, alpha=0.6, colors='k')
+                gap_dates_dt = imdates_dt[0:-1][gap1p]-imdates_dt[1:][gap1p]
+                gap_dt = imdates_dt[1:][gap1p]+gap_dates_dt/2
+                axts.vlines(gap_dt, 0, 1, transform=axts.get_xaxis_transform(), zorder=1, label=label_gap, alpha=0.6, colors='k')
         
         ### Y axis
         if ylen:

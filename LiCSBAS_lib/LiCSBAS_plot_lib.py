@@ -8,6 +8,8 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.2 20200827 Yu Morioshita, GSI
+ - Bug fix in plot_network; use datetime instead of ordinal
 v1.1 20200228 Yu Morioshita, Uni of Leeds and GSI
  - Remove pdf option in plot_network
  - Add plot_hgt_corr
@@ -208,29 +210,30 @@ def plot_network(ifgdates, bperp, rm_ifgdates, pngfile, plot_bad=True):
 
     imdates_all = tools_lib.ifgdates2imdates(ifgdates)
     n_im_all = len(imdates_all)
-    idlist_all = [dt.datetime.strptime(x, '%Y%m%d').toordinal() for x in imdates_all]
+    imdates_dt_all = np.array(([dt.datetime.strptime(imd, '%Y%m%d') for imd in imdates_all])) ##datetime
 
     ifgdates = list(set(ifgdates)-set(rm_ifgdates))
     ifgdates.sort()
     imdates = tools_lib.ifgdates2imdates(ifgdates)
     n_im = len(imdates)
-    idlist = [dt.datetime.strptime(x, '%Y%m%d').toordinal() for x in imdates]
+    imdates_dt = np.array(([dt.datetime.strptime(imd, '%Y%m%d') for imd in imdates])) ##datetime
     
     ### Identify gaps    
     G = inv_lib.make_sb_matrix(ifgdates)
     ixs_inc_gap = np.where(G.sum(axis=0)==0)[0]
     
     ### Plot fig
-    figsize_x = np.round((idlist_all[-1]-idlist_all[0])/80)+2
+    figsize_x = np.round(((imdates_dt_all[-1]-imdates_dt_all[0]).days)/80)+2
     fig = plt.figure(figsize=(figsize_x, 6))
-    ax = fig.add_axes([0.12, 0.12, 0.85,0.85])
+    ax = fig.add_axes([0.06, 0.12, 0.92,0.85])
     
     ### IFG blue lines
     for i, ifgd in enumerate(ifgdates):
         ix_m = imdates_all.index(ifgd[:8])
         ix_s = imdates_all.index(ifgd[-8:])
         label = 'IFG' if i==0 else '' #label only first
-        plt.plot([idlist_all[ix_m], idlist_all[ix_s]], [bperp[ix_m], bperp[ix_s]], color='b', alpha=0.6, zorder=2, label=label)
+        plt.plot([imdates_dt_all[ix_m], imdates_dt_all[ix_s]], [bperp[ix_m],
+                bperp[ix_s]], color='b', alpha=0.6, zorder=2, label=label)
 
     ### IFG bad red lines
     if plot_bad:
@@ -238,21 +241,25 @@ def plot_network(ifgdates, bperp, rm_ifgdates, pngfile, plot_bad=True):
             ix_m = imdates_all.index(ifgd[:8])
             ix_s = imdates_all.index(ifgd[-8:])
             label = 'Removed IFG' if i==0 else '' #label only first
-            plt.plot([idlist_all[ix_m], idlist_all[ix_s]], [bperp[ix_m], bperp[ix_s]], color='r', alpha=0.6, zorder=6, label=label)
+            plt.plot([imdates_dt_all[ix_m], imdates_dt_all[ix_s]], [bperp[ix_m],
+                    bperp[ix_s]], color='r', alpha=0.6, zorder=6, label=label)
 
     ### Image points and dates
-    ax.scatter(idlist_all, bperp, alpha=0.6, zorder=4)
+    ax.scatter(imdates_dt_all, bperp, alpha=0.6, zorder=4)
     for i in range(n_im_all):
         if bperp[i] > np.median(bperp): va='bottom'
         else: va = 'top'
-        ax.annotate(imdates_all[i][4:6]+'/'+imdates_all[i][6:], (idlist_all[i], bperp[i]), ha='center', va=va, zorder=8)
+        ax.annotate(imdates_all[i][4:6]+'/'+imdates_all[i][6:],
+                    (imdates_dt_all[i], bperp[i]), ha='center', va=va, zorder=8)
 
     ### gaps
     if len(ixs_inc_gap)!=0:
-        gap_idlist = []
+        gap_dates_dt = []
         for ix_gap in ixs_inc_gap:
-            gap_idlist.append((idlist[ix_gap]+idlist[ix_gap+1])/2)
-        plt.vlines(gap_idlist, 0, 1, transform=ax.get_xaxis_transform(), zorder=1, label='Gap', alpha=0.6, colors='k', linewidth=3)
+            ddays_td = imdates_dt[ix_gap+1]-imdates_dt[ix_gap]
+            gap_dates_dt.append(imdates_dt[ix_gap]+ddays_td/2)
+        plt.vlines(gap_dates_dt, 0, 1, transform=ax.get_xaxis_transform(),
+                   zorder=1, label='Gap', alpha=0.6, colors='k', linewidth=3)
         
     ### Locater        
     loc = ax.xaxis.set_major_locator(mdates.AutoDateLocator())
@@ -269,7 +276,8 @@ def plot_network(ifgdates, bperp, rm_ifgdates, pngfile, plot_bad=True):
     ax.xaxis.set_minor_locator(mdates.YearLocator())
     ax.grid(b=True, which='minor', linewidth=2)
 
-    ax.set_xlim((idlist_all[0]-10, idlist_all[-1]+10))
+    ax.set_xlim((imdates_dt_all[0]-dt.timedelta(days=10),
+                 imdates_dt_all[-1]+dt.timedelta(days=10)))
 
     ### Labels and legend
     plt.xlabel('Time')
