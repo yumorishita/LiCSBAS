@@ -8,6 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.5 20200827 Yu Morioshita, GSI
+ - Update for matplotlib >= 3.3
 v1.4 20200703 Yu Morioshita, GSI
  - Replace problematic terms
  - Small bug (shift) fix in read_range_geo
@@ -45,7 +47,10 @@ def bl2xy(lon, lat, width, length, lat1, postlat, lon1, postlon):
 def cmap_insar():
     """
     How to use cmap_insar:
+        import matplotlib as mpl
+        from matplotlib import pyplot as plt
         cdict = cmap_insar()
+        plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
         plt.register_cmap(name='insar', data=cdict)
         plt.imshow(array, cmap='insar', vmin=-np.pi, vmax=np.pi)
         

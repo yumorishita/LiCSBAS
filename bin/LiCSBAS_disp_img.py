@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.6 20200814 Yu Morishita, GSI
+v1.7 20200827 Yu Morishita, GSI
 
 ========
 Overview
@@ -34,6 +34,8 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 #%% Change log
 '''
+v1.7 20200827 Yu Morishita, GSI
+ - Update for matplotlib >= 3.3
 v1.6 20200814 Yu Morishita, GSI
  - Set 0 as nodata by default
 v1.5 20200317 Yu Morishita, Uni of Leeds and GSI
@@ -95,7 +97,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.6; date=20200814; author="Y. Morishita"
+    ver=1.7; date=20200827; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -169,7 +171,7 @@ if __name__ == "__main__":
             exec("cmap = {}".format(cmap_name))
     elif cmap_name == 'insar':
         cdict = tools_lib.cmap_insar()
-        plt.register_cmap(name='insar', data=cdict)
+        plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
         cmap='insar'
     else:
         cmap = cmap_name

@@ -10,6 +10,7 @@ Changelog
 =========
 v1.2 20200827 Yu Morioshita, GSI
  - Bug fix in plot_network; use datetime instead of ordinal
+ - Update for matplotlib >= 3.3
 v1.1 20200228 Yu Morioshita, Uni of Leeds and GSI
  - Remove pdf option in plot_network
  - Add plot_hgt_corr
@@ -24,10 +25,10 @@ import numpy as np
 import datetime as dt
 
 import warnings
-import matplotlib
+import matplotlib as mpl
 with warnings.catch_warnings(): ## To silence user warning
     warnings.simplefilter('ignore', UserWarning)
-    matplotlib.use('Agg')
+    mpl.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib import dates as mdates
 
@@ -44,7 +45,7 @@ def make_im_png(data, pngfile, cmap, title, vmin=None, vmax=None, cbar=True):
 
     if cmap=='insar':
         cdict = tools_lib.cmap_insar()
-        plt.register_cmap(name='insar',data=cdict)
+        plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
     
     length, width = data.shape
     figsizex = 8
@@ -77,7 +78,7 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
     ### Plot setting
     if cmap=='insar':
         cdict = tools_lib.cmap_insar()
-        plt.register_cmap(name='insar',data=cdict)
+        plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
 
     length, width = data3[0].shape
     figsizex = 12

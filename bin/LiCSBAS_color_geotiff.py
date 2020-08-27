@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20200703 Yu Morishita, GSI
+v1.2 20200827 Yu Morishita, GSI
 
 ========
 Overview
@@ -25,6 +25,8 @@ LiCSBAS_color_geotiff.py -i infile [-c cmap] [-o outfile] [--cmin float] [--cmax
 """
 #%% Change log
 '''
+v1.2 20200827 Yu Morishita, GSI
+ - Update for matplotlib >= 3.3
 v1.1 20200703 Yu Morishita, GSI
  - Bug fix for using SCM without _r
 v1.0 20200409 Yu Morishita, GSI
@@ -56,7 +58,7 @@ if __name__ == "__main__":
     argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20200703; author="Y. Morishita"
+    ver=1.2; date=20200827; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -122,7 +124,8 @@ if __name__ == "__main__":
         plt.register_cmap(name=cmap_name, cmap=cmap, lut=n_color)
     elif cmap_name == 'insar':
         cdict = tools_lib.cmap_insar()
-        plt.register_cmap(name='insar', data=cdict)
+        plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
+
 
     cmap = plt.get_cmap(cmap_name, n_color)
         

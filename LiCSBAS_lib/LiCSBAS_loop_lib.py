@@ -8,6 +8,8 @@ Python3 library of loop closure check functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.4 20200827 Yu Morishita, GSI
+ - Update for matplotlib >= 3.3
 v1.3 20200703 Yu Morioshita, GSI
  - Replace problematic terms
 v1.2 20200224 Yu Morioshita, Uni of Leeds and GSI
@@ -26,10 +28,10 @@ import LiCSBAS_tools_lib as tools_lib
 
 os.environ['QT_QPA_PLATFORM']='offscreen'
 import warnings
-import matplotlib
+import matplotlib as mpl
 with warnings.catch_warnings(): ## To silence user warning
     warnings.simplefilter('ignore', UserWarning)
-    matplotlib.use('Agg')
+    mpl.use('Agg')
 from matplotlib import pyplot as plt
 
 
@@ -117,7 +119,7 @@ def identify_bad_ifg(bad_ifg_cand, good_ifg):
 def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_pngdir):
     ### Load color map for InSAR
     cdict = tools_lib.cmap_insar()
-    plt.register_cmap(name='insar', data=cdict)
+    plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
 
     rms = np.sqrt(np.nanmean(loop_ph**2))
 
