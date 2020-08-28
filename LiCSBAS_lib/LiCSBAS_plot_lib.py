@@ -8,9 +8,10 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
-v1.2 20200827 Yu Morioshita, GSI
+v1.2 20200828 Yu Morioshita, GSI
  - Bug fix in plot_network; use datetime instead of ordinal
  - Update for matplotlib >= 3.3
+ - Use nearest interpolation for insar cmap to avoid aliasing
 v1.1 20200228 Yu Morioshita, Uni of Leeds and GSI
  - Remove pdf option in plot_network
  - Add plot_hgt_corr
@@ -46,6 +47,9 @@ def make_im_png(data, pngfile, cmap, title, vmin=None, vmax=None, cbar=True):
     if cmap=='insar':
         cdict = tools_lib.cmap_insar()
         plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
+        interp = 'nearest'
+    else:
+        interp = 'antialiased'
     
     length, width = data.shape
     figsizex = 8
@@ -56,7 +60,7 @@ def make_im_png(data, pngfile, cmap, title, vmin=None, vmax=None, cbar=True):
     fig, ax = plt.subplots(1, 1, figsize=(figsizex, figsizey))
     plt.tight_layout()
     
-    im = ax.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap)
+    im = ax.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap, interpolation=interp)
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.set_title(title)
@@ -79,6 +83,9 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
     if cmap=='insar':
         cdict = tools_lib.cmap_insar()
         plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
+        interp = 'nearest'
+    else:
+        interp = 'antialiased'
 
     length, width = data3[0].shape
     figsizex = 12
@@ -89,7 +96,7 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
 
     for i in range(3):
         ax = fig.add_subplot(1, 3, i+1) #index start from 1
-        im = ax.imshow(data3[i], vmin=vmin, vmax=vmax, cmap=cmap)
+        im = ax.imshow(data3[i], vmin=vmin, vmax=vmax, cmap=cmap, interpolation=interp)
         ax.set_title(title3[i])
         ax.set_xticklabels([])
         ax.set_yticklabels([])

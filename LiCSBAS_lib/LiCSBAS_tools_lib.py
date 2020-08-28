@@ -8,8 +8,9 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
-v1.5 20200827 Yu Morioshita, GSI
+v1.5 20200828 Yu Morioshita, GSI
  - Update for matplotlib >= 3.3
+ - Use nearest interpolation for insar cmap to avoid aliasing
 v1.4 20200703 Yu Morioshita, GSI
  - Replace problematic terms
  - Small bug (shift) fix in read_range_geo
@@ -52,7 +53,7 @@ def cmap_insar():
         cdict = cmap_insar()
         plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
         plt.register_cmap(name='insar', data=cdict)
-        plt.imshow(array, cmap='insar', vmin=-np.pi, vmax=np.pi)
+        plt.imshow(array, cmap='insar', vmin=-np.pi, vmax=np.pi, interpolation='nearest')
         
     Note:
         - Input array should be wrapped and in radian

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7 20200827 Yu Morishita, GSI
+v1.7 20200828 Yu Morishita, GSI
 
 ========
 Overview
@@ -34,8 +34,9 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 #%% Change log
 '''
-v1.7 20200827 Yu Morishita, GSI
+v1.7 20200828 Yu Morishita, GSI
  - Update for matplotlib >= 3.3
+ - Use nearest interpolation for cyclic cmap to avoid aliasing
 v1.6 20200814 Yu Morishita, GSI
  - Set 0 as nodata by default
 v1.5 20200317 Yu Morishita, Uni of Leeds and GSI
@@ -97,7 +98,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.7; date=20200827; author="Y. Morishita"
+    ver=1.7; date=20200828; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -113,6 +114,7 @@ if __name__ == "__main__":
     endian = 'little'
     pngname = []
     kmzname = []
+    interp = 'antialiased'
     
     #%% Read options
     try:
@@ -223,6 +225,7 @@ if __name__ == "__main__":
         data = np.angle(np.exp(1j*(data/cycle))*cycle)
         cmin = -np.pi
         cmax = np.pi
+        interp = 'nearest'
     else:
         cyclic= False
 
@@ -244,7 +247,7 @@ if __name__ == "__main__":
         dpi = 100
         figsize2 = (width/dpi, length/dpi)
         plt.figure(figsize=figsize2, dpi=dpi)
-        plt.imshow(data, clim=[cmin, cmax], cmap=cmap)
+        plt.imshow(data, clim=[cmin, cmax], cmap=cmap, interpolation=interp)
         plt.axis('off')
         plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
         pngnametmp = kmzname.replace('.kmz', '_tmp.png')
@@ -281,7 +284,7 @@ if __name__ == "__main__":
     figsize_x = 6 if length > width else 8
     figsize = (figsize_x, ((figsize_x-2)*length/width))
     plt.figure('{}'.format(infile), figsize)
-    plt.imshow(data, clim=[cmin, cmax], cmap=cmap)
+    plt.imshow(data, clim=[cmin, cmax], cmap=cmap, interpolation=interp)
     if cyclic:
         plt.title('{}*2pi/cycle'.format(cycle))
     else:

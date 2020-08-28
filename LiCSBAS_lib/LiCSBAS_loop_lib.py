@@ -8,8 +8,9 @@ Python3 library of loop closure check functions for LiCSBAS.
 =========
 Changelog
 =========
-v1.4 20200827 Yu Morishita, GSI
+v1.4 20200828 Yu Morishita, GSI
  - Update for matplotlib >= 3.3
+ - Use nearest interpolation for insar cmap to avoid aliasing
 v1.3 20200703 Yu Morioshita, GSI
  - Replace problematic terms
 v1.2 20200224 Yu Morioshita, Uni of Leeds and GSI
@@ -149,7 +150,7 @@ def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_png
     for i in range(3):
         data_wrapped = np.angle(np.exp(1j*(data[i]/cycle))*cycle)
         ax = fig.add_subplot(2, 2, i+1) #index start from 1
-        ax.imshow(data_wrapped, vmin=-np.pi, vmax=+np.pi, cmap='insar')
+        ax.imshow(data_wrapped, vmin=-np.pi, vmax=+np.pi, cmap='insar', interpolation='nearest')
         ax.set_title('{}'.format(titles[i]))
         ax.set_xticklabels([])
         ax.set_yticklabels([])
