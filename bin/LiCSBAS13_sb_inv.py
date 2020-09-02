@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
+v1.3 20200902 Yu Morishita, GSI
 
 ========
 Overview
 ========
-This script inverts the SB network of unw to obtain the time series and velocity using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
-A stable reference point is determined after the inversion. RMS of the time series wrt median among all points is calculated for each point. Then the point with minimum RMS and minimum n_gap is selected as new stable reference point.
+This script inverts the SB network of unw to obtain the time series and velocity 
+using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
+A stable reference point is determined after the inversion. RMS of the time series
+wrt median among all points is calculated for each point. Then the point with 
+minimum RMS and minimum n_gap is selected as new stable reference point.
 
 ===============
 Input & output files
@@ -57,7 +60,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
               Weight (variance) is calculated by (1-coh**2)/(2*coh**2)
  --mem_size   Max memory size for each patch in MB. (Default: 4000)
  --gamma      Gamma value for NSBAS inversion (Default: 0.0001)
- --n_core     Number of cores for parallel processing (Default: 1)
+ --n_core     Number of cores for parallel processing (Default: # of usable CPU)
  --n_unw_r_thre
      Threshold of n_unw (number of used unwrap data)
      (Note this value is ratio to the number of images; i.e., 1.5*n_im)
@@ -69,6 +72,10 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.3 20200902 Yu Morishita, GSI
+ - Parallelize calculation of n_gap and n_ifg_noloop
+ - Change n_core default to # of usable CPU
+ - Fix n_core_inv=1 for inversion because it already uses multicore
 v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Change color of png
@@ -90,6 +97,7 @@ import time
 import h5py as h5
 import numpy as np
 import datetime as dt
+import multiprocessing as multi
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_inv_lib as inv_lib
@@ -112,16 +120,19 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200225; author="Y. Morishita"
+    ver=1.3; date=20200902; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
-
+    global n_core, G, Aloop, unwpatch ## for parallel processing
+    
     #%% Set default
     ifgdir = []
     tsadir = []
     inv_alg = 'LS'
-    n_core = 1
+    
+    n_core = len(os.sched_getaffinity(0)) ##
+    n_core_inv = 1
 
     memory_size = 4000
     gamma = 0.0001
@@ -487,37 +498,23 @@ def main(argv=None):
         ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
         maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
 
-        ### n_gap
-        print('\n  Identifing gaps and counting n_gap...', flush=True)
-#        ns_unw_unnan4inc = (np.matmul(np.int8(G[:, :, None]), (~np.isnan(unwpatch.T))[:, None, :])).sum(axis=0, dtype=np.int16) #n_ifg, n_im-1, n_pt -> n_im-1, n_pt
-        ns_unw_unnan4inc = np.array([(G[:, i]*(~np.isnan(unwpatch))).sum(axis=1, dtype=np.int16) for i in range(n_im-1)]) #n_ifg*(n_pt,n_ifg) -> (n_im-1,n_pt)
-        ns_gap_patch[ix_unnan_pt] = (ns_unw_unnan4inc==0).sum(axis=0) #n_pt
-        gap_patch[:, ix_unnan_pt] = ns_unw_unnan4inc==0
+        ### Determine n_core
+        n_pt_patch_min = 1000
+        if n_pt_patch_min*n_core > n_pt_unnan:
+            ## Too much n_core
+            n_core = int(np.floor(n_pt_unnan/n_pt_patch_min))
 
-        del ns_unw_unnan4inc
+        print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
+        print('  with {} parallel processing...'.format(n_core), flush=True)
 
-        ### n_ifg_noloop
-        print('  Counting n_ifg_noloop...', flush=True)
-        # n_ifg*(n_pt,n_ifg)->(n_loop,n_pt) 
-        # Number of ifgs for each loop at eath point.
-        # 3 means complete loop, 1 or 2 means broken loop.
-        ns_ifg4loop = np.array([
-                (np.abs(Aloop[i, :])*(~np.isnan(unwpatch))).sum(axis=1)
-                for i in range(n_loop)])
-        bool_loop = (ns_ifg4loop==3) #(n_loop,n_pt) identify complete loop only
-        
-        # n_loop*(n_loop,n_pt)*n_pt->(n_ifg,n_pt)
-        # Number of loops for each ifg at eath point.
-        ns_loop4ifg = np.array([(
-                (np.abs(Aloop[:, i])*bool_loop.T).T*
-                (~np.isnan(unwpatch[:, i]))
-                ).sum(axis=0) for i in range(n_ifg)]) #
-
-        ns_ifg_noloop_tmp = (ns_loop4ifg==0).sum(axis=0) #n_pt
-        ns_nan_ifg = np.isnan(unwpatch).sum(axis=1) #n_pt, nan ifg count
-        ns_ifg_noloop_patch[ix_unnan_pt] = ns_ifg_noloop_tmp - ns_nan_ifg
-
-        del bool_loop, ns_ifg4loop, ns_loop4ifg
+        ### Devide unwpatch by n_core for parallel processing
+        p = multi.Pool(n_core)
+        _result = np.array(p.map(count_gaps_wrapper, range(n_core)), dtype=object)
+        p.close()
+    
+        ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt        
+        gap_patch[:, ix_unnan_pt] = np.hstack(_result[:, 1]) #n_im-1, n_pt
+        ns_ifg_noloop_patch[ix_unnan_pt] = np.hstack(_result[:, 2])
 
         ### maxTlen
         _maxTlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
@@ -532,9 +529,9 @@ def main(argv=None):
         #%% Time series inversion
         print('\n  Small Baseline inversion by {}...\n'.format(inv_alg), flush=True)
         if inv_alg == 'WLS':
-            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_core)
+            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_core_inv)
         else:
-            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_core)
+            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_core_inv)
 
         ### Set to valuables
         inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan
@@ -746,6 +743,57 @@ def main(argv=None):
 
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
     print('Output directory: {}\n'.format(os.path.relpath(tsadir)))
+
+
+
+#%% 
+def count_gaps_wrapper(i):
+    print("    Running {:2}/{:2}th patch...".format(i+1, n_core), flush=True)
+    n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_core))
+    n_im = G.shape[1]+1
+    n_loop, n_ifg = Aloop.shape
+    
+    if i*n_pt_patch >= unwpatch.shape[0]:
+        # Nothing to do
+        return
+
+    ### n_gap and gap location
+#    ns_unw_unnan4inc = (np.matmul(np.int8(G[:, :, None]), (~np.isnan(unwpatch.T))[:, None, :])).sum(axis=0, dtype=np.int16) #n_ifg, n_im-1, n_pt -> n_im-1, n_pt
+    ns_unw_unnan4inc = np.array([(G[:, j]*
+                          (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch])))
+                         .sum(axis=1, dtype=np.int16) for j in range(n_im-1)])
+                    #n_ifg*(n_pt,n_ifg) -> (n_im-1,n_pt)
+    _ns_gap_patch = (ns_unw_unnan4inc==0).sum(axis=0) #n_pt
+    _gap_patch = ns_unw_unnan4inc==0
+
+    del ns_unw_unnan4inc
+
+    ### n_ifg_noloop
+    # n_ifg*(n_pt,n_ifg)->(n_loop,n_pt) 
+    # Number of ifgs for each loop at eath point.
+    # 3 means complete loop, 1 or 2 means broken loop.
+    ns_ifg4loop = np.array([(np.abs(Aloop[j, :])*
+                         (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch])))
+                            .sum(axis=1) for j in range(n_loop)])
+    bool_loop = (ns_ifg4loop==3) #(n_loop,n_pt) identify complete loop only
+    del ns_ifg4loop
+    
+    # n_loop*(n_loop,n_pt)*n_pt->(n_ifg,n_pt)
+    # Number of loops for each ifg at eath point.
+    ns_loop4ifg = np.array([(
+            (np.abs(Aloop[:, j])*bool_loop.T).T*
+            (~np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch, j]))
+            ).sum(axis=0) for j in range(n_ifg)]) #
+    del bool_loop
+
+    ns_ifg_noloop_tmp = (ns_loop4ifg==0).sum(axis=0) #n_pt
+    del ns_loop4ifg
+    
+    ns_nan_ifg = np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch, :]).sum(axis=1)
+    #n_pt, nan ifg count
+    _ns_ifg_noloop_patch = ns_ifg_noloop_tmp - ns_nan_ifg
+    
+    return _ns_gap_patch, _gap_patch, _ns_ifg_noloop_patch
 
 
 #%% main
