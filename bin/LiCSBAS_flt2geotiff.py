@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
+v1.5 20200902 Yu Morishita, GSI
 
 ========
 Overview
@@ -26,6 +26,8 @@ LiCSBAS_flt2geotiff.py -i infile -p dempar [-o outfile] [--zero2nan] [--nan2zero
 
 #%% Change log
 '''
+v1.5 20200902 Yu Morishita, GSI
+ - Do not add .geo when already added
 v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
  - Change Default nodata to nan
  - Remove --keep_nan and add --nan2zero
@@ -62,7 +64,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.4; date=20200214; author="Y. Morishita"
+    ver=1.5; date=20200902; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -131,7 +133,7 @@ def main(argv=None):
 
     #%% Read info
     if not outfile:
-        outfile = infile+'.geo.tif'
+        outfile = infile.replace('.geo', '')+'.geo.tif'
 
     width = int(io_lib.get_param_par(dempar, 'width'))
     length = int(io_lib.get_param_par(dempar, 'nlines'))
