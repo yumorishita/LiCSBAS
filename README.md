@@ -45,6 +45,10 @@ The [Scientific Colour Maps](http://www.fabiocrameri.ch/colourmaps.php) ([Cramer
 
 ## Significant Updates
 
+##### September 2020
+
+- Speed up Step 1-3
+
 ##### May 2020
 
 - Add `LiCSBAS_decomposeLOS.py` which decomposes 2 (or more) LOS displacement data to EW and UD components.
