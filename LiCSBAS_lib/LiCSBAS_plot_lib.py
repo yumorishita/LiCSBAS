@@ -8,6 +8,8 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.3 20200902 Yu Morishita, GSI
+ - Always use nearest interpolation to avoid expanded nan
 v1.2 20200828 Yu Morioshita, GSI
  - Bug fix in plot_network; use datetime instead of ordinal
  - Update for matplotlib >= 3.3
@@ -49,7 +51,7 @@ def make_im_png(data, pngfile, cmap, title, vmin=None, vmax=None, cbar=True):
         plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
         interp = 'nearest'
     else:
-        interp = 'antialiased'
+        interp = 'nearest' #'antialiased'
     
     length, width = data.shape
     figsizex = 8
@@ -85,7 +87,7 @@ def make_3im_png(data3, pngfile, cmap, title3, vmin=None, vmax=None, cbar=True):
         plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
         interp = 'nearest'
     else:
-        interp = 'antialiased'
+        interp = 'nearest' #'antialiased'
 
     length, width = data3[0].shape
     figsizex = 12

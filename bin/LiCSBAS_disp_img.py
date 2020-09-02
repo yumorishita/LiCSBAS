@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7 20200828 Yu Morishita, GSI
+v1.8 20200902 Yu Morishita, GSI
 
 ========
 Overview
@@ -34,6 +34,8 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 #%% Change log
 '''
+v1.8 20200902 Yu Morishita, GSI
+ - Always use nearest interpolation to avoid expanded nan
 v1.7 20200828 Yu Morishita, GSI
  - Update for matplotlib >= 3.3
  - Use nearest interpolation for cyclic cmap to avoid aliasing
@@ -98,7 +100,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.7; date=20200828; author="Y. Morishita"
+    ver=1.8; date=20200902; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -114,7 +116,7 @@ if __name__ == "__main__":
     endian = 'little'
     pngname = []
     kmzname = []
-    interp = 'antialiased'
+    interp = 'nearest' #'antialiased'
     
     #%% Read options
     try:

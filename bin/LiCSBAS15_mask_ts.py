@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
+v1.8 20200902 Yu Morishita, GSI
 
 ========
 Overview
@@ -54,6 +54,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
 """
 #%% Change log
 '''
+v1.8 20200902 Yu Morishita, GSI
+ - Use nearest interpolation to avoid expanded nan
 v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
  - Change color of mask_ts.png
  - Update about parameters.txt
@@ -101,7 +103,7 @@ class Usage(Exception):
 #%%
 def add_subplot(fig, i, data, vmin, vmax, cmap, title):
     ax = fig.add_subplot(3, 4, i+1) #index start from 1
-    im = ax.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap)
+    im = ax.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap, interpolation='nearest')
     fig.colorbar(im)
     ax.set_title('{0}'.format(title))
     ax.set_xticklabels([])
@@ -116,7 +118,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.7; date=20200224; author="Y. Morishita"
+    ver=1.8; date=20200902; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

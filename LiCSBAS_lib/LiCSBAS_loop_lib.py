@@ -157,7 +157,7 @@ def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_png
 
     ## loop phase
     ax = fig.add_subplot(2, 2, 4) #index start from 1
-    ax.imshow(loop_ph, vmin=-np.pi, vmax=+np.pi, cmap=SCM.vik)
+    ax.imshow(loop_ph, vmin=-np.pi, vmax=+np.pi, cmap=SCM.vik, interpolation='nearest')
     ax.set_title('Loop phase (RMS={:.2f}rad)'.format(rms))
     ax.set_xticklabels([])
     ax.set_yticklabels([])

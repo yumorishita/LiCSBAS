@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.12 20200827 Yu Morishita, GSI
+v1.13 20200902 Yu Morishita, GSI
 
 ========
 Overview
@@ -54,6 +54,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
 """
 #%% Change log
 '''
+v1.13 20200902 Yu Morishita, GSI
+ - Use nearest interpolation to avoid expanded nan
 v1.12 20200827 Yu Morishita, GSI
  - Bug fix for new matplotlib (>=3.3); shift epoch and use datetime instead of ordinal
    (https://matplotlib.org/3.3.1/api/dates_api.html)
@@ -162,7 +164,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.12; date=20200827; author="Y. Morishita"
+    ver=1.13; date=20200902; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -519,7 +521,7 @@ if __name__ == "__main__":
     rax, = axv.plot([refx1h, refx2h, refx2h, refx1h, refx1h],
                     [refy1h, refy1h, refy2h, refy2h, refy1h], '--k', alpha=0.8)
     data = vel*mask-np.nanmean((vel*mask)[refy1:refy2+1, refx1:refx2+1])
-    cax = axv.imshow(data, clim=[vmin, vmax], cmap=cmap, aspect=aspect)
+    cax = axv.imshow(data, clim=[vmin, vmax], cmap=cmap, aspect=aspect, interpolation='nearest')
         
     axv.set_title('vel')
 
