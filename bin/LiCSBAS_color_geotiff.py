@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200827 Yu Morishita, GSI
+v1.3 20200904 Yu Morishita, GSI
 
 ========
 Overview
@@ -25,6 +25,8 @@ LiCSBAS_color_geotiff.py -i infile [-c cmap] [-o outfile] [--cmin float] [--cmax
 """
 #%% Change log
 '''
+v1.3 20200904 Yu Morishita, GSI
+ - Avoid segmentation fault
 v1.2 20200827 Yu Morishita, GSI
  - Update for matplotlib >= 3.3
 v1.1 20200703 Yu Morishita, GSI
@@ -38,7 +40,7 @@ v1.0 20200409 Yu Morishita, GSI
 import getopt
 import os
 import sys
-import gdal
+#import gdal  # may cause segmentation fault in savefig?
 import time
 import SCM
 import numpy as np
@@ -58,7 +60,7 @@ if __name__ == "__main__":
     argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200827; author="Y. Morishita"
+    ver=1.3; date=20200904; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -130,7 +132,20 @@ if __name__ == "__main__":
     cmap = plt.get_cmap(cmap_name, n_color)
         
 
+    #%% colorbar
+    if cbar_flag:
+        fig, ax = plt.subplots(figsize=(3, 1))
+        norm = mpl.colors.Normalize(cmin, cmax)
+        mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+        cbarfile = "{}_{}_{}.pdf".format(cmap_name, cmin, cmax)
+        plt.tight_layout()
+        plt.savefig(cbarfile, transparent=True)
+        plt.close()
+    
+
     #%% Set color range
+    import gdal
+    
     ### Auto
     if cmin is None:
         cmin = gdal.Info(infile, computeMinMax=True, format="json")["bands"][0]['computedMin']
@@ -163,15 +178,15 @@ if __name__ == "__main__":
                        format="GTiff", creationOptions=gdal_option, addAlpha=4)
 
 
-    #%% colorbar
-    if cbar_flag:
-        fig, ax = plt.subplots(figsize=(3, 1))
-        norm = mpl.colors.Normalize(cmin, cmax)
-        mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
-        cbarfile = "{}_{}_{}.pdf".format(cmap_name, cmin, cmax)
-        plt.tight_layout()
-        plt.savefig(cbarfile, transparent=True)
-        plt.close()
+    #%% colorbar. Move before import gdal to avoid segmentation fault 
+    # if cbar_flag:
+    #     fig, ax = plt.subplots(figsize=(3, 1))
+    #     norm = mpl.colors.Normalize(cmin, cmax)
+    #     mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+    #     cbarfile = "{}_{}_{}.pdf".format(cmap_name, cmin, cmax)
+    #     plt.tight_layout()
+    #     plt.savefig(cbarfile, transparent=True)
+    #     plt.close()
         
 
     #%% Remove intermediate files
