@@ -21,6 +21,7 @@ end_step="16"	# 01-05, 11-16
 
 nlook="1"	# multilook factor, used in step02
 GEOCmldir="GEOCml${nlook}"	# If start from 11 or later after doing 03-05, use e.g., GEOCml${nlook}GACOSmaskclip
+n_para="" # Number of paralell processing in step 02-05,12,13,16. default: number of usable CPU
 check_only="n" # y/n. If y, not run scripts and just show commands to be done
 
 logdir="log"
@@ -62,25 +63,30 @@ p01_get_gacos="y" # y/n
 p02_GEOCdir=""	# default: GEOC
 p02_GEOCmldir=""	# default: GEOCml$nlook
 p02_frame=""	# e.g. 021D_04972_131213
+p02_n_para=""   # default: # of usable CPU
 order_op03_05="03 04 05"	# can change order e.g., 05 03 04
 p03_inGEOCmldir=""	# default: $GEOCmldir
 p03_outGEOCmldir_suffix="" # default: GACOS
 p03_fillhole="y"	# y/n. default: n
 p03_gacosdir=""	# default: GACOS
+p03_n_para=""   # default: # of usable CPU
 p04_inGEOCmldir=""	# default: $GEOCmldir
 p04_outGEOCmldir_suffix="" # default: mask
+p04_n_para=""   # default: # of usable CPU
 p05_inGEOCmldir=""      # default: $GEOCmldir
 p05_outGEOCmldir_suffix="" # default: clip
+p05_n_para=""   # default: # of usable CPU
 p11_GEOCmldir=""	# default: $GEOCmldir
 p11_TSdir=""	# default: TS_$GEOCmldir
 p12_GEOCmldir=""        # default: $GEOCmldir
 p12_TSdir=""    # default: TS_$GEOCmldir
+p12_n_para=""	# default: # of usable CPU
 p13_GEOCmldir=""        # default: $GEOCmldir
 p13_TSdir=""    # default: TS_$GEOCmldir
 p13_inv_alg=""	# LS (default) or WLS
 p13_mem_size=""	# default: 4000 (MB)
 p13_gamma=""	# default: 0.0001
-p13_n_core=""	# default: # of usable CPU
+p13_n_para=""	# default: # of usable CPU
 p13_n_unw_r_thre=""	# defualt: 1
 p13_keep_incfile="n"	# y/n. default: n
 p14_TSdir=""    # default: TS_$GEOCmldir
@@ -94,7 +100,7 @@ p16_TSdir=""    # default: TS_$GEOCmldir
 p16_hgt_min=""	# default: 200 (m)
 p16_hgt_max=""  # default: 10000 (m)
 p16_nomask="n"	# y/n. default: n
-
+p16_n_para=""   # default: # of usable CPU
 
 
 #############################
@@ -129,6 +135,8 @@ if [ $start_step -le 02 -a $end_step -ge 02 ];then
   if [ ! -z $p02_GEOCmldir ];then p02_op="$p02_op -o $p02_GEOCmldir"; fi
   if [ ! -z $nlook ];then p02_op="$p02_op -n $nlook"; fi
   if [ ! -z $p02_frame ];then p02_op="$p02_op -f $p02_frame"; fi
+  if [ ! -z $p02_n_para ];then p02_op="$p02_op --n_para $p02_n_para";
+  elif [ ! -z $n_para ];then p02_op="$p02_op --n_para $n_para";fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS02_ml_prep.py $p02_op"
@@ -152,6 +160,8 @@ if [ $step -eq 03 -a $start_step -le 03 -a $end_step -ge 03 ];then
     p03_op="$p03_op -o $outGEOCmldir"
     if [ ! -z $p03_gacosdir ];then p03_op="$p03_op -g $p03_gacosdir"; fi
     if [ $p03_fillhole == "y" ];then p03_op="$p03_op --fillhole"; fi
+    if [ ! -z $p03_n_para ];then p03_op="$p03_op --n_para $p03_n_para";
+    elif [ ! -z $n_para ];then p03_op="$p03_op --n_para $n_para";fi
 
     if [ $check_only == "y" ];then
       echo "LiCSBAS03op_GACOS.py $p03_op"
@@ -176,6 +186,8 @@ if [ $step -eq 04 -a $start_step -le 04 -a $end_step -ge 04 ];then
     if [ ! -z $p04_mask_coh_thre ];then p04_op="$p04_op -c $p04_mask_coh_thre"; fi
     if [ ! -z $p04_mask_range ];then p04_op="$p04_op -r $p04_mask_range"; fi
     if [ ! -z $p04_mask_range_file ];then p04_op="$p04_op -f $p04_mask_range_file"; fi
+    if [ ! -z $p04_n_para ];then p04_op="$p04_op --n_para $p04_n_para";
+    elif [ ! -z $n_para ];then p04_op="$p04_op --n_para $n_para";fi
 
     if [ $check_only == "y" ];then
       echo "LiCSBAS04op_mask_unw.py $p04_op"
@@ -199,6 +211,8 @@ if [ $step -eq 05 -a $start_step -le 05 -a $end_step -ge 05 ];then
     p05_op="$p05_op -o $outGEOCmldir"
     if [ ! -z $p05_clip_range ];then p05_op="$p05_op -r $p05_clip_range"; fi
     if [ ! -z $p05_clip_range_geo ];then p05_op="$p05_op -g $p05_clip_range_geo"; fi
+    if [ ! -z $p05_n_para ];then p05_op="$p05_op --n_para $p05_n_para";
+    elif [ ! -z $n_para ];then p05_op="$p05_op --n_para $n_para";fi
 
     if [ $check_only == "y" ];then
       echo "LiCSBAS05op_clip_unw.py $p05_op"
@@ -239,6 +253,8 @@ if [ $start_step -le 12 -a $end_step -ge 12 ];then
     else p12_op="$p12_op -d $GEOCmldir"; fi
   if [ ! -z $p12_TSdir ];then p12_op="$p12_op -t $p12_TSdir"; fi
   if [ ! -z $p12_loop_thre ];then p12_op="$p12_op -l $p12_loop_thre"; fi
+  if [ ! -z $p12_n_para ];then p12_op="$p12_op --n_para $p12_n_para";
+  elif [ ! -z $n_para ];then p12_op="$p12_op --n_para $n_para";fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS12_loop_closure.py $p12_op"
@@ -256,7 +272,9 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   if [ ! -z $p13_inv_alg ];then p13_op="$p13_op --inv_alg $p13_inv_alg"; fi
   if [ ! -z $p13_mem_size ];then p13_op="$p13_op --mem_size $p13_mem_size"; fi
   if [ ! -z $p13_gamma ];then p13_op="$p13_op --gamma $p13_gamma"; fi
-  if [ ! -z $p13_n_core ];then p13_op="$p13_op --n_core $p13_n_core"; fi
+  if [ ! -z $p13_n_para ];then p13_op="$p13_op --n_para $p13_n_para";
+  elif [ ! -z $n_para ];then p13_op="$p13_op --n_para $n_para";fi
+  if [ ! -z $p13_n_para ];then p13_op="$p13_op --n_para $p13_n_para"; fi
   if [ ! -z $p13_n_unw_r_thre ];then p13_op="$p13_op --n_unw_r_thre $p13_n_unw_r_thre"; fi
   if [ $p13_keep_incfile == "y" ];then p13_op="$p13_op --keep_incfile"; fi
 
@@ -319,6 +337,8 @@ if [ $start_step -le 16 -a $end_step -ge 16 ];then
   if [ ! -z $p16_hgt_min ];then p16_op="$p16_op --hgt_min $p16_hgt_min"; fi
   if [ ! -z $p16_hgt_max ];then p16_op="$p16_op --hgt_max $p16_hgt_max"; fi
   if [ $p16_nomask == "y" ];then p16_op="$p16_op --nomask"; fi
+  if [ ! -z $p16_n_para ];then p16_op="$p16_op --n_para $p16_n_para";
+  elif [ ! -z $n_para ];then p16_op="$p16_op --n_para $n_para";fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS16_filt_ts.py $p16_op"

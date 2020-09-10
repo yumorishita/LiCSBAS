@@ -8,6 +8,8 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.3.1 20200909 Yu Morishita, GSI
+ - fix loc = upper right to avoid UserWarning in plot_hgt_corr
 v1.3 20200902 Yu Morishita, GSI
  - Always use nearest interpolation to avoid expanded nan
 v1.2 20200828 Yu Morioshita, GSI
@@ -198,7 +200,7 @@ def plot_hgt_corr(data_bf, fit_hgt, hgt, title, pngfile):
     ax.set_xlabel('Height (m)')
     ax.set_ylabel('Displacement (mm)')
 
-    ax.legend()
+    ax.legend(loc='upper right')
     fig.tight_layout()
     fig.savefig(pngfile)
     plt.close()

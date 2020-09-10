@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200902 Yu Morishita, GSI
+v1.4 20200909 Yu Morishita, GSI
 
 ========
 Overview
@@ -50,7 +50,7 @@ Outputs in TS_GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_core int] [--n_unw_r_thre float] [--keep_incfile] 
+LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile] 
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
@@ -60,7 +60,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
               Weight (variance) is calculated by (1-coh**2)/(2*coh**2)
  --mem_size   Max memory size for each patch in MB. (Default: 4000)
  --gamma      Gamma value for NSBAS inversion (Default: 0.0001)
- --n_core     Number of cores for parallel processing (Default: # of usable CPU)
+ --n_para     Number of parallel processing (Default: # of usable CPU)
  --n_unw_r_thre
      Threshold of n_unw (number of used unwrap data)
      (Note this value is ratio to the number of images; i.e., 1.5*n_im)
@@ -72,6 +72,9 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4 20200909 Yu Morishita, GSI
+ - n_core -> n_para
+ - Parallelize making png
 v1.3 20200902 Yu Morishita, GSI
  - Parallelize calculation of n_gap and n_ifg_noloop
  - Change n_core default to # of usable CPU
@@ -120,19 +123,23 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200902; author="Y. Morishita"
+    ver=1.4; date=20200909; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
-    global n_core, G, Aloop, unwpatch ## for parallel processing
-    
+    ## For parallel processing
+    global n_para, G, Aloop, unwpatch, imdates, incdir, ifgdir, length, width,\
+        coef_r2m, ifgdates, ref_unw, cycle, keep_incfile, resdir, restxtfile, \
+        cmap_vel, wavelength
+
+
     #%% Set default
     ifgdir = []
     tsadir = []
     inv_alg = 'LS'
     
-    n_core = len(os.sched_getaffinity(0)) ##
-    n_core_inv = 1
+    n_para = len(os.sched_getaffinity(0)) ##
+    n_para_inv = 1
 
     memory_size = 4000
     gamma = 0.0001
@@ -146,7 +153,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:t:", ["help",  "mem_size=", "gamma=", "n_unw_r_thre=", "keep_incfile", "inv_alg=", "n_core="])
+            opts, args = getopt.getopt(argv[1:], "hd:t:", ["help",  "mem_size=", "gamma=", "n_unw_r_thre=", "keep_incfile", "inv_alg=", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -167,8 +174,8 @@ def main(argv=None):
                 keep_incfile = True
             elif o == '--inv_alg':
                 inv_alg = a
-            elif o == '--n_core':
-                n_core = int(a)
+            elif o == '--n_para':
+                n_para = int(a)
 
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
@@ -498,18 +505,18 @@ def main(argv=None):
         ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
         maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
 
-        ### Determine n_core
+        ### Determine n_para
         n_pt_patch_min = 1000
-        if n_pt_patch_min*n_core > n_pt_unnan:
-            ## Too much n_core
-            n_core = int(np.floor(n_pt_unnan/n_pt_patch_min))
+        if n_pt_patch_min*n_para > n_pt_unnan:
+            ## Too much n_para
+            n_para = int(np.floor(n_pt_unnan/n_pt_patch_min))
 
         print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
-        print('  with {} parallel processing...'.format(n_core), flush=True)
+        print('  with {} parallel processing...'.format(n_para), flush=True)
 
-        ### Devide unwpatch by n_core for parallel processing
-        p = multi.Pool(n_core)
-        _result = np.array(p.map(count_gaps_wrapper, range(n_core)), dtype=object)
+        ### Devide unwpatch by n_para for parallel processing
+        p = multi.Pool(n_para)
+        _result = np.array(p.map(count_gaps_wrapper, range(n_para)), dtype=object)
         p.close()
     
         ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt        
@@ -529,9 +536,9 @@ def main(argv=None):
         #%% Time series inversion
         print('\n  Small Baseline inversion by {}...\n'.format(inv_alg), flush=True)
         if inv_alg == 'WLS':
-            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_core_inv)
+            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_para_inv)
         else:
-            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_core_inv)
+            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_para_inv)
 
         ### Set to valuables
         inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan
@@ -666,51 +673,21 @@ def main(argv=None):
 
 
     #%% Output png images
-    print('\nOutput png images...', flush=True)
     ### Incremental displacement
-    for imx, imd in enumerate(imdates):
-        if imd == imdates[-1]: continue #skip last for increment
-        ## Comparison of increment and daisy chain pair
-        ifgd = '{}_{}'.format(imd, imdates[imx+1])
-        incfile = os.path.join(incdir, '{}.inc'.format(ifgd))
-        unwfile = os.path.join(ifgdir, ifgd, '{}.unw'.format(ifgd))
-        pngfile = os.path.join(incdir, '{}.inc_comp.png'.format(ifgd))
-        
-        inc = io_lib.read_img(incfile, length, width)
-        
-        try:
-            unw = io_lib.read_img(unwfile, length, width)*coef_r2m
-            ix_ifg = ifgdates.index(ifgd)
-            unw = unw - ref_unw[ix_ifg]
-        except:
-            unw = np.zeros((length, width), dtype=np.float32)*np.nan
-
-        ### Output png for comparison
-        data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [unw, inc, inc-unw]]
-        title3 = ['Daisy-chain IFG ({}pi/cycle)'.format(cycle*2), 'Inverted ({}pi/cycle)'.format(cycle*2), 'Difference ({}pi/cycle)'.format(cycle*2)]
-        pngfile = os.path.join(incdir, '{}.increment.png'.format(ifgd))
-        plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
-
-        if not keep_incfile:
-            os.remove(incfile)
+    _n_para = n_im-1 if n_para > n_im-1 else n_para
+    print('\nOutput increment png images with {} parallel processing...'.format(_n_para), flush=True)
+    p = multi.Pool(_n_para)
+    p.map(inc_png_wrapper, range(n_im-1))
+    p.close()
 
     ### Residual for each ifg. png and txt.
     with open(restxtfile, "w") as f:
         print('# RMS of residual (mm)', file=f)
-    for ifgd in ifgdates:
-        infile = os.path.join(resdir, '{}.res'.format(ifgd))
-        resid = io_lib.read_img(infile, length, width)
-        resid_rms = np.sqrt(np.nanmean(resid**2))
-        with open(restxtfile, "a") as f:
-            print('{} {:5.2f}'.format(ifgd, resid_rms), file=f)
-        
-        pngfile = infile+'.png'
-        title = 'Residual (mm) of {} (RMS:{:.2f}mm)'.format(ifgd, resid_rms)
-        plot_lib.make_im_png(resid, pngfile, cmap_vel, title, -wavelength/2*1000, wavelength/2*1000)
-        
-
-        if not keep_incfile:
-            os.remove(infile)
+    _n_para = n_ifg if n_para > n_ifg else n_para
+    print('\nOutput residual png images with {} parallel processing...'.format(_n_para), flush=True)
+    p = multi.Pool(_n_para)
+    p.map(resid_png_wrapper, range(n_ifg))
+    p.close()
     
     ### Velocity and noise indices
     cmins = [None, None, None, None, None, None]
@@ -718,6 +695,7 @@ def main(argv=None):
     cmaps = [cmap_vel, cmap_vel, cmap_noise_r, cmap_noise_r, cmap_noise_r, cmap_noise]
     titles = ['Velocity (mm/yr)', 'Intercept of velocity (mm)', 'RMS of residual (mm)', 'Number of gaps in SB network', 'Number of ifgs with no loops', 'Max length of connected SB network (yr)']
 
+    print('\nOutput noise png images...', flush=True)
     for i in range(len(names)):
         file = os.path.join(resultsdir, names[i])
         data = io_lib.read_img(file, length, width)
@@ -748,8 +726,8 @@ def main(argv=None):
 
 #%% 
 def count_gaps_wrapper(i):
-    print("    Running {:2}/{:2}th patch...".format(i+1, n_core), flush=True)
-    n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_core))
+    print("    Running {:2}/{:2}th patch...".format(i+1, n_para), flush=True)
+    n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_para))
     n_im = G.shape[1]+1
     n_loop, n_ifg = Aloop.shape
     
@@ -794,6 +772,53 @@ def count_gaps_wrapper(i):
     _ns_ifg_noloop_patch = ns_ifg_noloop_tmp - ns_nan_ifg
     
     return _ns_gap_patch, _gap_patch, _ns_ifg_noloop_patch
+
+
+#%%
+def inc_png_wrapper(imx):
+    imd = imdates[imx]
+    if imd == imdates[-1]:
+        return #skip last for increment
+    
+    ## Comparison of increment and daisy chain pair
+    ifgd = '{}_{}'.format(imd, imdates[imx+1])
+    incfile = os.path.join(incdir, '{}.inc'.format(ifgd))
+    unwfile = os.path.join(ifgdir, ifgd, '{}.unw'.format(ifgd))
+    pngfile = os.path.join(incdir, '{}.inc_comp.png'.format(ifgd))
+    
+    inc = io_lib.read_img(incfile, length, width)
+    
+    try:
+        unw = io_lib.read_img(unwfile, length, width)*coef_r2m
+        ix_ifg = ifgdates.index(ifgd)
+        unw = unw - ref_unw[ix_ifg]
+    except:
+        unw = np.zeros((length, width), dtype=np.float32)*np.nan
+
+    ### Output png for comparison
+    data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [unw, inc, inc-unw]]
+    title3 = ['Daisy-chain IFG ({}pi/cycle)'.format(cycle*2), 'Inverted ({}pi/cycle)'.format(cycle*2), 'Difference ({}pi/cycle)'.format(cycle*2)]
+    pngfile = os.path.join(incdir, '{}.increment.png'.format(ifgd))
+    plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+
+    if not keep_incfile:
+        os.remove(incfile)
+
+#%%
+def resid_png_wrapper(i):
+    ifgd = ifgdates[i]
+    infile = os.path.join(resdir, '{}.res'.format(ifgd))
+    resid = io_lib.read_img(infile, length, width)
+    resid_rms = np.sqrt(np.nanmean(resid**2))
+    with open(restxtfile, "a") as f:
+        print('{} {:5.2f}'.format(ifgd, resid_rms), file=f)
+    
+    pngfile = infile+'.png'
+    title = 'Residual (mm) of {} (RMS:{:.2f}mm)'.format(ifgd, resid_rms)
+    plot_lib.make_im_png(resid, pngfile, cmap_vel, title, -wavelength/2*1000, wavelength/2*1000)
+
+    if not keep_incfile:
+        os.remove(infile)
 
 
 #%% main

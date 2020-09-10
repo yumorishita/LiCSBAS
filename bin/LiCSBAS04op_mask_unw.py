@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200614 Yu Morishita, GSI
+v1.3 20200909 Yu Morishita, GSI
 
 ========
 Overview
@@ -27,7 +27,7 @@ Outputs in GEOCml*mask/
 =====
 Usage
 =====
-LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f txtfile]
+LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f txtfile] [--n_para int]
 
  -i  Path to the GEOCml* dir containing stack of unw data.
  -o  Path to the output dir.
@@ -35,12 +35,15 @@ LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f 
  -r  Range to be masked. Index starts from 0.
      0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  -f  Text file of a list of ranges to be masked (format is x1:x2/y1:y2)
+ --n_para  Number of parallel processing (Default: # of usable CPU)
 
  Note: either -c, -r or -f must be specified.
 
 """
 #%% Change log
 '''
+v1.3 20200909 Yu Morishita, GSI
+ - Parallel processing
 v1.2 20200614 Yu Morishita, GSI
  - Wrong png name printing fixed
 v1.1 20200409 Yu Morishita, GSI
@@ -57,6 +60,7 @@ import glob
 import shutil
 import time
 import numpy as np
+import multiprocessing as multi
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -74,9 +78,12 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200614; author="Y. Morishita"
+    ver=1.3; date=20200909; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
+
+    ### For paralell processing
+    global ifgdates2, in_dir, out_dir, length, width, bool_mask, cycle
 
 
     #%% Set default
@@ -85,6 +92,7 @@ def main(argv=None):
     coh_thre = []
     ex_range_str = []
     ex_range_file = []
+    n_para = len(os.sched_getaffinity(0))
 
     cmap_noise = 'viridis'
 
@@ -92,7 +100,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:c:r:f:", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hi:o:c:r:f:", ["help", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -109,6 +117,8 @@ def main(argv=None):
                 ex_range_str = a
             elif o == '-f':
                 ex_range_file = a
+            elif o == '--n_para':
+                n_para = int(a)
 
         if not in_dir:
             raise Usage('No input directory given, -i is not optional!')
@@ -234,32 +244,16 @@ def main(argv=None):
     if n_ifg-n_ifg2 > 0:
         print("  {0:3}/{1:3} masked unw and cc already exist. Skip".format(n_ifg-n_ifg2, n_ifg), flush=True)
    
-    ### Mask
-    for ifgix, ifgd in enumerate(ifgdates2): 
-        if np.mod(ifgix,100) == 0:
-            print("  {0:3}/{1:3}th unw...".format(ifgix, n_ifg2), flush=True)
-    
-        unwfile = os.path.join(in_dir, ifgd, ifgd+'.unw')
-        unw = io_lib.read_img(unwfile, length, width)
-
-        ### Mask
-        unw[bool_mask] = np.nan
-
-        ### Output
-        out_dir1 = os.path.join(out_dir, ifgd)
-        if not os.path.exists(out_dir1): os.mkdir(out_dir1)
-        
-        unw.tofile(os.path.join(out_dir1, ifgd+'.unw'))
-        
-        if not os.path.exists(os.path.join(out_dir1, ifgd+'.cc')):
-            ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
-            os.symlink(os.path.relpath(ccfile, out_dir1), os.path.join(out_dir1, ifgd+'.cc'))
-
-        ## Output png for masked unw
-        pngfile = os.path.join(out_dir1, ifgd+'.unw.png')
-        title = '{} ({}pi/cycle)'.format(ifgd, cycle*2)
-        plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, 'insar', title, -np.pi, np.pi, cbar=False)
+    if n_ifg2 > 0:
+        ### Mask with parallel processing
+        if n_para > n_ifg2:
+            n_para = n_ifg2
             
+        print('  {} parallel processing...'.format(n_para), flush=True)
+        p = multi.Pool(n_para)
+        p.map(mask_wrapper, range(n_ifg2))
+        p.close()
+
     print("", flush=True)
 
 
@@ -283,6 +277,34 @@ def main(argv=None):
 
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
     print('Output directory: {}\n'.format(os.path.relpath(out_dir)))
+
+
+#%%
+def mask_wrapper(ifgix):
+    ifgd = ifgdates2[ifgix]
+    if np.mod(ifgix,100) == 0:
+        print("  {0:3}/{1:3}th unw...".format(ifgix, len(ifgdates2)), flush=True)
+
+    unwfile = os.path.join(in_dir, ifgd, ifgd+'.unw')
+    unw = io_lib.read_img(unwfile, length, width)
+
+    ### Mask
+    unw[bool_mask] = np.nan
+
+    ### Output
+    out_dir1 = os.path.join(out_dir, ifgd)
+    if not os.path.exists(out_dir1): os.mkdir(out_dir1)
+    
+    unw.tofile(os.path.join(out_dir1, ifgd+'.unw'))
+    
+    if not os.path.exists(os.path.join(out_dir1, ifgd+'.cc')):
+        ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
+        os.symlink(os.path.relpath(ccfile, out_dir1), os.path.join(out_dir1, ifgd+'.cc'))
+
+    ## Output png for masked unw
+    pngfile = os.path.join(out_dir1, ifgd+'.unw.png')
+    title = '{} ({}pi/cycle)'.format(ifgd, cycle*2)
+    plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, 'insar', title, -np.pi, np.pi, cbar=False)
 
 
 #%% main

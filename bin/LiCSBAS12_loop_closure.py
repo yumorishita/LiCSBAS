@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
+v1.3 20200907 Yu Morishita, GSI
 
 ========
 Overview
@@ -50,15 +50,18 @@ Outputs in TS_GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre]
+LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--n_para int]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
  -l  Threshold of RMS of loop phase (Default: 1.5 rad)
+ --n_para  Number of parallel processing (Default: # of usable CPU)
 
 """
 #%% Change log
 '''
+v1.3 20200907 Yu Morishita, GSI
+ - Parallel processing in 1st loop
 v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
  - Not output network pdf
  - Improve bad loop cand identification
@@ -80,6 +83,7 @@ import shutil
 import glob
 import numpy as np
 import datetime as dt
+import multiprocessing as multi
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_loop_lib as loop_lib
@@ -102,15 +106,17 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200228; author="Y. Morishita"
+    ver=1.3; date=20200907; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
+    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir ## for parallel processing
 
     #%% Set default
     ifgdir = []
     tsadir = []
     loop_thre = 1.5
+    n_para = len(os.sched_getaffinity(0))
 
     cmap_noise = 'viridis'
     cmap_noise_r = 'viridis_r'
@@ -118,7 +124,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:t:l:", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hd:t:l:", ["help", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -131,6 +137,8 @@ def main(argv=None):
                 tsadir = a
             elif o == '-l':
                 loop_thre = float(a)
+            elif o == '--n_para':
+                n_para = int(a)
 
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
@@ -240,37 +248,31 @@ def main(argv=None):
 
 
     #%% 1st loop closure check. First without reference
-    print('\n1st Loop closure check and make png for all possible {} loops...'.format(n_loop), flush=True)
+    print('\n1st Loop closure check and make png for all possible {} loops,'.format(n_loop), flush=True)
+    print('with {} parallel processing...'.format(n_para), flush=True)
+    
     bad_ifg_cand = []
     good_ifg = []
-    loop_ph_rms_ifg = []
+
+    ### Parallel processing
+    p = multi.Pool(n_para)
+    loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=object)
+    p.close()
+
 
     for i in range(n_loop):
-        if np.mod(i, 100) == 0:
-            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
-
-        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
-
-        ## Calculate loop phase and check n bias (2pi*n)
-        loop_ph = unw12+unw23-unw13
-        loop_2pin = int(np.round(np.nanmedian(loop_ph)/(2*np.pi)))*2*np.pi
-        loop_ph = loop_ph-loop_2pin #unbias 2pi x n
-        loop_ph_rms_ifg.append(np.sqrt(np.nanmean(loop_ph**2)))
+        ### Find index of ifg
+        ix_ifg12, ix_ifg23 = np.where(Aloop[i, :] == 1)[0]
+        ix_ifg13 = np.where(Aloop[i, :] == -1)[0][0]
+        ifgd12 = ifgdates[ix_ifg12]
+        ifgd23 = ifgdates[ix_ifg23]
+        ifgd13 = ifgdates[ix_ifg13]
 
         ### List as good or bad candidate
         if loop_ph_rms_ifg[i] >= loop_thre: #Bad loop including bad ifg.
             bad_ifg_cand.extend([ifgd12, ifgd23, ifgd13])
         else:
             good_ifg.extend([ifgd12, ifgd23, ifgd13])
-
-        ### Output png. If exist in old, move to save time
-        oldpng = os.path.join(loop_pngdir+'_old/', ifgd12[:8]+'_'+ifgd23[:8]+'_'+ifgd13[-8:]+'_loop.png')
-        if os.path.exists(oldpng):
-            ### Just move from old png
-            shutil.move(oldpng, loop_pngdir)
-        else:
-            ### Make png. Take time a little.
-            loop_lib.make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_pngdir)
 
     if os.path.exists(loop_pngdir+'_old/'):
         shutil.rmtree(loop_pngdir+'_old/')
@@ -697,6 +699,32 @@ def main(argv=None):
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
     print('Output directory: {}\n'.format(os.path.relpath(tsadir)))
 
+
+#%% 
+def loop_closure_1st_wrapper(i):
+    n_loop = Aloop.shape[0]
+    
+    if np.mod(i, 100) == 0:
+        print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+
+    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+
+    ## Calculate loop phase and check n bias (2pi*n)
+    loop_ph = unw12+unw23-unw13
+    loop_2pin = int(np.round(np.nanmedian(loop_ph)/(2*np.pi)))*2*np.pi
+    loop_ph = loop_ph-loop_2pin #unbias 2pi x n
+    loop_ph_rms_ifg = np.sqrt(np.nanmean(loop_ph**2))
+
+    ### Output png. If exist in old, move to save time
+    oldpng = os.path.join(loop_pngdir+'_old/', ifgd12[:8]+'_'+ifgd23[:8]+'_'+ifgd13[-8:]+'_loop.png')
+    if os.path.exists(oldpng):
+        ### Just move from old png
+        shutil.move(oldpng, loop_pngdir)
+    else:
+        ### Make png. Take time a little.
+        loop_lib.make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_pngdir)
+
+    return loop_ph_rms_ifg
 
 
 #%% main

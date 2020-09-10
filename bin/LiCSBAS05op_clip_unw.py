@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20200302 Yu Morishita, Uni of Leeds and GSI
+v1.2 20200909 Yu Morishita, GSI
 
 ========
 Overview
@@ -30,17 +30,20 @@ Outputs in GEOCml*clip/ :
 =====
 Usage
 =====
-LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1/lat2]
+LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1/lat2] [--n_para int]
 
  -i  Path to the GEOCml* dir containing stack of unw data.
  -o  Path to the output dir.
  -r  Range to be clipped. Index starts from 0.
      0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  -g  Range to be clipped in geographical coordinates (deg).
+ --n_para  Number of parallel processing (Default: # of usable CPU)
 
 """
 #%% Change log
 '''
+v1.2 20200909 Yu Morishita, GSI
+ - Parallel processing
 v1.1 20200302 Yu Morishita, Uni of Leeds and GSI
  - Bag fix for hgt.png and glob
  - Deal with cc file in uint8 format
@@ -57,6 +60,7 @@ import glob
 import shutil
 import time
 import numpy as np
+import multiprocessing as multi
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -75,9 +79,12 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20200302; author="Y. Morishita"
+    ver=1.2; date=20200909; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
+
+    ### For parallel processing
+    global ifgdates2, in_dir, out_dir, length, width, x1, x2, y1, y2,cycle
 
 
     #%% Set default
@@ -85,12 +92,13 @@ def main(argv=None):
     out_dir = []
     range_str = []
     range_geo_str = []
+    n_para = len(os.sched_getaffinity(0))
 
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:r:g:", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hi:o:r:g:", ["help", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -105,6 +113,8 @@ def main(argv=None):
                 range_str = a
             elif o == '-g':
                 range_geo_str = a
+            elif o == '--n_para':
+                n_para = int(a)
 
         if not in_dir:
             raise Usage('No input directory given, -i is not optional!')
@@ -257,39 +267,15 @@ def main(argv=None):
     if n_ifg-n_ifg2 > 0:
         print("  {0:3}/{1:3} clipped unw and cc already exist. Skip".format(n_ifg-n_ifg2, n_ifg), flush=True)
 
-    ### Clip    
-    for ifgix, ifgd in enumerate(ifgdates2): 
-        if np.mod(ifgix,100) == 0:
-            print("  {0:3}/{1:3}th unw...".format(ifgix, n_ifg2), flush=True)
-    
-        unwfile = os.path.join(in_dir, ifgd, ifgd+'.unw')
-        ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
-        
-        unw = io_lib.read_img(unwfile, length, width)
-        if os.path.getsize(ccfile) == length*width:
-            ccformat = np.uint8
-        elif os.path.getsize(ccfile) == length*width*4:
-            ccformat = np.float32
-        else:
-            print("ERROR: unkown file format for {}".format(ccfile), file=sys.stderr)
-            continue
-        coh = io_lib.read_img(ccfile, length, width, dtype=ccformat)
-
-        ### Clip
-        unw = unw[y1:y2, x1:x2]
-        coh = coh[y1:y2, x1:x2]
-
-        ### Output
-        out_dir1 = os.path.join(out_dir, ifgd)
-        if not os.path.exists(out_dir1): os.mkdir(out_dir1)
-        
-        unw.tofile(os.path.join(out_dir1, ifgd+'.unw'))
-        coh.tofile(os.path.join(out_dir1, ifgd+'.cc'))
-
-        ## Output png for corrected unw
-        pngfile = os.path.join(out_dir1, ifgd+'.unw.png')
-        title = '{} ({}pi/cycle)'.format(ifgd, cycle*2)
-        plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, 'insar', title, -np.pi, np.pi, cbar=False)
+    if n_ifg2 > 0:
+        ### Clip with parallel processing
+        if n_para > n_ifg2:
+            n_para = n_ifg2
+            
+        print('  {} parallel processing...'.format(n_para), flush=True)
+        p = multi.Pool(n_para)
+        p.map(clip_wrapper, range(n_ifg2))
+        p.close()
 
 
     #%% Finish
@@ -301,6 +287,42 @@ def main(argv=None):
 
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
     print('Output directory: {}\n'.format(os.path.relpath(out_dir)))
+
+
+#%%
+def clip_wrapper(ifgix):
+    if np.mod(ifgix, 100) == 0:
+        print("  {0:3}/{1:3}th unw...".format(ifgix, len(ifgdates2)), flush=True)
+
+    ifgd = ifgdates2[ifgix]
+    unwfile = os.path.join(in_dir, ifgd, ifgd+'.unw')
+    ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
+    
+    unw = io_lib.read_img(unwfile, length, width)
+    if os.path.getsize(ccfile) == length*width:
+        ccformat = np.uint8
+    elif os.path.getsize(ccfile) == length*width*4:
+        ccformat = np.float32
+    else:
+        print("ERROR: unkown file format for {}".format(ccfile), file=sys.stderr)
+        return
+    coh = io_lib.read_img(ccfile, length, width, dtype=ccformat)
+
+    ### Clip
+    unw = unw[y1:y2, x1:x2]
+    coh = coh[y1:y2, x1:x2]
+
+    ### Output
+    out_dir1 = os.path.join(out_dir, ifgd)
+    if not os.path.exists(out_dir1): os.mkdir(out_dir1)
+    
+    unw.tofile(os.path.join(out_dir1, ifgd+'.unw'))
+    coh.tofile(os.path.join(out_dir1, ifgd+'.cc'))
+
+    ## Output png for corrected unw
+    pngfile = os.path.join(out_dir1, ifgd+'.unw.png')
+    title = '{} ({}pi/cycle)'.format(ifgd, cycle*2)
+    plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, 'insar', title, -np.pi, np.pi, cbar=False)
 
 
 #%% main
