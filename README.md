@@ -47,7 +47,7 @@ The [Scientific Colour Maps](http://www.fabiocrameri.ch/colourmaps.php) ([Cramer
 
 ##### September 2020
 
-- Speed up Step 1-3
+- Speed up Steps 0-2 to 0-5, 1-2, 1-3, and 1-6 by parallel processing
 
 ##### May 2020
 
