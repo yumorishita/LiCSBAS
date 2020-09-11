@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200703 Yu Morishita, GSI
+v1.3.1 20200911 Yu Morishita, GSI
 
 ========
 Overview
@@ -38,12 +38,14 @@ LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
- -c  Threshold of average coherence (Default: 0.1)
- -u  Threshold of coverage of unw data (Default: 0.5)
+ -c  Threshold of average coherence (Default: 0.05)
+ -u  Threshold of coverage of unw data (Default: 0.3)
 
 """
 #%% Change log
 '''
+v1.3.1 20200911 Yu Morioshita, GSI
+ - Change default to -c 0.05 -u 0.3
 v1.3 20200703 Yu Morioshita, GSI
  - Replace problematic terms
 v1.2 20200225 Yu Morishita, Uni of Leeds and GSI
@@ -81,7 +83,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200703; author="Y. Morishita"
+    ver="1.3.1"; date=20200911; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -89,8 +91,8 @@ def main(argv=None):
     #%% Set default
     ifgdir = []
     tsadir = []
-    coh_thre = 0.1
-    unw_cov_thre = 0.5
+    coh_thre = 0.05
+    unw_cov_thre = 0.3
 
 
     #%% Read options

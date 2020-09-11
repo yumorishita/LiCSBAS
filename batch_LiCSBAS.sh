@@ -38,8 +38,8 @@ p05_clip_range=""	# e.g. 10:100/20:200 (ix start from 0)
 p05_clip_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 
 ### Frequently used options. If blank, use default. ###
-p11_unw_thre=""	# default: 0.5
-p11_coh_thre=""	# default: 0.1
+p11_unw_thre=""	# default: 0.3
+p11_coh_thre=""	# default: 0.05
 p12_loop_thre=""	# default: 1.5 rad
 p15_coh_thre=""	# default: 0.05
 p15_n_unw_r_thre=""	# default: 1.5
@@ -47,7 +47,7 @@ p15_vstd_thre=""	# default: 100 mm/yr
 p15_maxTlen_thre=""	# default: 1 yr
 p15_n_gap_thre=""	# default: 10
 p15_stc_thre=""	# default: 5 mm
-p15_n_ifg_noloop_thre=""	# default: 10
+p15_n_ifg_noloop_thre=""	# default: 50
 p15_n_loop_err_thre=""	# default: 5
 p15_resid_rms_thre=""	# default: 2 mm
 p16_filtwidth_km=""	# default: 2 km

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.8 20200902 Yu Morishita, GSI
+v1.8.1 20200911 Yu Morishita, GSI
 
 ========
 Overview
@@ -48,12 +48,14 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
                  (Default: do auto adjust)
  
  Default thresholds for L-band:
-   C-band : -c 0.05 -u 1.5 -v 100 -T 1 -g 10 -s 5  -i 10 -l 5 -r 2
-   L-band : -c 0.01 -u 1   -v 200 -T 1 -g 1  -s 10 -i 10 -l 1 -r 10
+   C-band : -c 0.05 -u 1.5 -v 100 -T 1 -g 10 -s 5  -i 50 -l 5 -r 2
+   L-band : -c 0.01 -u 1   -v 200 -T 1 -g 1  -s 10 -i 50 -l 1 -r 10
  
 """
 #%% Change log
 '''
+v1.8.1 20200911 Yu Morishita, GSI
+ - Change default to -i 50
 v1.8 20200902 Yu Morishita, GSI
  - Use nearest interpolation to avoid expanded nan
 v1.7 20200224 Yu Morishita, Uni of Leeds and GSI
@@ -118,7 +120,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.8; date=20200902; author="Y. Morishita"
+    ver="1.8.1"; date=20200911; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -217,7 +219,7 @@ def main(argv=None):
     
     #%% Determine default thretholds depending on frequency band
     if not 'maxTlen' in thre_dict: thre_dict['maxTlen'] = 1
-    if not 'n_ifg_noloop' in thre_dict: thre_dict['n_ifg_noloop'] = 10
+    if not 'n_ifg_noloop' in thre_dict: thre_dict['n_ifg_noloop'] = 50
 
     if wavelength > 0.2: ## L-band
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.01
