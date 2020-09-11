@@ -8,6 +8,9 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.6 20200911 Yu Morioshita, GSI
+ - STDOUT time and size in download_data
+ - Add convert_size
 v1.5 20200828 Yu Morioshita, GSI
  - Update for matplotlib >= 3.3
  - Use nearest interpolation for insar cmap to avoid aliasing
@@ -26,7 +29,10 @@ v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
 import os
 import sys
 import re
+import time
 import requests
+import dateutil
+import datetime as dt
 import numpy as np
 import statsmodels.api as sm
 import warnings
@@ -42,6 +48,35 @@ def bl2xy(lon, lat, width, length, lat1, postlat, lon1, postlon):
     y = int(np.round((lat - lat1)/postlat))
     
     return [x, y]
+
+
+#%%
+def comp_size_time(file_remote, file_local):
+    """
+    Compare size and time of remote and local files.
+    Returns:
+        0 : Size is identical and local time is new
+        1 : Size is not identical
+        2 : Size is identical but remote time is new
+        3 : Remote not exist
+    """
+
+    response = requests.head(file_remote, allow_redirects=True)
+    
+    if response.status_code != 200:
+        return 3
+
+    size_remote = int(response.headers.get("Content-Length"))
+    size_local = os.path.getsize(file_local)
+    if size_remote != size_local: ### Different size
+        return 1
+
+    time_remote = dateutil.parser.parse(response.headers.get("Last-Modified"))
+    time_local = dt.datetime.fromtimestamp(os.path.getmtime(file_local), dt.timezone.utc)
+    if time_remote > time_local: ### New file
+        return 2
+
+    return 0
 
 
 #%%
@@ -88,22 +123,40 @@ def cmap_insar():
     return cdict
 
 
+#%%
+def convert_size(size_bytes):
+   if size_bytes == 0:
+       return "0B"
+   size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+   i = int(np.floor(np.log(size_bytes)/np.log(1024)))
+   p = np.power(1024, i)
+   s = round(size_bytes / p, 2)
+   return "%s%s" % (s, size_name[i])
+
+
 #%% 
 def download_data(url, file):
     try:
-        with requests.get(url) as res:
+       start = time.time() 
+       with requests.get(url) as res:
             res.raise_for_status()
             with open(file, "wb") as output:
                 output.write(res.content)
+       elapsed = int(time.time()-start)
+       if elapsed==0: elapsed=elapsed+1
+       fsize = convert_size(os.path.getsize(file))
+       speed = convert_size(int(os.path.getsize(file)/elapsed))
+       print('  {}, {}, {}s, {}/s'.format(os.path.basename(file),
+                                          fsize, elapsed, speed))
 
-#    except requests.exceptions.RequestException as error:
     except:
         print(
             "    Error while downloading from {}".format(url),
             file=sys.stderr,
             flush=True,
         )
-#        raise SystemExit(error)
+        return
+
 
 
 #%%

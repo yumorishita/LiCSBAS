@@ -60,6 +60,7 @@ p01_frame=""	# e.g. 021D_04972_131213
 p01_start_date=""	# default: 20141001
 p01_end_date=""	# default: today
 p01_get_gacos="y" # y/n 
+p01_n_para=""	# default: 4
 p02_GEOCdir=""	# default: GEOC
 p02_GEOCmldir=""	# default: GEOCml$nlook
 p02_frame=""	# e.g. 021D_04972_131213
@@ -119,6 +120,7 @@ if [ $start_step -le 01 -a $end_step -ge 01 ];then
   if [ ! -z $p01_start_date ];then p01_op="$p01_op -s $p01_start_date"; fi
   if [ ! -z $p01_end_date ];then p01_op="$p01_op -e $p01_end_date"; fi
   if [ $p01_get_gacos == "y" ];then p01_op="$p01_op --get_gacos"; fi
+  if [ ! -z $p01_n_para ];then p01_op="$p01_op --n_para $p01_n_para"; fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS01_get_geotiff.py $p01_op"
