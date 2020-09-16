@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5 20200909 Yu Morishita, GSI
+v1.5.1 20200916 Yu Morishita, GSI
 
 ========
 Overview
@@ -47,6 +47,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f frameID] [--n_para
 """
 #%% Change log
 '''
+v1.5.1 20200916 Yu Morishita, GSI
+ - Bug fix in handling cc float
 v1.5 20200909 Yu Morishita, GSI
  - Parallel processing
 v1.4 20200228 Yu Morishita, Uni of Leeds and GSI
@@ -94,7 +96,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.5; date=20200909; author="Y. Morishita"
+    ver="1.5.1"; date=20200916; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -434,9 +436,8 @@ def convert_wrapper(i):
 
     try:
         cc = gdal.Open(cc_tiffile).ReadAsArray()
-        #if cc.dtype == np.uint8: ## New format since 201910
-            #cc = cc.astype(np.float32)/255
-        #cc[cc==0] = np.nan
+        if cc.dtype == np.float32:
+            cc = cc*255 ## 0-1 -> 0-255 to output in uint8
     except: ## if broken
         print ('  {} cannot open. Skip'.format(ifgd+'.geo.cc.tif'), flush=True)
         shutil.rmtree(ifgdir1)
@@ -448,10 +449,10 @@ def convert_wrapper(i):
         cc = cc.astype(np.float32)
         cc[cc==0] = np.nan
         cc = tools_lib.multilook(cc, nlook, nlook, n_valid_thre)
-        cc = cc.astype(np.uint8) ##nan->0, max255, auto-floored
 
     ### Output float
     unw.tofile(unwfile)
+    cc = cc.astype(np.uint8) ##nan->0, max255, auto-floored
     cc.tofile(ccfile)
 
     ### Make png

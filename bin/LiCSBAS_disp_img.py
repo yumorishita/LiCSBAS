@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.8 20200902 Yu Morishita, GSI
+v1.8.1 20200915 Yu Morishita, GSI
 
 ========
 Overview
@@ -25,7 +25,7 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
  --auto_crange  % of color range used for automatic determination (Default: 99)
  --cycle        Value*2pi/cycle only if cyclic cmap (i.e., insar or SCM.*O*)
                 (Default: 3 (6pi/cycle))
- --nodata       Nodata value (Default: 0)
+ --nodata       Nodata value (only for float32) (Default: 0)
  --bigendian    If input file is in big endian
  --png          Save png (pdf etc also available) instead of displaying
  --kmz          Save kmz (need EQA.dem_par for -p option)
@@ -34,6 +34,8 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 #%% Change log
 '''
+v1.8.1 20200916 Yu Morishita, GSI
+ - Small bug fix to display uint8
 v1.8 20200902 Yu Morishita, GSI
  - Always use nearest interpolation to avoid expanded nan
 v1.7 20200828 Yu Morishita, GSI
@@ -100,7 +102,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.8; date=20200902; author="Y. Morishita"
+    ver="1.8.1"; date=20200916; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -219,8 +221,7 @@ if __name__ == "__main__":
         data = io_lib.read_img(infile, length, width, np.uint8, endian=endian)
     else:
         data = io_lib.read_img(infile, length, width, endian=endian)
-    
-    data[data==nodata] = np.nan
+        data[data==nodata] = np.nan
 
     if cmap_name == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
         cyclic= True
