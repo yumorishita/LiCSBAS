@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4 20200909 Yu Morishita, GSI
+v1.4.1 20200925 Yu Morishita, GSI
 
 ========
 Overview
@@ -72,6 +72,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.1 20200925 Yu Morishita, GSI
+ - Small bug fix in n_para
 v1.4 20200909 Yu Morishita, GSI
  - n_core -> n_para
  - Parallelize making png
@@ -123,12 +125,12 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.4; date=20200909; author="Y. Morishita"
+    ver="1.4.1"; date=20200925; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ## For parallel processing
-    global n_para, G, Aloop, unwpatch, imdates, incdir, ifgdir, length, width,\
+    global n_para_gap, G, Aloop, unwpatch, imdates, incdir, ifgdir, length, width,\
         coef_r2m, ifgdates, ref_unw, cycle, keep_incfile, resdir, restxtfile, \
         cmap_vel, wavelength
 
@@ -323,7 +325,6 @@ def main(argv=None):
     ### Construct G and Aloop matrix for increment and n_gap
     G = inv_lib.make_sb_matrix(ifgdates)
     Aloop = loop_lib.make_loop_matrix(ifgdates)
-    n_loop = Aloop.shape[0] # (n_loop,n_ifg)
 
 
     #%% Plot network
@@ -509,14 +510,17 @@ def main(argv=None):
         n_pt_patch_min = 1000
         if n_pt_patch_min*n_para > n_pt_unnan:
             ## Too much n_para
-            n_para = int(np.floor(n_pt_unnan/n_pt_patch_min))
+            n_para_gap = int(np.floor(n_pt_unnan/n_pt_patch_min))
+            if n_para_gap == 0: n_para_gap = 1 
+        else:
+            n_para_gap = n_para
 
         print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
-        print('  with {} parallel processing...'.format(n_para), flush=True)
+        print('  with {} parallel processing...'.format(n_para_gap), flush=True)
 
         ### Devide unwpatch by n_para for parallel processing
-        p = multi.Pool(n_para)
-        _result = np.array(p.map(count_gaps_wrapper, range(n_para)), dtype=object)
+        p = multi.Pool(n_para_gap)
+        _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)), dtype=object)
         p.close()
     
         ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt        
@@ -726,8 +730,8 @@ def main(argv=None):
 
 #%% 
 def count_gaps_wrapper(i):
-    print("    Running {:2}/{:2}th patch...".format(i+1, n_para), flush=True)
-    n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_para))
+    print("    Running {:2}/{:2}th patch...".format(i+1, n_para_gap), flush=True)
+    n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_para_gap))
     n_im = G.shape[1]+1
     n_loop, n_ifg = Aloop.shape
     
