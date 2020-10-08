@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200907 Yu Morishita, GSI
+v1.4 20201007 Yu Morishita, GSI
 
 ========
 Overview
@@ -55,11 +55,15 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--n_para int]
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
  -l  Threshold of RMS of loop phase (Default: 1.5 rad)
+ --multi_prime  Multi Prime mode (take into account bias in loop)
  --n_para  Number of parallel processing (Default: # of usable CPU)
-
+                                         
 """
 #%% Change log
 '''
+v1.4 20201007 Yu Morishita, GSI
+ - Add --multi_prime option
+ - Parallel processing in 2-4th loop
 v1.3 20200907 Yu Morishita, GSI
  - Parallel processing in 1st loop
 v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
@@ -106,25 +110,28 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200907; author="Y. Morishita"
+    ver=1.4; date=20201007; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
-    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir ## for parallel processing
+    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, \
+        multi_prime, bad_ifg, noref_ifg, bad_ifg_all, refy1, refy2, refx1, refx2 ## for parallel processing
 
     #%% Set default
     ifgdir = []
     tsadir = []
     loop_thre = 1.5
+    multi_prime = False
     n_para = len(os.sched_getaffinity(0))
 
+    cycle = 3 # 2pi*3/cycle
     cmap_noise = 'viridis'
     cmap_noise_r = 'viridis_r'
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:t:l:", ["help", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hd:t:l:", ["help", "multi_prime", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -137,6 +144,8 @@ def main(argv=None):
                 tsadir = a
             elif o == '-l':
                 loop_thre = float(a)
+            elif o == '--multi_prime':
+                multi_prime = True
             elif o == '--n_para':
                 n_para = int(a)
 
@@ -248,15 +257,16 @@ def main(argv=None):
 
 
     #%% 1st loop closure check. First without reference
+    _n_para = n_para if n_para < n_loop else n_loop
     print('\n1st Loop closure check and make png for all possible {} loops,'.format(n_loop), flush=True)
-    print('with {} parallel processing...'.format(n_para), flush=True)
+    print('with {} parallel processing...'.format(_n_para), flush=True)
     
     bad_ifg_cand = []
     good_ifg = []
 
     ### Parallel processing
-    p = multi.Pool(n_para)
-    loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=object)
+    p = multi.Pool(_n_para)
+    loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=np.float32)
     p.close()
 
 
@@ -300,37 +310,22 @@ def main(argv=None):
 
 
     #%% 2nd loop closure check without bad ifgs to define stable ref area
+    ### Devide n_loop for paralell proc
+    _n_para2, args = tools_lib.get_patchrow(1, n_loop, 2**20/4, int(np.ceil(n_loop/n_para)))
+
     print('\n2nd Loop closure check without bad ifgs to define ref area...', flush=True)
-    ns_loop_ph = np.zeros((length, width), dtype=np.float32)
-    ns_bad_loop = np.zeros((length, width), dtype=np.int16)
-    loop_ph_rms_points = np.zeros((length, width), dtype=np.float32)
+    print('with {} parallel processing...'.format(_n_para2), flush=True)
 
-    for i in range(n_loop):
-        if np.mod(i, 100) == 0:
-            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+    ### Parallel processing
+    p = multi.Pool(_n_para2)
+    res = np.array(p.map(loop_closure_2nd_wrapper, args), dtype=np.float32)
+    p.close()
 
-        ### Read unw
-        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
-
-        ### Skip if bad ifg is included
-        if ifgd12 in bad_ifg or ifgd23 in bad_ifg or ifgd13 in bad_ifg:
-            continue
-
-        ## Calculate loop phase and rms at points
-        loop_ph = unw12+unw23-unw13
-        loop_2pin = int(np.round(np.nanmedian(loop_ph)/(2*np.pi)))*2*np.pi
-        loop_ph = loop_ph-loop_2pin #unbias
-        ns_loop_ph = ns_loop_ph + ~np.isnan(loop_ph)
-
-        loop_ph_sq = loop_ph**2
-        loop_ph_sq[np.isnan(loop_ph_sq)] = 0
-        loop_ph_rms_points = loop_ph_rms_points + loop_ph_sq
-
-        ns_bad_loop = ns_bad_loop+(loop_ph_sq>np.pi**2) #suspected unw error
-#        ns_bad_loop = ns_bad_loop+(np.abs(loop_ph)>loop_thre)
-        ## multiple nan seem to generate RuntimeWarning
-
+    ns_loop_ph = np.sum(res[:, 0, :, :,], axis=0)
     ns_loop_ph[ns_loop_ph==0] = np.nan # To avoid 0 division
+
+    ns_bad_loop = np.sum(res[:, 1, :, :,], axis=0)
+    loop_ph_rms_points = np.sum(res[:, 2, :, :,], axis=0)
     loop_ph_rms_points = np.sqrt(loop_ph_rms_points/ns_loop_ph)
 
     ### Find stable ref area which have all n_unw and minimum ns_bad_loop and loop_ph_rms_points
@@ -385,38 +380,20 @@ def main(argv=None):
 
     #%% 3rd loop closure check without bad ifgs wrt ref point
     print('\n3rd loop closure check taking into account ref phase...', flush=True)
+    print('with {} parallel processing...'.format(_n_para), flush=True)
+
+    ### Parallel processing
+    p = multi.Pool(_n_para)
+    loop_ph_rms_ifg2 = list(np.array(p.map(loop_closure_3rd_wrapper, range(n_loop)), dtype=np.float32))
+    p.close()
+
     bad_ifg_cand2 = []
     good_ifg2 = []
-    loop_ph_rms_ifg2 = []
-
+    ### List as good or bad candidate
     for i in range(n_loop):
-        if np.mod(i, 100) == 0:
-            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
-
-        ### Read unw
-        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
-
-        ### Skip if bad ifg is included
-        if ifgd12 in bad_ifg or ifgd23 in bad_ifg or ifgd13 in bad_ifg:
-            loop_ph_rms_ifg2.append('--')
-            continue
-
-        ### Skip if noref ifg is included
-        if ifgd12 in noref_ifg or ifgd23 in noref_ifg or ifgd13 in noref_ifg:
-            loop_ph_rms_ifg2.append('--')
-            continue
-
-        ## Skip if no data in ref area in any unw. It is bad data.
-        ref_unw12 = np.nanmean(unw12[refy1:refy2, refx1:refx2])
-        ref_unw23 = np.nanmean(unw23[refy1:refy2, refx1:refx2])
-        ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
-
-        ## Calculate loop phase taking into account ref phase
-        loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
-        loop_ph_rms_ifg2.append(np.sqrt(np.nanmean((loop_ph)**2)))
-
-        ### List as good or bad candidate
-        if loop_ph_rms_ifg2[i] >= loop_thre: #Bad loop including bad ifg.
+        if np.isnan(loop_ph_rms_ifg2[i]): # Skipped
+            loop_ph_rms_ifg2[i] = '--' ## Replace
+        elif loop_ph_rms_ifg2[i] >= loop_thre: #Bad loop including bad ifg.
             bad_ifg_cand2.extend([ifgd12, ifgd23, ifgd13])
         else:
             good_ifg2.extend([ifgd12, ifgd23, ifgd13])
@@ -466,31 +443,15 @@ def main(argv=None):
 
     #%% 4th loop to be used to calc n_loop_err and n_ifg_noloop
     print('\n4th loop to compute statistics...', flush=True)
-    ns_loop_err = np.zeros((length, width), dtype=np.int16)
+    print('with {} parallel processing...'.format(_n_para2), flush=True)
 
-    for i in range(n_loop):
-        if np.mod(i, 100) == 0:
-            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+    ### Parallel processing
+    p = multi.Pool(_n_para2)
+    res = np.array(p.map(loop_closure_4th_wrapper, args), dtype=np.int16)
+    p.close()
 
-        ### Read unw
-        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+    ns_loop_err = np.sum(res[:, :, :,], axis=0)
 
-        ### Skip if bad ifg is included
-        if ifgd12 in bad_ifg_all or ifgd23 in bad_ifg_all or ifgd13 in bad_ifg_all:
-            continue
-
-        ## Compute ref
-        ref_unw12 = np.nanmean(unw12[refy1:refy2, refx1:refx2])
-        ref_unw23 = np.nanmean(unw23[refy1:refy2, refx1:refx2])
-        ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
-
-        ## Calculate loop phase taking into account ref phase
-        loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
-
-        ## Count number of loops with suspected unwrap error (>pi)
-        loop_ph[np.isnan(loop_ph)] = 0 #to avoid warning
-        ns_loop_err = ns_loop_err+(np.abs(loop_ph)>np.pi) #suspected unw error
-        
 
     #%% Output loop info, move bad_loop_png
     loop_info_file = os.path.join(loopdir, 'loop_info.txt')
@@ -713,20 +674,138 @@ def loop_closure_1st_wrapper(i):
     loop_ph = unw12+unw23-unw13
     loop_2pin = int(np.round(np.nanmedian(loop_ph)/(2*np.pi)))*2*np.pi
     loop_ph = loop_ph-loop_2pin #unbias 2pi x n
-    loop_ph_rms_ifg = np.sqrt(np.nanmean(loop_ph**2))
+
+    if multi_prime:
+        bias = np.nanmedian(loop_ph)
+        loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+
+    rms = np.sqrt(np.nanmean(loop_ph**2))
 
     ### Output png. If exist in old, move to save time
-    oldpng = os.path.join(loop_pngdir+'_old/', ifgd12[:8]+'_'+ifgd23[:8]+'_'+ifgd13[-8:]+'_loop.png')
+    imd1 = ifgd12[:8]
+    imd2 = ifgd23[:8]
+    imd3 = ifgd23[-8:]
+    png = os.path.join(loop_pngdir, imd1+'_'+imd2+'_'+imd3+'_loop.png')
+    oldpng = os.path.join(loop_pngdir+'_old/', imd1+'_'+imd2+'_'+imd3+'_loop.png')
     if os.path.exists(oldpng):
         ### Just move from old png
         shutil.move(oldpng, loop_pngdir)
     else:
         ### Make png. Take time a little.
-        loop_lib.make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_pngdir)
+        titles4 = ['{} ({}*2pi/cycle)'.format(ifgd12, cycle),
+                   '{} ({}*2pi/cycle)'.format(ifgd23, cycle),
+                   '{} ({}*2pi/cycle)'.format(ifgd13, cycle),]
+        if multi_prime:
+            titles4.append('Loop (STD={:.2f}rad, bias={:.2f}rad)'.format(rms, bias))
+        else:
+            titles4.append('Loop phase (RMS={:.2f}rad)'.format(rms))
+        
+        loop_lib.make_loop_png(unw12, unw23, unw13, loop_ph, png, titles4, cycle)
+        
+    return rms
 
-    return loop_ph_rms_ifg
+
+#%% 
+def loop_closure_2nd_wrapper(args):
+    i0, i1 = args
+    n_loop = Aloop.shape[0]
+    ns_loop_ph1 = np.zeros((length, width), dtype=np.float32)
+    ns_bad_loop1 = np.zeros((length, width), dtype=np.float32)
+    loop_ph_rms_points1 = np.zeros((length, width), dtype=np.float32)
+    
+    for i in range(i0, i1):
+        if np.mod(i, 100) == 0:
+            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+
+        ### Read unw
+        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+
+        ### Skip if bad ifg is included
+        if ifgd12 in bad_ifg or ifgd23 in bad_ifg or ifgd13 in bad_ifg:
+            continue
+
+        ## Calculate loop phase and rms at points
+        loop_ph = unw12+unw23-unw13
+        loop_2pin = int(np.round(np.nanmedian(loop_ph)/(2*np.pi)))*2*np.pi
+        loop_ph = loop_ph-loop_2pin #unbias
+        
+        if multi_prime:
+            bias = np.nanmedian(loop_ph)
+            loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+
+        ns_loop_ph1 = ns_loop_ph1 + ~np.isnan(loop_ph)
+
+        loop_ph_sq = loop_ph**2
+        loop_ph_sq[np.isnan(loop_ph_sq)] = 0
+        loop_ph_rms_points1 = loop_ph_rms_points1 + loop_ph_sq
+
+        ns_bad_loop1 = ns_bad_loop1+(loop_ph_sq>np.pi**2) #suspected unw error
+#        ns_bad_loop = ns_bad_loop+(np.abs(loop_ph)>loop_thre)
+        ## multiple nan seem to generate RuntimeWarning
+        
+    return ns_loop_ph1, ns_bad_loop1, loop_ph_rms_points1
+   
+ 
+#%%
+def loop_closure_3rd_wrapper(i):
+    n_loop = Aloop.shape[0]
+    
+    if np.mod(i, 100) == 0:
+        print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+
+    ### Read unw
+    unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+
+    ### Skip if bad ifg is included
+    if ifgd12 in bad_ifg or ifgd23 in bad_ifg or ifgd13 in bad_ifg:
+        return np.nan
+
+    ### Skip if noref ifg is included
+    if ifgd12 in noref_ifg or ifgd23 in noref_ifg or ifgd13 in noref_ifg:
+        return np.nan
+
+    ## Skip if no data in ref area in any unw. It is bad data.
+    ref_unw12 = np.nanmean(unw12[refy1:refy2, refx1:refx2])
+    ref_unw23 = np.nanmean(unw23[refy1:refy2, refx1:refx2])
+    ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
+
+    ## Calculate loop phase taking into account ref phase
+    loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
+    return np.sqrt(np.nanmean((loop_ph)**2))
 
 
+#%% 
+def loop_closure_4th_wrapper(args):
+    i0, i1 = args
+    n_loop = Aloop.shape[0]
+    ns_loop_err1 = np.zeros((length, width), dtype=np.int16)
+
+    for i in range(i0, i1):
+        if np.mod(i, 100) == 0:
+            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+
+        ### Read unw
+        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+
+        ### Skip if bad ifg is included
+        if ifgd12 in bad_ifg_all or ifgd23 in bad_ifg_all or ifgd13 in bad_ifg_all:
+            continue
+
+        ## Compute ref
+        ref_unw12 = np.nanmean(unw12[refy1:refy2, refx1:refx2])
+        ref_unw23 = np.nanmean(unw23[refy1:refy2, refx1:refx2])
+        ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
+
+        ## Calculate loop phase taking into account ref phase
+        loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
+
+        ## Count number of loops with suspected unwrap error (>pi)
+        loop_ph[np.isnan(loop_ph)] = 0 #to avoid warning
+        ns_loop_err1 = ns_loop_err1+(np.abs(loop_ph)>np.pi) #suspected unw error
+
+    return ns_loop_err1
+        
+        
 #%% main
 if __name__ == "__main__":
     sys.exit(main())
