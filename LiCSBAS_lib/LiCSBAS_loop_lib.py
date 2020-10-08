@@ -8,6 +8,8 @@ Python3 library of loop closure check functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.5 20201006 Yu Morishita, GSI
+ - Update make_loop_png
 v1.4 20200828 Yu Morishita, GSI
  - Update for matplotlib >= 3.3
  - Use nearest interpolation for insar cmap to avoid aliasing
@@ -117,20 +119,13 @@ def identify_bad_ifg(bad_ifg_cand, good_ifg):
 
 
 #%% 
-def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_pngdir):
+def make_loop_png(unw12, unw23, unw13, loop_ph, png, titles4, cycle):
     ### Load color map for InSAR
     cdict = tools_lib.cmap_insar()
     plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
-
-    rms = np.sqrt(np.nanmean(loop_ph**2))
+    plt.rcParams['axes.titlesize'] = 10
 
     ### Settings    
-    imd1 = ifgd12[:8]
-    imd2 = ifgd23[:8]
-    imd3 = ifgd23[-8:]
-    pngname = os.path.join(loop_pngdir, imd1+'_'+imd2+'_'+imd3+'_loop.png')
-    cycle = 3 # 2pi*3/cycle
-    titles = [ifgd12, ifgd23, ifgd13]
     data = [unw12, unw23, unw13]
 
     length, width = unw12.shape
@@ -151,17 +146,18 @@ def make_loop_png(ifgd12, ifgd23, ifgd13, unw12, unw23, unw13, loop_ph, loop_png
         data_wrapped = np.angle(np.exp(1j*(data[i]/cycle))*cycle)
         ax = fig.add_subplot(2, 2, i+1) #index start from 1
         ax.imshow(data_wrapped, vmin=-np.pi, vmax=+np.pi, cmap='insar', interpolation='nearest')
-        ax.set_title('{}'.format(titles[i]))
+        ax.set_title('{}'.format(titles4[i]))
         ax.set_xticklabels([])
         ax.set_yticklabels([])
 
     ## loop phase
     ax = fig.add_subplot(2, 2, 4) #index start from 1
     ax.imshow(loop_ph, vmin=-np.pi, vmax=+np.pi, cmap=SCM.vik, interpolation='nearest')
-    ax.set_title('Loop phase (RMS={:.2f}rad)'.format(rms))
+    ax.set_title('{}'.format(titles4[3]))
     ax.set_xticklabels([])
     ax.set_yticklabels([])
 
     plt.tight_layout()
-    plt.savefig(pngname)
+    plt.savefig(png)
     plt.close()
+
