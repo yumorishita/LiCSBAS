@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5.1 20200916 Yu Morishita, GSI
+v1.6 20201008 Yu Morishita, GSI
 
 ========
 Overview
@@ -35,18 +35,22 @@ Outputs in GEOCml*/ (downsampled if indicated):
 =====
 Usage
 =====
-LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f frameID] [--n_para int]
+LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f frameID] [--freq float] [--n_para int]
 
  -i  Path to the input GEOC dir containing stack of geotiff data
  -o  Path to the output GEOCml dir (Default: GEOCml[nlook])
  -n  Number of donwsampling factor (Default: 1, no donwsampling)
  -f  Frame ID (e.g., 021D_04972_131213). Used only for downloading ENU
      (Default: Read from directory name)
+ --freq    Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
+           (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
  --n_para  Number of parallel processing (Default: # of usable CPU)
 
 """
 #%% Change log
 '''
+v1.6 20201008 Yu Morishita, GSI
+ - Add --freq option
 v1.5.1 20200916 Yu Morishita, GSI
  - Bug fix in handling cc float
 v1.5 20200909 Yu Morishita, GSI
@@ -96,7 +100,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.5.1"; date=20200916; author="Y. Morishita"
+    ver="1.6"; date=20201008; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -109,16 +113,18 @@ def main(argv=None):
     outdir = []
     nlook = 1
     frameID = []
+    radar_freq = 5.405e9
+    n_para = len(os.sched_getaffinity(0))
+
     cmap = 'insar'
     cycle = 3
     n_valid_thre = 0.5
-    n_para = len(os.sched_getaffinity(0))
 
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:n:f:", ["help", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hi:o:n:f:", ["help", "freq=", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -133,6 +139,8 @@ def main(argv=None):
                 nlook = int(a)
             elif o == '-f':
                 frameID = a
+            elif o == '--freq':
+                radar_freq = float(a)
             elif o == '--n_para':
                 n_para = int(a)
 
@@ -319,7 +327,7 @@ def main(argv=None):
     #%% EQA.dem_par, slc.mli.par
     if not os.path.exists(mlipar):
         print('\nCreate slc.mli.par', flush=True)
-        radar_freq = 5.405e9 ## fixed for Sentnel-1
+#        radar_freq = 5.405e9 ## fixed for Sentnel-1
 
         with open(mlipar, 'w') as f:
             print('range_samples:   {}'.format(width), file=f)
