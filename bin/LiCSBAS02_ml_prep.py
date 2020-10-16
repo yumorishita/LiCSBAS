@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.6 20201008 Yu Morishita, GSI
+v1.6.1 20201016 Yu Morishita, GSI
 
 ========
 Overview
@@ -49,6 +49,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f frameID] [--freq f
 """
 #%% Change log
 '''
+v1.6.1 20201016 Yu Morishita, GSI
+ - Deal with mli and hgt in other dtype
 v1.6 20201008 Yu Morishita, GSI
  - Add --freq option
 v1.5.1 20200916 Yu Morishita, GSI
@@ -100,7 +102,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.6"; date=20201008; author="Y. Morishita"
+    ver="1.6.1"; date=20201016; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -232,7 +234,7 @@ def main(argv=None):
     mlitif = os.path.join(geocdir, '{}.geo.mli.tif'.format(frameID))
     if os.path.exists(mlitif):
         print('\nCreate slc.mli', flush=True)
-        mli = gdal.Open(mlitif).ReadAsArray()
+        mli = np.float32(gdal.Open(mlitif).ReadAsArray())
         mli[mli==0] = np.nan
     
         if nlook != 1:
@@ -242,9 +244,10 @@ def main(argv=None):
         mlifile = os.path.join(outdir, 'slc.mli')
         mli.tofile(mlifile)
         mlipngfile = mlifile+'.png'
+        mli = np.log10(mli)
         vmin = np.nanpercentile(mli, 5)
         vmax = np.nanpercentile(mli, 95)
-        plot_lib.make_im_png(mli, mlipngfile, 'gray', 'MLI', vmin, vmax, cbar=True)
+        plot_lib.make_im_png(mli, mlipngfile, 'gray', 'MLI (log10)', vmin, vmax, cbar=True)
         print('  slc.mli[.png] created', flush=True)
 
 
@@ -252,7 +255,7 @@ def main(argv=None):
     hgttif = os.path.join(geocdir, '{}.geo.hgt.tif'.format(frameID))
     if os.path.exists(hgttif):
         print('\nCreate hgt', flush=True)
-        hgt = gdal.Open(hgttif).ReadAsArray()
+        hgt = np.float32(gdal.Open(hgttif).ReadAsArray())
         hgt[hgt==0] = np.nan
     
         if nlook != 1:

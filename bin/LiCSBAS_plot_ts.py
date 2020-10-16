@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.13 20200902 Yu Morishita, GSI
+v1.13.1 20201016 Yu Morishita, GSI
 
 ========
 Overview
@@ -54,6 +54,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
 """
 #%% Change log
 '''
+v1.13.1 20201016 Yu Morishita, GSI
+ - Use log10 to display mli
 v1.13 20200902 Yu Morishita, GSI
  - Use nearest interpolation to avoid expanded nan
 v1.12 20200827 Yu Morishita, GSI
@@ -461,7 +463,7 @@ if __name__ == "__main__":
     mapdict_unit = {}
     names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 
              'n_ifg_noloop', 'n_loop_err', 'resid', 'mli', 'hgt']
-    units = ['', '', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm', '', 'm']
+    units = ['', '', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm', 'log10', 'm']
     files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile, 
              stcfile, n_ifg_noloopfile, n_loop_errfile, residfile, mlifile, hgtfile]
 #    for name, file in zip(names, files):
@@ -645,6 +647,7 @@ if __name__ == "__main__":
             
         else:  ## Other noise indices
             data = mapdict_data[val_ind]*mask
+            if val_ind=='mli': data = np.log10(data)
             cmin_ind = np.nanpercentile(data*mask, 100-auto_crange)
             cmax_ind = np.nanpercentile(data*mask, auto_crange)
             if val_ind=='hgt': cmin_ind = -cmax_ind/3 ## bnecause 1/4 of terrain is blue
