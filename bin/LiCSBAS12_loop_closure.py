@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4 20201007 Yu Morishita, GSI
+v1.5 20201016 Yu Morishita, GSI
 
 ========
 Overview
@@ -61,6 +61,8 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--n_para int]
 """
 #%% Change log
 '''
+v1.5 20201016 Yu Morishita, GSI
+ - Bug fix in identifying bad_ifg_cand2
 v1.4 20201007 Yu Morishita, GSI
  - Add --multi_prime option
  - Parallel processing in 2-4th loop
@@ -110,7 +112,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.4; date=20201007; author="Y. Morishita"
+    ver=1.5; date=20201016; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -391,6 +393,13 @@ def main(argv=None):
     good_ifg2 = []
     ### List as good or bad candidate
     for i in range(n_loop):
+        ### Find index of ifg
+        ix_ifg12, ix_ifg23 = np.where(Aloop[i, :] == 1)[0]
+        ix_ifg13 = np.where(Aloop[i, :] == -1)[0][0]
+        ifgd12 = ifgdates[ix_ifg12]
+        ifgd23 = ifgdates[ix_ifg23]
+        ifgd13 = ifgdates[ix_ifg13]
+        
         if np.isnan(loop_ph_rms_ifg2[i]): # Skipped
             loop_ph_rms_ifg2[i] = '--' ## Replace
         elif loop_ph_rms_ifg2[i] >= loop_thre: #Bad loop including bad ifg.
