@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-v1.6.1 20201016 Yu Morishita, GSI
+v1.7 20201020 Yu Morishita, GSI
 
 ========
 Overview
 ========
 This script converts GeoTIFF files of unw and cc to float32 and uint8 format, respectively, for further time series analysis, and also downsamples (multilooks) data if specified. Existing files are not re-created to save time, i.e., only the newly available data will be processed.
 
-===============
+====================
 Input & output files
-===============
+====================
 Inputs:
  - GEOC/    
    - yyyymmdd_yyyymmdd/
@@ -17,8 +17,8 @@ Inputs:
      - yyyymmdd_yyyymmdd.geo.cc.tif
   [- *.geo.mli.tif]
   [- *.geo.hgt.tif]
-  [- *.geo.[E|N|U].tif] (if not exist, try to download from COMET-LiCS web)
-  [- baselines] (if not exist, try to download from COMET-LiCS web)
+  [- *.geo.[E|N|U].tif]
+  [- baselines]
   [- metadata.txt]
 
 Outputs in GEOCml*/ (downsampled if indicated):
@@ -27,21 +27,20 @@ Outputs in GEOCml*/ (downsampled if indicated):
    - yyyymmdd_yyyymmdd.cc (uint8)
  - baselines (may be dummy)
  - EQA.dem_par
- - slc.mli[.par|.png]
- - hgt[.png]
- - [E|N|U].geo (if exist)
+ - slc.mli.par
+ - slc.mli[.png] (if input exists)
+ - hgt[.png] (if input exists)
+ - [E|N|U].geo (if input exists)
  - no_unw_list.txt (if there are unavailable unw|cc)
 
 =====
 Usage
 =====
-LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f frameID] [--freq float] [--n_para int]
+LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_para int]
 
  -i  Path to the input GEOC dir containing stack of geotiff data
  -o  Path to the output GEOCml dir (Default: GEOCml[nlook])
  -n  Number of donwsampling factor (Default: 1, no donwsampling)
- -f  Frame ID (e.g., 021D_04972_131213). Used only for downloading ENU
-     (Default: Read from directory name)
  --freq    Radar frequency in Hz (Default: 5.405e9 for Sentinel-1)
            (e.g., 1.27e9 for ALOS, 1.2575e9 for ALOS-2/U, 1.2365e9 for ALOS-2/{F,W})
  --n_para  Number of parallel processing (Default: # of usable CPU)
@@ -49,6 +48,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [-f frameID] [--freq f
 """
 #%% Change log
 '''
+v1.7 20201020 Yu Morishita, GSI
+ - Remove -f option and not download tifs here
 v1.6.1 20201016 Yu Morishita, GSI
  - Deal with mli and hgt in other dtype
 v1.6 20201008 Yu Morishita, GSI
@@ -102,7 +103,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.6.1"; date=20201016; author="Y. Morishita"
+    ver="1.7"; date=20201020; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -114,7 +115,6 @@ def main(argv=None):
     geocdir = []
     outdir = []
     nlook = 1
-    frameID = []
     radar_freq = 5.405e9
     n_para = len(os.sched_getaffinity(0))
 
@@ -126,7 +126,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:n:f:", ["help", "freq=", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hi:o:n:", ["help", "freq=", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -139,8 +139,6 @@ def main(argv=None):
                 outdir = a
             elif o == '-n':
                 nlook = int(a)
-            elif o == '-f':
-                frameID = a
             elif o == '--freq':
                 radar_freq = float(a)
             elif o == '--n_para':
@@ -179,18 +177,6 @@ def main(argv=None):
     else:
         center_time = None
 
-    LiCSARweb = 'http://gws-access.ceda.ac.uk/public/nceo_geohazards/LiCSAR_products/'
-
-    ### Frame ID even if not used
-    if not frameID: ## if not specified
-        _tmp = re.findall(r'\d{3}[AD]_\d{5}_\d{6}', geocdir)
-        ##e.g., 021D_04972_131213
-        if len(_tmp)!=0: ## if not found, keep []
-             frameID = _tmp[0]
-             trackID = str(int(frameID[0:3]))
-    else:
-        trackID = str(int(frameID[0:3]))
-
 
     #%% ENU
     for ENU in ['E', 'N', 'U']:
@@ -200,20 +186,8 @@ def main(argv=None):
         ### Download if not exist
         if len(enutif)==0:
             print('  No *.geo.{}.tif found in {}'.format(ENU, os.path.basename(geocdir)), flush=True)
+            continue
 
-            if not frameID: ## if frameID not found above
-                print('  Frame ID cannot be identified from dir name!', file=sys.stderr)
-                print('  Use -f option if you need {}.geo'.format(ENU), file=sys.stderr)
-                continue
-
-            ### Download tif
-            url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', '{}.geo.{}.tif'.format(frameID, ENU))
-            enutif = os.path.join(geocdir, '{}.geo.{}.tif'.format(frameID, ENU))
-            if not tools_lib.download_data(url, enutif):
-                print('  Error while downloading from {}'.format(url), file=sys.stderr, flush=True)
-                continue
-            else:
-                print('  {} dowonloaded from LiCSAR-portal'.format(os.path.basename(url)), flush=True)
         else:
             enutif = enutif[0] ## first one
                 
@@ -231,9 +205,10 @@ def main(argv=None):
 
 
     #%% mli
-    mlitif = os.path.join(geocdir, '{}.geo.mli.tif'.format(frameID))
-    if os.path.exists(mlitif):
-        print('\nCreate slc.mli', flush=True)
+    print('\nCreate slc.mli', flush=True)
+    mlitif = glob.glob(os.path.join(geocdir, '*.geo.mli.tif'))
+    if len(mlitif)>0:
+        mlitif = mlitif[0] ## First one
         mli = np.float32(gdal.Open(mlitif).ReadAsArray())
         mli[mli==0] = np.nan
     
@@ -249,15 +224,18 @@ def main(argv=None):
         vmax = np.nanpercentile(mli, 95)
         plot_lib.make_im_png(mli, mlipngfile, 'gray', 'MLI (log10)', vmin, vmax, cbar=True)
         print('  slc.mli[.png] created', flush=True)
+    else:
+        print('  No *.geo.mli.tif found in {}'.format(os.path.basename(geocdir)), flush=True)
 
 
     #%% hgt
-    hgttif = os.path.join(geocdir, '{}.geo.hgt.tif'.format(frameID))
-    if os.path.exists(hgttif):
-        print('\nCreate hgt', flush=True)
+    print('\nCreate hgt', flush=True)
+    hgttif = glob.glob(os.path.join(geocdir, '*.geo.hgt.tif'))
+    if len(hgttif)>0:
+        hgttif = hgttif[0] ## First one
         hgt = np.float32(gdal.Open(hgttif).ReadAsArray())
         hgt[hgt==0] = np.nan
-    
+
         if nlook != 1:
             ### Multilook
             hgt = tools_lib.multilook(hgt, nlook, nlook)
@@ -269,6 +247,8 @@ def main(argv=None):
         vmin = -vmax/3 ## bnecause 1/4 of terrain is blue
         plot_lib.make_im_png(hgt, hgtpngfile, 'terrain', 'DEM (m)', vmin, vmax, cbar=True)
         print('  hgt[.png] created', flush=True)
+    else:
+        print('  No *.geo.hgt.tif found in {}'.format(os.path.basename(geocdir)), flush=True)
 
 
     #%% tif -> float (with multilook/downsampling)
@@ -384,22 +364,8 @@ def main(argv=None):
         else:
             shutil.copyfile(bperp_file_in, bperp_file_out)
     else:
-        print('  No valid baselines exists.', flush=True)
-        if not frameID: ## if frameID not found above
-            print('  Frame ID cannot be identified from dir name!')
-            print('  Make dummy.', flush=True)
-            io_lib.make_dummy_bperp(bperp_file_out, imdates)
-        else:
-            print('  Try download.', flush=True)
-            url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'baselines')
-            if not tools_lib.download_data(url, bperp_file_out):
-                print('  Error while downloading from {}.\n  Make dummy.'.format(url), file=sys.stderr, flush=True)
-                io_lib.make_dummy_bperp(bperp_file_out, imdates)
-            else:
-                print('  {} dowonloaded from LiCSAR-portal'.format(os.path.basename(url)), flush=True)
-                if not io_lib.read_bperp_file(bperp_file_out, imdates):
-                    print('  but not complete. Make dummy.', flush=True)
-                    io_lib.make_dummy_bperp(bperp_file_out, imdates)
+        print('  No valid baselines file exists. Make dummy.', flush=True)
+        io_lib.make_dummy_bperp(bperp_file_out, imdates)
 
 
     #%% Finish
