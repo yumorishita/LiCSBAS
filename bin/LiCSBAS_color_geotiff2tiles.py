@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0 20200924 Yu Morishita, GSI
+v1.0.1 20201016 Yu Morishita, GSI
 
 ========
 Overview
@@ -15,7 +15,8 @@ LiCSBAS_color_geotiff2tiles.py -i infile [-o outdir] [--zmin int] [--zmax int]
  [--xyz] [--n_para int] 
 
  -i  Input color GeoTIFF file
- -o  Output directory containing XYZ tiles (Default: infile%.tif)
+ -o  Output directory containing XYZ tiles
+     (Default: tiles_[infile%.tif], '.' will be replaced with '_')
  --zmin  Minimum zoom level to render (Default: 5)
  --zmax  Maximum zoom level to render (Default: auto, see below)
          17 (pixel spacing <=   5m)
@@ -32,6 +33,8 @@ LiCSBAS_color_geotiff2tiles.py -i infile [-o outdir] [--zmin int] [--zmax int]
 """
 #%% Change log
 '''
+v1.0.1 20201016 Yu Morishita, GSI
+ - Change default output name
 v1.0 20200924 Yu Morishita, GSI
  - Original implementation
 '''
@@ -63,7 +66,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver=1.0; date=20200924; author="Y. Morishita"
+    ver='1.0.1'; date=20201016; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -119,7 +122,7 @@ def main(argv=None):
 
     #%% Parameter setting
     if not outdir:
-        outdir = infile.replace('.tif', '')
+        outdir = 'tiles_'+infile.replace('.tif', '').replace('.', '_')
     if os.path.exists(outdir):
         print('\n{} already exists. Remove and overwrite.'.format(outdir), flush=True)
         shutil.rmtree(outdir)
