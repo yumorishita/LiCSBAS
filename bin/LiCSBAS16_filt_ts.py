@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200909 Yu Morishita, GSI
+v1.4 20201020 Yu Morishita, GSI
 
 ========
 Overview
@@ -40,7 +40,10 @@ Outputs in TS_GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--hgt_linear] [--hgt_min int] [--hgt_max int] [--nomask] [--n_para int]
+LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
+ [--hgt_linear] [--hgt_min int] [--hgt_max int] [--nomask] [--n_para int]
+ [--range x1:x2/y1:y2 | --range_geo lon1/lon2/lat1/lat2]
+ [--ex_range x1:x2/y1:y2 | --ex_range_geo lon1/lon2/lat1/lat2]
 
  -t  Path to the TS_GEOCml* dir.
  -s  Width of spatial filter in km (Default: 2 km)
@@ -52,11 +55,20 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg] [--h
  --hgt_min    Minumum hgt to take into account in hgt-linear (Default: 200m)
  --hgt_max    Maximum hgt to take into account in hgt-linear (Default: 10000m, no effect)
  --nomask     Apply filter to unmasked data (Default: apply to masked)
- --n_para  Number of parallel processing (Default: # of usable CPU)
+ --n_para     Number of parallel processing (Default: # of usable CPU)
+ --range       Range used in deramp and hgt_linear. Index starts from 0.
+              0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ --range_geo   Range used in deramp and hgt_linear in geographical coordinates (deg).
+ --ex_range    Range EXCLUDED in deramp and hgt_linear. Index starts from 0.
+              0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
+ --ex_range_geo  Range EXCLUDED in deramp and hgt_linear in geographical 
+                 coordinates (deg).
 
 """
 #%% Change log
 '''
+v1.4 20201020 Yu Morishita, GSI
+ - Add --range[_geo] and --ex_range[_geo] options
 v1.3 20200909 Yu Morishita, GSI
  - Parallel processing
 v1.2 20200228 Yu Morishita, Uni of Leeds and GSI
@@ -105,14 +117,14 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200909; author="Y. Morishita"
+    ver=1.4; date=20201016; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ## for parallel processing
     global cum, mask, deg_ramp, hgt_linearflag, hgt, hgt_min, hgt_max,\
     filtcumdir, filtincdir, imdates, cycle, coef_r2m, models, \
-    filtwidth_yr, filtwidth_km, dt_cum, x_stddev, y_stddev
+    filtwidth_yr, filtwidth_km, dt_cum, x_stddev, y_stddev, mask2
     ## global cum_org from hdf5 contaminate in paralell warpper? So pass them by arg.
 
 
@@ -127,6 +139,11 @@ def main(argv=None):
     maskflag = True
     n_para = len(os.sched_getaffinity(0))
 
+    range_str = []
+    range_geo_str = []
+    ex_range_str = []
+    ex_range_geo_str = []
+
     cumname = 'cum.h5'
     
     cmap_vel = SCM.roma.reversed()
@@ -135,7 +152,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:s:y:r:", ["help", "hgt_linear", "hgt_min=", "hgt_max=", "nomask", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "ht:s:y:r:", ["help", "hgt_linear", "hgt_min=", "hgt_max=", "nomask", "n_para=", "range=", "range_geo=", "ex_range=", "ex_range_geo="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -160,6 +177,14 @@ def main(argv=None):
                 maskflag = False
             elif o == '--n_para':
                 n_para = int(a)
+            elif o == '--range':
+                range_str = a
+            elif o == '--range_geo':
+                range_geo_str = a
+            elif o == '--ex_range':
+                ex_range_str = a
+            elif o == '--ex_range_geo':
+                ex_range_geo_str = a
 
         if not tsadir:
             raise Usage('No tsa directory given, -t is not optional!')
@@ -167,6 +192,10 @@ def main(argv=None):
             raise Usage('No {} dir exists!'.format(tsadir))
         elif not os.path.exists(os.path.join(tsadir, cumname)):
             raise Usage('No {} exists in {}!'.format(cumname, tsadir))
+        if range_str and range_geo_str:
+            raise Usage('Both --range and --range_geo given, use either one not both!')
+        if ex_range_str and ex_range_geo_str:
+            raise Usage('Both --ex_range and --ex_range_geo given, use either one not both!')
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -265,6 +294,46 @@ def main(argv=None):
         hgt = []   
 
 
+    #%% --range[_geo] and --ex_range[_geo]
+    if range_str: ## --range
+        if not tools_lib.read_range(range_str, width, length):
+            print('\nERROR in {}\n'.format(range_str), file=sys.stderr)
+            return 1
+        else:
+            x1, x2, y1, y2 = tools_lib.read_range(range_str, width, length)
+            range_str = '{}:{}/{}:{}'.format(x1, x2, y1, y2)
+    elif range_geo_str: ## --range_geo
+        if not tools_lib.read_range_geo(range_geo_str, width, length, lat1, dlat, lon1, dlon):
+            print('\nERROR in {}\n'.format(range_geo_str), file=sys.stderr)
+            return 1
+        else:
+            x1, x2, y1, y2 = tools_lib.read_range_geo(range_geo_str, width, length, lat1, dlat, lon1, dlon)
+            range_str = '{}:{}/{}:{}'.format(x1, x2, y1, y2)
+
+    if ex_range_str: ## --ex_range
+        if not tools_lib.read_range(ex_range_str, width, length):
+            print('\nERROR in {}\n'.format(ex_range_str), file=sys.stderr)
+            return 1
+        else:
+            ex_x1, ex_x2, ex_y1, ex_y2 = tools_lib.read_range(ex_range_str, width, length)
+            ex_range_str = '{}:{}/{}:{}'.format(ex_x1, ex_x2, ex_y1, ex_y2)
+    elif ex_range_geo_str: ## --ex_range_geo
+        if not tools_lib.read_range_geo(ex_range_geo_str, width, length, lat1, dlat, lon1, dlon):
+            print('\nERROR in {}\n'.format(ex_range_geo_str), file=sys.stderr)
+            return 1
+        else:
+            ex_x1, ex_x2, ex_y1, ex_y2 = tools_lib.read_range_geo(ex_range_geo_str, width, length, lat1, dlat, lon1, dlon)
+            ex_range_str = '{}:{}/{}:{}'.format(ex_x1, ex_x2, ex_y1, ex_y2)
+            
+    ### Make range mask
+    mask2 = np.ones((length, width), dtype=np.float32)
+    if range_str:
+        mask2 = mask2*np.nan
+        mask2[y1:y2, x1:x2] = 1
+    if ex_range_str:
+        mask2[ex_y1:ex_y2, ex_x1:ex_x2] = np.nan
+    
+
     #%% Display settings
     print('')
     print('Size of image (w,l)      : {0}, {1}'.format(width, length))
@@ -276,7 +345,10 @@ def main(argv=None):
     if hgt_linearflag:
         print('Minimum hgt              : {} m'.format(hgt_min), flush=True)
         print('Maximum hgt              : {} m'.format(hgt_max), flush=True)
-
+    if range_str:
+        print('Range                    : {}'.format(range_str), flush=True)
+    if ex_range_str:
+        print('Excluded range           : {}'.format(ex_range_str), flush=True)
     with open(outparmfile, "w") as f:
         print('filtwidth_km:  {}'.format(filtwidth_km), file=f)
         print('filtwidth_xpixels:  {:.1f}'.format(x_stddev), file=f)
@@ -287,6 +359,8 @@ def main(argv=None):
         print('hgt_linear:  {}'.format(hgt_linearflag*1), file=f)
         print('hgt_min: {}'.format(hgt_min), file=f)
         print('hgt_max: {}'.format(hgt_max), file=f)
+        print('range: {}'.format(range_str), file=f)
+        print('ex_range: {}'.format(ex_range_str), file=f)
 
 
     #%% Load Mask (1: unmask, 0: mask, nan: no cum data)
@@ -501,7 +575,7 @@ def deramp_wrapper(args):
     if np.mod(i, 10) == 0:
         print("  {0:3}/{1:3}th image...".format(i, len(imdates)), flush=True)
 
-    fit, model = tools_lib.fit2dh(_cum_org*mask, deg_ramp, hgt, hgt_min, hgt_max)  ## fit is not masked
+    fit, model = tools_lib.fit2dh(_cum_org*mask*mask2, deg_ramp, hgt, hgt_min, hgt_max)  ## fit is not masked
     _cum = _cum_org-fit
     
     if hgt_linearflag:

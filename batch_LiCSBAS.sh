@@ -54,6 +54,10 @@ p16_filtwidth_km=""	# default: 2 km
 p16_filtwidth_yr=""	# default: avg_interval*3 yr
 p16_deg_deramp=""	# 1, bl, or 2. default: no deramp
 p16_hgt_linear="n"	# y/n. default: n
+p16_range=""	# e.g. 10:100/20:200 (ix start from 0)
+p16_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
+p16_ex_range=""	# e.g. 10:100/20:200 (ix start from 0)
+p16_ex_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 
 ### Less frequently used options. If blank, use default. ###
 p01_frame=""	# e.g. 021D_04972_131213 
@@ -345,6 +349,10 @@ if [ $start_step -le 16 -a $end_step -ge 16 ];then
   if [ $p16_nomask == "y" ];then p16_op="$p16_op --nomask"; fi
   if [ ! -z $p16_n_para ];then p16_op="$p16_op --n_para $p16_n_para";
   elif [ ! -z $n_para ];then p16_op="$p16_op --n_para $n_para";fi
+  if [ ! -z $p16_range ];then p16_op="$p16_op --range $p16_range"; fi
+  if [ ! -z $p16_range_geo ];then p16_op="$p16_op --range_geo $p16_range_geo"; fi
+  if [ ! -z $p16_ex_range ];then p16_op="$p16_op --ex_range $p16_ex_range"; fi
+  if [ ! -z $p16_ex_range_geo ];then p16_op="$p16_op --ex_range_geo $p16_ex_range_geo"; fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS16_filt_ts.py $p16_op"
