@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0.1 20201016 Yu Morishita, GSI
+v1.0.2 20201028 Yu Morishita, GSI
 
 ========
 Overview
@@ -33,6 +33,8 @@ LiCSBAS_color_geotiff2tiles.py -i infile [-o outdir] [--zmin int] [--zmax int]
 """
 #%% Change log
 '''
+v1.0.2 20201028 Yu Morishita, GSI
+ - Update how to get n_para
 v1.0.1 20201016 Yu Morishita, GSI
  - Change default output name
 v1.0 20200924 Yu Morishita, GSI
@@ -66,7 +68,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver='1.0.1'; date=20201016; author="Y. Morishita"
+    ver='1.0.2'; date=20201028; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -80,7 +82,10 @@ def main(argv=None):
     zmin = 5
     zmax = []
     tms_flag = True
-    n_para = len(os.sched_getaffinity(0))
+    try:
+        n_para = len(os.sched_getaffinity(0))
+    except:
+        n_para = multi.cpu_count()
 
 
     #%% Read options

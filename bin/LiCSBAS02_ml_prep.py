@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7 20201020 Yu Morishita, GSI
+v1.7.1 20201028 Yu Morishita, GSI
 
 ========
 Overview
@@ -48,6 +48,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 """
 #%% Change log
 '''
+v1.7.1 20201028 Yu Morishita, GSI
+ - Update how to get n_para
 v1.7 20201020 Yu Morishita, GSI
  - Remove -f option and not download tifs here
 v1.6.1 20201016 Yu Morishita, GSI
@@ -103,7 +105,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.7"; date=20201020; author="Y. Morishita"
+    ver="1.7.1"; date=20201028; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -116,7 +118,10 @@ def main(argv=None):
     outdir = []
     nlook = 1
     radar_freq = 5.405e9
-    n_para = len(os.sched_getaffinity(0))
+    try:
+        n_para = len(os.sched_getaffinity(0))
+    except:
+        n_para = multi.cpu_count()
 
     cmap = 'insar'
     cycle = 3

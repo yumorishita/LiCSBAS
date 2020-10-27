@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.1 20200925 Yu Morishita, GSI
+v1.4.2 20201028 Yu Morishita, GSI
 
 ========
 Overview
@@ -72,6 +72,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.2 20201028 Yu Morishita, GSI
+ - Update how to get n_para
 v1.4.1 20200925 Yu Morishita, GSI
  - Small bug fix in n_para
 v1.4 20200909 Yu Morishita, GSI
@@ -125,7 +127,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.1"; date=20200925; author="Y. Morishita"
+    ver="1.4.2"; date=20201028; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -140,7 +142,10 @@ def main(argv=None):
     tsadir = []
     inv_alg = 'LS'
     
-    n_para = len(os.sched_getaffinity(0)) ##
+    try:
+        n_para = len(os.sched_getaffinity(0))
+    except:
+        n_para = multi.cpu_count()
     n_para_inv = 1
 
     memory_size = 4000

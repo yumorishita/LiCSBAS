@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200909 Yu Morishita, GSI
+v1.3.1 20201028 Yu Morishita, GSI
 
 ========
 Overview
@@ -42,6 +42,8 @@ LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f 
 """
 #%% Change log
 '''
+v1.3.1 20201028 Yu Morishita, GSI
+ - Update how to get n_para
 v1.3 20200909 Yu Morishita, GSI
  - Parallel processing
 v1.2 20200614 Yu Morishita, GSI
@@ -78,7 +80,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200909; author="Y. Morishita"
+    ver="1.3.1"; date=20201028; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -92,7 +94,10 @@ def main(argv=None):
     coh_thre = []
     ex_range_str = []
     ex_range_file = []
-    n_para = len(os.sched_getaffinity(0))
+    try:
+        n_para = len(os.sched_getaffinity(0))
+    except:
+        n_para = multi.cpu_count()
 
     cmap_noise = 'viridis'
 

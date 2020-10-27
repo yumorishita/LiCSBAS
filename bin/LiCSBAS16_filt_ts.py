@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4 20201020 Yu Morishita, GSI
+v1.4.1 20201028 Yu Morishita, GSI
 
 ========
 Overview
@@ -67,6 +67,8 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
 """
 #%% Change log
 '''
+v1.4.1 20201028 Yu Morishita, GSI
+ - Update how to get n_para
 v1.4 20201020 Yu Morishita, GSI
  - Add --range[_geo] and --ex_range[_geo] options
 v1.3 20200909 Yu Morishita, GSI
@@ -117,7 +119,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.4; date=20201016; author="Y. Morishita"
+    ver="1.4.1"; date=20201028; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -137,8 +139,11 @@ def main(argv=None):
     hgt_min = 200 ## meter
     hgt_max = 10000 ## meter
     maskflag = True
-    n_para = len(os.sched_getaffinity(0))
-
+    try:
+        n_para = len(os.sched_getaffinity(0))
+    except:
+        n_para = multi.cpu_count()
+        
     range_str = []
     range_geo_str = []
     ex_range_str = []

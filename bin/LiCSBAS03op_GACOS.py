@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5 20200909 Yu Morishita, GSI
+v1.5.1 20201028 Yu Morishita, GSI
 
 ========
 Overview
@@ -51,6 +51,8 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole] [--n_para i
 """
 #%% Change log
 '''
+v1.5.1 20201028 Yu Morishita, GSI
+ - Update how to get n_para
 v1.5 20200909 Yu Morishita, GSI
  - Parallel processing
 v1.4 20200703 Yu Morioshita, GSI
@@ -153,7 +155,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.5; date=20200909; author="Y. Morishita"
+    ver="1.5.1"; date=20201028; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -169,7 +171,10 @@ def main(argv=None):
     gacosdir = 'GACOS'
     resampleAlg = 'cubicspline'# None # 'cubic' 
     fillholeflag = False
-    n_para = len(os.sched_getaffinity(0))
+    try:
+        n_para = len(os.sched_getaffinity(0))
+    except:
+        n_para = multi.cpu_count()
 
 
     #%% Read options

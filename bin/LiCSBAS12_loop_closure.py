@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5 20201016 Yu Morishita, GSI
+v1.5.1 20201028 Yu Morishita, GSI
 
 ========
 Overview
@@ -61,6 +61,8 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--n_para int]
 """
 #%% Change log
 '''
+v1.5.1 20201028 Yu Morishita, GSI
+ - Update how to get n_para
 v1.5 20201016 Yu Morishita, GSI
  - Bug fix in identifying bad_ifg_cand2
 v1.4 20201007 Yu Morishita, GSI
@@ -112,7 +114,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.5; date=20201016; author="Y. Morishita"
+    ver="1.5.1"; date=20201028; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -124,7 +126,10 @@ def main(argv=None):
     tsadir = []
     loop_thre = 1.5
     multi_prime = False
-    n_para = len(os.sched_getaffinity(0))
+    try:
+        n_para = len(os.sched_getaffinity(0))
+    except:
+        n_para = multi.cpu_count()
 
     cycle = 3 # 2pi*3/cycle
     cmap_noise = 'viridis'
