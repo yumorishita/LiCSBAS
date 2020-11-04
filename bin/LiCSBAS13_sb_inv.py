@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.2 20201028 Yu Morishita, GSI
+v1.4.3 20201104 Yu Morishita, GSI
 
 ========
 Overview
@@ -72,6 +72,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.3 20201104 Yu Morishita, GSI
+ - Bug fix when n_pt_unnan=0 in a patch
 v1.4.2 20201028 Yu Morishita, GSI
  - Update how to get n_para
 v1.4.1 20200925 Yu Morishita, GSI
@@ -127,7 +129,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.2"; date=20201028; author="Y. Morishita"
+    ver="1.4.3"; date=20201104; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -440,9 +442,8 @@ def main(argv=None):
 
 
     #%% For each patch
-    i_patch = 1
-    for rows in patchrow:
-        print('\nProcess {0}/{1}th line ({2}/{3}th patch)...'.format(rows[1], patchrow[-1][-1], i_patch, n_patch), flush=True)
+    for i_patch, rows in enumerate(patchrow):
+        print('\nProcess {0}/{1}th line ({2}/{3}th patch)...'.format(rows[1], patchrow[-1][-1], i_patch+1, n_patch), flush=True)
         start2 = time.time()
         
         #%% Read data
@@ -506,92 +507,107 @@ def main(argv=None):
 
 
         #%% Compute number of gaps, ifg_noloop, maxTlen point-by-point
-        ns_gap_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-        gap_patch = np.zeros((n_im-1, n_pt_all), dtype=np.int8)
-        ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-        maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-
-        ### Determine n_para
-        n_pt_patch_min = 1000
-        if n_pt_patch_min*n_para > n_pt_unnan:
-            ## Too much n_para
-            n_para_gap = int(np.floor(n_pt_unnan/n_pt_patch_min))
-            if n_para_gap == 0: n_para_gap = 1 
-        else:
-            n_para_gap = n_para
-
-        print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
-        print('  with {} parallel processing...'.format(n_para_gap), flush=True)
-
-        ### Devide unwpatch by n_para for parallel processing
-        p = multi.Pool(n_para_gap)
-        _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)), dtype=object)
-        p.close()
+        if n_pt_unnan != 0:
+            ns_gap_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            gap_patch = np.zeros((n_im-1, n_pt_all), dtype=np.int8)
+            ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
     
-        ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt        
-        gap_patch[:, ix_unnan_pt] = np.hstack(_result[:, 1]) #n_im-1, n_pt
-        ns_ifg_noloop_patch[ix_unnan_pt] = np.hstack(_result[:, 2])
-
-        ### maxTlen
-        _maxTlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
-        _Tlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
-        for imx in range(n_im-1):
-            _Tlen = _Tlen + (dt_cum[imx+1]-dt_cum[imx]) ## Adding dt
-            _Tlen[gap_patch[imx, ix_unnan_pt]==1] = 0 ## reset to 0 if gap
-            _maxTlen[_maxTlen<_Tlen] = _Tlen[_maxTlen<_Tlen] ## Set Tlen to maxTlen
-        maxTlen_patch[ix_unnan_pt] = _maxTlen
-
-
-        #%% Time series inversion
-        print('\n  Small Baseline inversion by {}...\n'.format(inv_alg), flush=True)
-        if inv_alg == 'WLS':
-            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_para_inv)
-        else:
-            inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_para_inv)
-
-        ### Set to valuables
-        inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan
-        vel_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-        vconst_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-
-        inc_patch[:, ix_unnan_pt] = inc_tmp
-        vel_patch[ix_unnan_pt] = vel_tmp
-        vconst_patch[ix_unnan_pt] = vconst_tmp
-
-        ### Calculate residuals
-        res_patch = np.zeros((n_ifg, n_pt_all), dtype=np.float32)*np.nan
-        res_patch[:, ix_unnan_pt] = unwpatch.T-np.dot(G, inc_tmp)
-
-        res_sumsq = np.nansum(res_patch**2, axis=0)
-        res_n = np.float32((~np.isnan(res_patch)).sum(axis=0))
-        res_n[res_n==0] = np.nan # To avoid 0 division
-        res_rms_patch = np.sqrt(res_sumsq/res_n)
-
-        ### Cumulative displacememt
-        cum_patch = np.zeros((n_im, n_pt_all), dtype=np.float32)*np.nan
-        cum_patch[1:, :] = np.cumsum(inc_patch, axis=0)
-
-        ## Fill 1st image with 0 at unnan points from 2nd images
-        bool_unnan_pt = ~np.isnan(cum_patch[1, :])
-        cum_patch[0, bool_unnan_pt] = 0
-
-        ## Drop (fill with nan) interpolated cum by 2 continuous gaps
-        for i in range(n_im-2): ## from 1->n_im-1
-            gap2 = gap_patch[i, :]+gap_patch[i+1, :] 
-            bool_gap2 = (gap2==2) ## true if 2 continuous gaps for each point
-            cum_patch[i+1, :][bool_gap2] = np.nan
-
-        ## Last (n_im th) image. 1 gap means interpolated
-        cum_patch[-1, :][gap_patch[-1, :]==1] = np.nan
-
+            ### Determine n_para
+            n_pt_patch_min = 1000
+            if n_pt_patch_min*n_para > n_pt_unnan:
+                ## Too much n_para
+                n_para_gap = int(np.floor(n_pt_unnan/n_pt_patch_min))
+                if n_para_gap == 0: n_para_gap = 1 
+            else:
+                n_para_gap = n_para
+    
+            print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
+            print('  with {} parallel processing...'.format(n_para_gap), flush=True)
+    
+            ### Devide unwpatch by n_para for parallel processing
+            p = multi.Pool(n_para_gap)
+            _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)), dtype=object)
+            p.close()
         
+            ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt        
+            gap_patch[:, ix_unnan_pt] = np.hstack(_result[:, 1]) #n_im-1, n_pt
+            ns_ifg_noloop_patch[ix_unnan_pt] = np.hstack(_result[:, 2])
+    
+            ### maxTlen
+            _maxTlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
+            _Tlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
+            for imx in range(n_im-1):
+                _Tlen = _Tlen + (dt_cum[imx+1]-dt_cum[imx]) ## Adding dt
+                _Tlen[gap_patch[imx, ix_unnan_pt]==1] = 0 ## reset to 0 if gap
+                _maxTlen[_maxTlen<_Tlen] = _Tlen[_maxTlen<_Tlen] ## Set Tlen to maxTlen
+            maxTlen_patch[ix_unnan_pt] = _maxTlen
+
+
+            #%% Time series inversion
+            print('\n  Small Baseline inversion by {}...\n'.format(inv_alg), flush=True)
+            if inv_alg == 'WLS':
+                inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_para_inv)
+            else:
+                inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_para_inv)
+    
+            ### Set to valuables
+            inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan
+            vel_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            vconst_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+    
+            inc_patch[:, ix_unnan_pt] = inc_tmp
+            vel_patch[ix_unnan_pt] = vel_tmp
+            vconst_patch[ix_unnan_pt] = vconst_tmp
+    
+            ### Calculate residuals
+            res_patch = np.zeros((n_ifg, n_pt_all), dtype=np.float32)*np.nan
+            res_patch[:, ix_unnan_pt] = unwpatch.T-np.dot(G, inc_tmp)
+    
+            res_sumsq = np.nansum(res_patch**2, axis=0)
+            res_n = np.float32((~np.isnan(res_patch)).sum(axis=0))
+            res_n[res_n==0] = np.nan # To avoid 0 division
+            res_rms_patch = np.sqrt(res_sumsq/res_n)
+    
+            ### Cumulative displacememt
+            cum_patch = np.zeros((n_im, n_pt_all), dtype=np.float32)*np.nan
+            cum_patch[1:, :] = np.cumsum(inc_patch, axis=0)
+    
+            ## Fill 1st image with 0 at unnan points from 2nd images
+            bool_unnan_pt = ~np.isnan(cum_patch[1, :])
+            cum_patch[0, bool_unnan_pt] = 0
+    
+            ## Drop (fill with nan) interpolated cum by 2 continuous gaps
+            for i in range(n_im-2): ## from 1->n_im-1
+                gap2 = gap_patch[i, :]+gap_patch[i+1, :] 
+                bool_gap2 = (gap2==2) ## true if 2 continuous gaps for each point
+                cum_patch[i+1, :][bool_gap2] = np.nan
+    
+            ## Last (n_im th) image. 1 gap means interpolated
+            cum_patch[-1, :][gap_patch[-1, :]==1] = np.nan
+
+
+        #%% Fill by np.nan if n_pt_unnan == 0
+        else:
+            cum_patch = np.zeros((n_im, n_pt_all), dtype=np.float32)*np.nan
+            vel_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            vconst_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            gap_patch = np.zeros((n_im-1, n_pt_all), dtype=np.int8)
+            inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan
+            res_patch = np.zeros((n_ifg, n_pt_all), dtype=np.float32)*np.nan
+            res_rms_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            ns_gap_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            
+            
         #%% Output data and image
         ### cum.h5 file
         cum[:, rows[0]:rows[1], :] = cum_patch.reshape((n_im, lengththis, width))
         vel[rows[0]:rows[1], :] = vel_patch.reshape((lengththis, width))
         vconst[rows[0]:rows[1], :] = vconst_patch.reshape((lengththis, width))
         gap[:, rows[0]:rows[1], :] = gap_patch.reshape((n_im-1, lengththis, width))
-        
+
         ### Others
         openmode = 'w' if rows[0] == 0 else 'a' #w only 1st patch
 
@@ -623,9 +639,7 @@ def main(argv=None):
         hour2 = int(elapsed_time2/3600)
         minite2 = int(np.mod((elapsed_time2/60),60))
         sec2 = int(np.mod(elapsed_time2,60))
-        print("  Elapsed time for {0}th patch: {1:02}h {2:02}m {3:02}s".format(i_patch, hour2, minite2, sec2), flush=True)
-
-        i_patch += 1 #Next patch count
+        print("  Elapsed time for {0}th patch: {1:02}h {2:02}m {3:02}s".format(i_patch+1, hour2, minite2, sec2), flush=True)
 
 
     #%% Find stable ref point
