@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.8.1 20200915 Yu Morishita, GSI
+v1.9 20201111 Yu Morishita, GSI
 
 ========
 Overview
@@ -14,8 +14,9 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
   [--cmax float] [--auto_crange float] [--cycle float] [--nodata float]
   [--bigendian] [--png pngname] [--kmz kmzname]
 
- -i  Input image file in float32 or uint8
+ -i  Input image file in float32, uint8, GeoTIFF, or NetCDF
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
+     (Not required if input is GeoTIFF or NetCDF)
  -c  Colormap name (see below for available colormap)
      - https://matplotlib.org/tutorials/colors/colormaps.html
      - http://www.fabiocrameri.ch/colourmaps.php
@@ -32,8 +33,11 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 """
 
+
 #%% Change log
 '''
+v1.9 20201111 Yu Morishita, GSI
+ - Data GeoTIFF or NetCDF available
 v1.8.1 20200916 Yu Morishita, GSI
  - Small bug fix to display uint8
 v1.8 20200902 Yu Morishita, GSI
@@ -70,6 +74,7 @@ import numpy as np
 import subprocess as subp
 import SCM
 import zipfile
+import gdal
 
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_io_lib as io_lib
@@ -79,7 +84,8 @@ class Usage(Exception):
     def __init__(self, msg):
         self.msg = msg
 
-#%%
+
+#%% make_kmz
 def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
     kmlfile = kmzfile.replace('.kmz', '.kml')
     name = os.path.basename(kmzfile).replace('.kmz', '')
@@ -102,9 +108,10 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver="1.8.1"; date=20200916; author="Y. Morishita"
+    ver="1.9"; date=20201111; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
+
 
     #%% Set default
     infile = []
@@ -119,6 +126,7 @@ if __name__ == "__main__":
     pngname = []
     kmzname = []
     interp = 'nearest' #'antialiased'
+
     
     #%% Read options
     try:
@@ -157,18 +165,14 @@ if __name__ == "__main__":
             raise Usage('No image file given, -i is not optional!')
         elif not os.path.exists(infile):
             raise Usage('No {} exists!'.format(infile))
-        if not parfile:
-            raise Usage('No par file given, -p is not optional!')
-        elif not os.path.exists(parfile):
-            raise Usage('No {} exists!'.format(parfile))
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         sys.exit(2)
-
-
+    
+    
     #%% Set cmap if SCM
     if cmap_name.startswith('SCM'):
         if cmap_name.endswith('_r'):
@@ -183,46 +187,69 @@ if __name__ == "__main__":
         cmap = cmap_name
         
 
-    #%% Get info
-    try:
-        try:
-            ### EQA.dem_par
-            width = int(subp.check_output(['grep', 'width', parfile]).decode().split()[1].strip())
-            length = int(subp.check_output(['grep', 'nlines', parfile]).decode().split()[1].strip())
-        except:
-            ### slc.mli.par
-            width = int(subp.check_output(['grep', 'range_samples', parfile]).decode().split()[1].strip())
-            length = int(subp.check_output(['grep', 'azimuth_lines', parfile]).decode().split()[1].strip())
-    except:
-        print('No fields about width/length found in {}!'.format(parfile), file=sys.stderr)
-        sys.exit(2)
-
-    if kmzname:
-        try:
-            ### EQA.dem_par
-            dlat = float(io_lib.get_param_par(parfile, 'post_lat'))
-            dlon = float(io_lib.get_param_par(parfile, 'post_lon'))
-
-            lat_n_g = float(io_lib.get_param_par(parfile, 'corner_lat')) #grid reg
-            lon_w_g = float(io_lib.get_param_par(parfile, 'corner_lon')) #grid reg
-            ## Grid registration to pixel registration by shifing half pixel
-            lat_n_p = lat_n_g - dlat/2
-            lon_w_p = lon_w_g - dlon/2
-            lat_s_p = lat_n_p+dlat*length
-            lon_e_p = lon_w_p+dlon*width
-        except:
-            print('No fields about geo for kmz found in {}!'.format(parfile), file=sys.stderr)
+    #%% Get info and Read data
+    if gdal.IdentifyDriver(infile): ## If Geotiff or grd
+        geotiff = gdal.Open(infile)
+        data = geotiff.ReadAsArray()
+        if data.ndim > 2:
+            print('\nERROR: {} has multiple bands and cannot be displayed.\n'.format(infile), file=sys.stderr)
             sys.exit(2)
 
+        length, width = data.shape
+        lon_w_p, dlon, _, lat_n_p, _, dlat = geotiff.GetGeoTransform()
+        lat_s_p = lat_n_p+dlat*length
+        lon_e_p = lon_w_p+dlon*width
+        if data.dtype == np.float32:
+            data[data==nodata] = np.nan
+        
+    else: ## Not GeoTIFF
+        if not parfile:
+            print('\nERROR: No par file given, -p is not optional!\n', file=sys.stderr)
+            sys.exit(2)
+        elif not os.path.exists(parfile):
+            print('\nERROR: No {} exists!\n'.format(parfile), file=sys.stderr)
+            sys.exit(2)
+    
+        try:
+            try:
+                ### EQA.dem_par
+                width = int(subp.check_output(['grep', 'width', parfile]).decode().split()[1].strip())
+                length = int(subp.check_output(['grep', 'nlines', parfile]).decode().split()[1].strip())
+            except:
+                ### slc.mli.par
+                width = int(subp.check_output(['grep', 'range_samples', parfile]).decode().split()[1].strip())
+                length = int(subp.check_output(['grep', 'azimuth_lines', parfile]).decode().split()[1].strip())
+        except:
+            print('No fields about width/length found in {}!'.format(parfile), file=sys.stderr)
+            sys.exit(2)
+    
+        if kmzname:
+            try:
+                ### EQA.dem_par
+                dlat = float(io_lib.get_param_par(parfile, 'post_lat'))
+                dlon = float(io_lib.get_param_par(parfile, 'post_lon'))
+    
+                lat_n_g = float(io_lib.get_param_par(parfile, 'corner_lat')) #grid reg
+                lon_w_g = float(io_lib.get_param_par(parfile, 'corner_lon')) #grid reg
+                ## Grid registration to pixel registration by shifing half pixel
+                lat_n_p = lat_n_g - dlat/2
+                lon_w_p = lon_w_g - dlon/2
+                lat_s_p = lat_n_p+dlat*length
+                lon_e_p = lon_w_p+dlon*width
+            except:
+                print('No fields about geo for kmz found in {}!'.format(parfile), file=sys.stderr)
+                sys.exit(2)
+    
+        ### Read data
+        if os.path.getsize(infile) == length*width:
+            print('File format: uint8')
+            data = io_lib.read_img(infile, length, width, np.uint8, endian=endian)
+        else:
+            data = io_lib.read_img(infile, length, width, endian=endian)
+            data[data==nodata] = np.nan
 
-    #%% Read data
-    if os.path.getsize(infile) == length*width:
-        print('File format: uint8')
-        data = io_lib.read_img(infile, length, width, np.uint8, endian=endian)
-    else:
-        data = io_lib.read_img(infile, length, width, endian=endian)
-        data[data==nodata] = np.nan
 
+    #%% Set cyclic and color range
     if cmap_name == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
         cyclic= True
         data = np.angle(np.exp(1j*(data/cycle))*cycle)
@@ -232,8 +259,6 @@ if __name__ == "__main__":
     else:
         cyclic= False
 
-
-    #%% Set color range for displacement and vel
     if cmin is None and cmax is None: ## auto
         climauto = True
         cmin = np.nanpercentile(data, 100-auto_crange)
@@ -242,6 +267,7 @@ if __name__ == "__main__":
         climauto = False
         if cmin is None: cmin = np.nanpercentile(data, 100-auto_crange)
         if cmax is None: cmax = np.nanpercentile(data, auto_crange)
+
 
     #%% Output kmz
     if kmzname:
@@ -298,6 +324,7 @@ if __name__ == "__main__":
         plt.savefig(pngname)
         plt.close()
         print('\nOutput: {}\n'.format(pngname))
+        sys.exit(0)
     else:
         plt.show()
 
