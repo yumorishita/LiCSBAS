@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-v1.1 20200608 Yu Morishita, GSI
+v1.1.1 20201112 Yu Morishita, GSI
 
-========
-Overview
-========
-This script decomposes 2 (or more) LOS displacement data to EW and UD components assuming no NS displacement (neglecting NS, e.g., https://doi.org/10.1029/2003GL018827, https://doi.org/10.1016/j.enggeo.2017.01.011). Positive values in the decomposed data mean eastward and upward displacement. The multiple LOS input data can have different coverage and resolution as they are resampled to the common area and resolution during the processing.
+This script decomposes 2 (or more) LOS displacement data to EW and UD components assuming no NS displacement (neglecting NS). Positive values in the decomposed data mean eastward and upward displacement. The multiple LOS input data can have different coverage and resolution as they are resampled to the common area and resolution during the processing.
+
+Reference:
+- Wright et al. (2004) https://doi.org/10.1029/2003GL018827
+- Motagh et al. (2017) https://doi.org/10.1016/j.enggeo.2017.01.011
 
 =====
 Usage
@@ -13,7 +14,7 @@ Usage
 LiCSBAS_decomposeLOS.py -f files.txt [-o outfile] [-r resampleAlg] [--out_stats]
 
  -f  Text file containing input GeoTIFF file paths of LOS displacement 
-     (or velocity), E component, and N component
+     (or velocity), E and N components of LOS unit vector
      Format:
          dispfile1 Efile1 Nfile1
          dispfile2 Efile2 Nfile2
@@ -26,6 +27,8 @@ LiCSBAS_decomposeLOS.py -f files.txt [-o outfile] [-r resampleAlg] [--out_stats]
 """
 #%% Change log
 '''
+v1.1.1 20201112 Yu Morishita, GSI
+ - Small bug fix
 v1.1 20200608 Yu Morishita, GSI
  - Add --out_stats option
 v1.0 20200528 Yu Morishita, GSI
@@ -80,9 +83,10 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.1; date=20200608; author="Y. Morishita"
+    ver='1.1.1'; date=20201112; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
+
 
     #%% Set default
     infiletxt = []
@@ -187,11 +191,11 @@ def main(argv=None):
         if np.abs(dlat1) > np.abs(dlat): dlat = dlat1
 
     ### Check if both from E and W used
-    if lon_w_E == -np.inf:
-        print('\nERROR: No LOS data from East!', file=sys.stderr)
+    if lon_w_E == np.inf:
+        print('\nERROR: No LOS data from East!\n', file=sys.stderr)
         return 2
-    elif lon_w_W == -np.inf:
-        print('\nERROR: No LOS data from West!', file=sys.stderr)
+    elif lon_w_W == np.inf:
+        print('\nERROR: No LOS data from West!\n', file=sys.stderr)
         return 2
 
     ### Set common area between E and W
