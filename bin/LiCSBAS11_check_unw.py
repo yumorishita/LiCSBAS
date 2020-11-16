@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3.1 20200911 Yu Morishita, GSI
+v1.3.2 20201116 Yu Morishita, GSI
 
 ========
 Overview
@@ -44,6 +44,8 @@ LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
 """
 #%% Change log
 '''
+v1.3.2 20201116 Yu Morioshita, GSI
+ - Exit if suffix is not set
 v1.3.1 20200911 Yu Morioshita, GSI
  - Change default to -c 0.05 -u 0.3
 v1.3 20200703 Yu Morioshita, GSI
@@ -83,7 +85,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.3.1"; date=20200911; author="Y. Morishita"
+    ver="1.3.2"; date=20201116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -247,7 +249,7 @@ def main(argv=None):
     print('# unw_cov_thre: {0}, coh_thre: {1}'.format(unw_cov_thre, coh_thre), file=fstats)
     print('# ifg dates         bperp   dt unw_cov  coh_av', file=fstats)
 
-    ### Identify suffix of raster image (ras or bmp?)
+    ### Identify suffix of raster image (png, ras or bmp?)
     unwfile = os.path.join(ifgdir, ifgdates[0], ifgdates[0]+'.unw')
     if os.path.exists(unwfile+'.ras'):
         suffix = '.ras'
@@ -255,11 +257,20 @@ def main(argv=None):
         suffix = '.bmp'
     elif os.path.exists(unwfile+'.png'):
         suffix = '.png'
+    else:
+        print('\nERROR: No browse image available for {}!\n'
+              .format(unwfile), file=sys.stderr)
+        return 2
 
     for i, ifgd in enumerate(ifgdates):
         rasname = ifgdates[i]+'.unw'+suffix
         rasorg = os.path.join(ifgdir, ifgdates[i], rasname)
-
+        
+        if not os.path.exists(rasorg):
+            print('\nERROR: No browse image {} available!\n'
+                  .format(rasorg), file=sys.stderr)
+            return 2
+        
         ### Identify bad ifgs and link ras
         if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre:
             bad_ifgdates.append(ifgdates[i])
