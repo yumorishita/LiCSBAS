@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0.2 20201028 Yu Morishita, GSI
+v1.0.3 20201116 Yu Morishita, GSI
 
 ========
 Overview
@@ -33,6 +33,8 @@ LiCSBAS_color_geotiff2tiles.py -i infile [-o outdir] [--zmin int] [--zmax int]
 """
 #%% Change log
 '''
+v1.0.3 20201116 Yu Morishita, GSI
+ - Bug fix of multiprocessing in Mac python>=3.8
 v1.0.2 20201028 Yu Morishita, GSI
  - Update how to get n_para
 v1.0.1 20201016 Yu Morishita, GSI
@@ -53,6 +55,7 @@ import gdal
 import numpy as np
 import subprocess as subp
 import multiprocessing as multi
+multi.set_start_method('fork') # for python >=3.8 in Mac
 
 class Usage(Exception):
     """Usage context manager"""
@@ -68,7 +71,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver='1.0.2'; date=20201028; author="Y. Morishita"
+    ver='1.0.3'; date=20201116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7.1 20201028 Yu Morishita, GSI
+v1.7.2 202011116 Yu Morishita, GSI
 
 ========
 Overview
@@ -48,6 +48,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 """
 #%% Change log
 '''
+v1.7.2 20201116 Yu Morishita, GSI
+ - Bug fix of multiprocessing in Mac python>=3.8
 v1.7.1 20201028 Yu Morishita, GSI
  - Update how to get n_para
 v1.7 20201020 Yu Morishita, GSI
@@ -87,6 +89,7 @@ import glob
 import numpy as np
 import subprocess as subp
 import multiprocessing as multi
+multi.set_start_method('fork') # for python >=3.8 in Mac
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -105,7 +108,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.7.1"; date=20201028; author="Y. Morishita"
+    ver="1.7.2"; date=202011116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

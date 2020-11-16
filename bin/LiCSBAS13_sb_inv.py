@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.3 20201104 Yu Morishita, GSI
+v1.4.4 20201116 Yu Morishita, GSI
 
 ========
 Overview
@@ -72,6 +72,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.4 20201116 Yu Morishita, GSI
+ - Bug fix of multiprocessing in Mac python>=3.8
 v1.4.3 20201104 Yu Morishita, GSI
  - Bug fix when n_pt_unnan=0 in a patch
 v1.4.2 20201028 Yu Morishita, GSI
@@ -107,6 +109,7 @@ import h5py as h5
 import numpy as np
 import datetime as dt
 import multiprocessing as multi
+multi.set_start_method('fork') # for python >=3.8 in Mac
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_inv_lib as inv_lib
@@ -129,7 +132,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.3"; date=20201104; author="Y. Morishita"
+    ver="1.4.4"; date=20201116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

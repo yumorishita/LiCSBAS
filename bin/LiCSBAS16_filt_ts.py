@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.1 20201028 Yu Morishita, GSI
+v1.4.2 20201116 Yu Morishita, GSI
 
 ========
 Overview
@@ -67,6 +67,8 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
 """
 #%% Change log
 '''
+v1.4.2 20201116 Yu Morishita, GSI
+ - Bug fix of multiprocessing in Mac python>=3.8
 v1.4.1 20201028 Yu Morishita, GSI
  - Update how to get n_para
 v1.4 20201020 Yu Morishita, GSI
@@ -99,6 +101,7 @@ import datetime as dt
 import h5py as h5
 from astropy.convolution import Gaussian2DKernel, convolve_fft
 import multiprocessing as multi
+multi.set_start_method('fork') # for python >=3.8 in Mac
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -119,7 +122,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.1"; date=20201028; author="Y. Morishita"
+    ver="1.4.2"; date=20201116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2.1 20201028 Yu Morishita, GSI
+v1.2.2 20201116 Yu Morishita, GSI
 
 ========
 Overview
@@ -42,6 +42,8 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
 """
 #%% Change log
 '''
+v1.2.2 20201116 Yu Morishita, GSI
+ - Bug fix of multiprocessing in Mac python>=3.8
 v1.2.1 20201028 Yu Morishita, GSI
  - Update how to get n_para
 v1.2 20200909 Yu Morishita, GSI
@@ -63,6 +65,7 @@ import shutil
 import time
 import numpy as np
 import multiprocessing as multi
+multi.set_start_method('fork')
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -81,7 +84,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.2.1"; date=20201028; author="Y. Morishita"
+    ver="1.2.2"; date=20201116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.4.1 20201116 Yu Morioshita, GSI
+ - Bug fix of multiprocessing in Mac python>=3.8
 v1.4 20200703 Yu Morioshita, GSI
  - Replace problematic terms
 v1.3 20200103 Yu Morioshita, Uni of Leeds and GSI
@@ -25,6 +27,7 @@ import warnings
 import numpy as np
 import datetime as dt
 import multiprocessing as multi
+multi.set_start_method('fork') # for python >=3.8 in Mac
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 import LiCSBAS_tools_lib as tools_lib

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5.1 20201028 Yu Morishita, GSI
+v1.5.2 20201116 Yu Morishita, GSI
 
 ========
 Overview
@@ -51,6 +51,8 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole] [--n_para i
 """
 #%% Change log
 '''
+v1.5.2 20201116 Yu Morishita, GSI
+ - Bug fix of multiprocessing in Mac python>=3.8
 v1.5.1 20201028 Yu Morishita, GSI
  - Update how to get n_para
 v1.5 20200909 Yu Morishita, GSI
@@ -81,6 +83,7 @@ import glob
 import numpy as np
 import gdal
 import multiprocessing as multi
+multi.set_start_method('fork') # for python >=3.8 in Mac
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -155,7 +158,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.5.1"; date=20201028; author="Y. Morishita"
+    ver="1.5.2"; date=20201116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
