@@ -8,7 +8,9 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
-v1.4.1 20201116 Yu Morioshita, GSI
+v1.4.2 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
+v1.4.1 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.4 20200703 Yu Morioshita, GSI
  - Replace problematic terms
@@ -27,7 +29,6 @@ import warnings
 import numpy as np
 import datetime as dt
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 import LiCSBAS_tools_lib as tools_lib
@@ -137,7 +138,8 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core):
         print('  {} parallel processing'.format(n_core), flush=True)
 
         args = [i for i in range(n_pt-n_pt_full)]
-        p = multi.Pool(n_core)
+        q = multi.get_context('fork')
+        p = q.Pool(n_core)
         _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
         result[:, ~bool_pt_full] = np.array(_result).T
 
@@ -209,7 +211,8 @@ def invert_nsbas_wls(unw, var, G, dt_cum, gamma, n_core):
         print('  {} parallel processing'.format(n_core), flush=True)
 
         args = [i for i in range(n_pt)]
-        p = multi.Pool(n_core)
+        q = multi.get_context('fork')
+        p = q.Pool(n_core)
         _result = p.map(wls_nsbas, args) #list[n_pt][length]
         result = np.array(_result).T
 

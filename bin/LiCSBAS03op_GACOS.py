@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5.2 20201116 Yu Morishita, GSI
+v1.5.3 20201118 Yu Morishita, GSI
 
 ========
 Overview
@@ -51,6 +51,8 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole] [--n_para i
 """
 #%% Change log
 '''
+v1.5.3 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.5.2 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.5.1 20201028 Yu Morishita, GSI
@@ -83,7 +85,6 @@ import glob
 import numpy as np
 import gdal
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -158,7 +159,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.5.2"; date=20201116; author="Y. Morishita"
+    ver="1.5.3"; date=20201118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -178,6 +179,8 @@ def main(argv=None):
         n_para = len(os.sched_getaffinity(0))
     except:
         n_para = multi.cpu_count()
+
+    q = multi.get_context('fork')
 
 
     #%% Read options
@@ -301,7 +304,7 @@ def main(argv=None):
             _n_para = n_para
             
         print('  {} parallel processing...'.format(_n_para), flush=True)
-        p = multi.Pool(_n_para)
+        p = q.Pool(_n_para)
         no_gacos_imds = p.map(convert_wrapper, range(n_im2))
         p.close()
     
@@ -343,7 +346,7 @@ def main(argv=None):
             _n_para = n_para
             
         print('  {} parallel processing...'.format(_n_para), flush=True)
-        p = multi.Pool(_n_para)
+        p = q.Pool(_n_para)
         _return = p.map(correct_wrapper, range(n_ifg2))
         p.close()
     

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2.2 20201116 Yu Morishita, GSI
+v1.2.3 20201118 Yu Morishita, GSI
 
 ========
 Overview
@@ -42,6 +42,8 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
 """
 #%% Change log
 '''
+v1.2.3 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.2.2 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.2.1 20201028 Yu Morishita, GSI
@@ -65,7 +67,6 @@ import shutil
 import time
 import numpy as np
 import multiprocessing as multi
-multi.set_start_method('fork')
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -84,7 +85,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.2.2"; date=20201116; author="Y. Morishita"
+    ver="1.2.3"; date=20201118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -101,6 +102,8 @@ def main(argv=None):
         n_para = len(os.sched_getaffinity(0))
     except:
         n_para = multi.cpu_count()
+
+    q = multi.get_context('fork')
 
 
     #%% Read options
@@ -281,7 +284,7 @@ def main(argv=None):
             n_para = n_ifg2
             
         print('  {} parallel processing...'.format(n_para), flush=True)
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         p.map(clip_wrapper, range(n_ifg2))
         p.close()
 

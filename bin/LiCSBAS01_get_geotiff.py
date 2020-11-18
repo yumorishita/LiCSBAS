@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.6.1 20201116 Yu Morishita, GSI
+v1.6.2 20201118 Yu Morishita, GSI
 
 ========
 Overview
@@ -38,6 +38,8 @@ LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos] 
 """
 #%% Change log
 '''
+v1.6.2 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.6.1 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.6 20200911 Yu Morishita, GSI
@@ -71,7 +73,6 @@ from bs4 import BeautifulSoup
 import numpy as np
 import datetime as dt
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 import LiCSBAS_tools_lib as tools_lib
 
 class Usage(Exception):
@@ -88,7 +89,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver='1.6.1'; date=20201116; author="Y. Morishita"
+    ver='1.6.2'; date=20201118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -99,6 +100,8 @@ def main(argv=None):
     enddate = int(dt.date.today().strftime("%Y%m%d"))
     get_gacos = False
     n_para = 4
+
+    q = multi.get_context('fork')
 
 
     #%% Read options
@@ -257,7 +260,7 @@ def main(argv=None):
                  os.path.join(gacosdir, imd+'.sltd.geo.tif')
                  ) for i, imd in enumerate(_imdates)]
     
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         rc = p.map(check_gacos_wrapper, args)
         p.close()
 
@@ -289,7 +292,7 @@ def main(argv=None):
                      os.path.join(gacosdir, '{}.sltd.geo.tif'.format(imd))
                      ) for i, imd in enumerate(imdates_dl)]
             
-            p = multi.Pool(n_para)
+            p = q.Pool(n_para)
             p.map(download_wrapper, args)
             p.close()
         else:
@@ -329,7 +332,7 @@ def main(argv=None):
              os.path.join(ifgd, '{}.geo.unw.tif'.format(ifgd))
              ) for i, ifgd in enumerate(ifgdates)]
 
-    p = multi.Pool(n_para)
+    p = q.Pool(n_para)
     rc = p.map(check_exist_wrapper, args)
     p.close()
 
@@ -349,7 +352,7 @@ def main(argv=None):
              os.path.join(ifgd, '{}.geo.cc.tif'.format(ifgd))
              ) for i, ifgd in enumerate(ifgdates)]
 
-    p = multi.Pool(n_para)
+    p = q.Pool(n_para)
     rc = p.map(check_exist_wrapper, args)
     p.close()
 
@@ -378,7 +381,7 @@ def main(argv=None):
                  os.path.join(ifgd, '{}.geo.unw.tif'.format(ifgd))
                  ) for i, ifgd in enumerate(unwdates_dl)]
         
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         p.map(download_wrapper, args)
         p.close()
    
@@ -390,7 +393,7 @@ def main(argv=None):
                  os.path.join(ifgd, '{}.geo.cc.tif'.format(ifgd))
                  ) for i, ifgd in enumerate(ccdates_dl)]
         
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         p.map(download_wrapper, args)
         p.close()
    

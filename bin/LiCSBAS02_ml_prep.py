@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.7.2 202011116 Yu Morishita, GSI
+v1.7.3 202011118 Yu Morishita, GSI
 
 ========
 Overview
@@ -48,6 +48,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 """
 #%% Change log
 '''
+v1.7.3 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.7.2 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.7.1 20201028 Yu Morishita, GSI
@@ -89,7 +91,6 @@ import glob
 import numpy as np
 import subprocess as subp
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -108,7 +109,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.7.2"; date=202011116; author="Y. Morishita"
+    ver="1.7.3"; date=202011118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -129,6 +130,7 @@ def main(argv=None):
     cmap = 'insar'
     cycle = 3
     n_valid_thre = 0.5
+    q = multi.get_context('fork')
 
 
     #%% Read options
@@ -283,7 +285,7 @@ def main(argv=None):
             
         ### Create float with parallel processing
         print('  {} parallel processing...'.format(n_para), flush=True)
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         rc = p.map(convert_wrapper, range(n_ifg2))
         p.close()
         

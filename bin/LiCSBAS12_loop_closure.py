@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5.2 20201116 Yu Morishita, GSI
+v1.5.3 20201118 Yu Morishita, GSI
 
 ========
 Overview
@@ -61,6 +61,8 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--n_para int]
 """
 #%% Change log
 '''
+v1.5.3 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.5.2 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.5.1 20201028 Yu Morishita, GSI
@@ -94,7 +96,6 @@ import glob
 import numpy as np
 import datetime as dt
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_loop_lib as loop_lib
@@ -117,7 +118,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.5.2"; date=20201116; author="Y. Morishita"
+    ver="1.5.3"; date=20201118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -137,6 +138,8 @@ def main(argv=None):
     cycle = 3 # 2pi*3/cycle
     cmap_noise = 'viridis'
     cmap_noise_r = 'viridis_r'
+    q = multi.get_context('fork')
+
 
     #%% Read options
     try:
@@ -275,7 +278,7 @@ def main(argv=None):
     good_ifg = []
 
     ### Parallel processing
-    p = multi.Pool(_n_para)
+    p = q.Pool(_n_para)
     loop_ph_rms_ifg = np.array(p.map(loop_closure_1st_wrapper, range(n_loop)), dtype=np.float32)
     p.close()
 
@@ -327,7 +330,7 @@ def main(argv=None):
     print('with {} parallel processing...'.format(_n_para2), flush=True)
 
     ### Parallel processing
-    p = multi.Pool(_n_para2)
+    p = q.Pool(_n_para2)
     res = np.array(p.map(loop_closure_2nd_wrapper, args), dtype=np.float32)
     p.close()
 
@@ -393,7 +396,7 @@ def main(argv=None):
     print('with {} parallel processing...'.format(_n_para), flush=True)
 
     ### Parallel processing
-    p = multi.Pool(_n_para)
+    p = q.Pool(_n_para)
     loop_ph_rms_ifg2 = list(np.array(p.map(loop_closure_3rd_wrapper, range(n_loop)), dtype=np.float32))
     p.close()
 
@@ -463,7 +466,7 @@ def main(argv=None):
     print('with {} parallel processing...'.format(_n_para2), flush=True)
 
     ### Parallel processing
-    p = multi.Pool(_n_para2)
+    p = q.Pool(_n_para2)
     res = np.array(p.map(loop_closure_4th_wrapper, args), dtype=np.int16)
     p.close()
 

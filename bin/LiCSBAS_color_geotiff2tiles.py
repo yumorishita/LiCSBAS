@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.0.3 20201116 Yu Morishita, GSI
+v1.0.4 20201118 Yu Morishita, GSI
 
 ========
 Overview
@@ -33,6 +33,8 @@ LiCSBAS_color_geotiff2tiles.py -i infile [-o outdir] [--zmin int] [--zmax int]
 """
 #%% Change log
 '''
+v1.0.4 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.0.3 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.0.2 20201028 Yu Morishita, GSI
@@ -55,7 +57,6 @@ import gdal
 import numpy as np
 import subprocess as subp
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 
 class Usage(Exception):
     """Usage context manager"""
@@ -71,7 +72,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver='1.0.3'; date=20201116; author="Y. Morishita"
+    ver='1.0.4'; date=20201118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -89,6 +90,8 @@ def main(argv=None):
         n_para = len(os.sched_getaffinity(0))
     except:
         n_para = multi.cpu_count()
+
+    q = multi.get_context('fork')
 
 
     #%% Read options
@@ -196,7 +199,7 @@ def main(argv=None):
     if not tms_flag and int(gdalver[0:3]) < 301:
         print('\nInvert Y with {} parallel processing...'.format(n_para), flush=True)
         files = glob.glob('{}/*/*/*.png'.format(outdir))
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         p.map(invert_y_wrapper, range(len(files)))
         p.close()
 

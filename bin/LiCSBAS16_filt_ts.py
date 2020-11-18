@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.2 20201116 Yu Morishita, GSI
+v1.4.3 20201118 Yu Morishita, GSI
 
 ========
 Overview
@@ -67,6 +67,8 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
 """
 #%% Change log
 '''
+v1.4.3 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.4.2 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.4.1 20201028 Yu Morishita, GSI
@@ -101,7 +103,6 @@ import datetime as dt
 import h5py as h5
 from astropy.convolution import Gaussian2DKernel, convolve_fft
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -122,7 +123,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.2"; date=20201116; author="Y. Morishita"
+    ver="1.4.3"; date=20201118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -156,6 +157,8 @@ def main(argv=None):
     
     cmap_vel = SCM.roma.reversed()
     cmap_noise_r = 'viridis_r'
+    q = multi.get_context('fork')
+
 
     #%% Read options
     try:
@@ -398,7 +401,7 @@ def main(argv=None):
         args = [(i, cum_org[i, :, :]) for i in range(n_im)]
 
         ### Parallel processing
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         _result = np.array(p.map(deramp_wrapper, args), dtype=object)
         p.close()
         del args
@@ -412,7 +415,7 @@ def main(argv=None):
         ### Only for output increment png files
         print('\nCreate png for increment with {} parallel processing...'.format(n_para), flush=True)
         args = [(i, cum_org[i, :, :], cum_org[i-1, :, :]) for i in range(1, n_im)]
-        p = multi.Pool(n_para)
+        p = q.Pool(n_para)
         p.map(deramp_wrapper2, args)
         p.close()
         del args
@@ -425,7 +428,7 @@ def main(argv=None):
     print('with {} parallel processing...'.format(n_para), flush=True)
 
     ### Parallel processing
-    p = multi.Pool(n_para)
+    p = q.Pool(n_para)
     cum_filt[:, :, :] = np.array(p.map(filter_wrapper, range(n_im)), dtype=np.float32)
     p.close()
 
@@ -433,7 +436,7 @@ def main(argv=None):
     ### Only for output increment png files
     print('\nCreate png for increment with {} parallel processing...'.format(n_para), flush=True)
     args = [(i, cum_filt[i, :, :]-cum_filt[i-1, :, :]) for i in range(1, n_im)]
-    p = multi.Pool(n_para)
+    p = q.Pool(n_para)
     p.map(filter_wrapper2, args)
     p.close()
     del args

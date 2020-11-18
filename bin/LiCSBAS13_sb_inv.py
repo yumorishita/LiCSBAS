@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.4 20201116 Yu Morishita, GSI
+v1.4.5 20201118 Yu Morishita, GSI
 
 ========
 Overview
@@ -72,6 +72,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.5 20201118 Yu Morishita, GSI
+ - Again Bug fix of multiprocessing
 v1.4.4 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
 v1.4.3 20201104 Yu Morishita, GSI
@@ -109,7 +111,6 @@ import h5py as h5
 import numpy as np
 import datetime as dt
 import multiprocessing as multi
-multi.set_start_method('fork') # for python >=3.8 in Mac
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_inv_lib as inv_lib
@@ -123,7 +124,6 @@ class Usage(Exception):
         self.msg = msg
 
 
-
 #%% Main
 def main(argv=None):
    
@@ -132,7 +132,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.4"; date=20201116; author="Y. Morishita"
+    ver="1.4.5"; date=20201118; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -161,6 +161,8 @@ def main(argv=None):
     cmap_vel = SCM.roma.reversed()
     cmap_noise = 'viridis'
     cmap_noise_r = 'viridis_r'
+    q = multi.get_context('fork')
+
 
     #%% Read options
     try:
@@ -529,7 +531,7 @@ def main(argv=None):
             print('  with {} parallel processing...'.format(n_para_gap), flush=True)
     
             ### Devide unwpatch by n_para for parallel processing
-            p = multi.Pool(n_para_gap)
+            p = q.Pool(n_para_gap)
             _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)), dtype=object)
             p.close()
         
@@ -702,7 +704,7 @@ def main(argv=None):
     ### Incremental displacement
     _n_para = n_im-1 if n_para > n_im-1 else n_para
     print('\nOutput increment png images with {} parallel processing...'.format(_n_para), flush=True)
-    p = multi.Pool(_n_para)
+    p = q.Pool(_n_para)
     p.map(inc_png_wrapper, range(n_im-1))
     p.close()
 
@@ -711,7 +713,7 @@ def main(argv=None):
         print('# RMS of residual (mm)', file=f)
     _n_para = n_ifg if n_para > n_ifg else n_para
     print('\nOutput residual png images with {} parallel processing...'.format(_n_para), flush=True)
-    p = multi.Pool(_n_para)
+    p = q.Pool(_n_para)
     p.map(resid_png_wrapper, range(n_ifg))
     p.close()
     
