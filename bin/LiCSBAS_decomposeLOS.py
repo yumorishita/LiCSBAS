@@ -39,7 +39,7 @@ v1.0 20200528 Yu Morishita, GSI
 import getopt
 import os
 import sys
-import gdal, osr
+from osgeo import gdal, osr
 import numpy as np
 import time
 from decimal import Decimal

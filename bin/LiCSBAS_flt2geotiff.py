@@ -167,7 +167,7 @@ def main(argv=None):
     else:
         print('Use gdal module')
         try:
-            import gdal, osr
+            from osgeo import gdal, osr
         except:
             print("\nERROR: gdal must be installed.", file=sys.stderr)
             return 1

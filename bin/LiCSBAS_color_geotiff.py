@@ -144,7 +144,7 @@ if __name__ == "__main__":
     
 
     #%% Set color range
-    import gdal
+    from osgeo import gdal
     
     ### Auto
     if cmin is None:

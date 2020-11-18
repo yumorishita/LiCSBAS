@@ -74,7 +74,7 @@ import numpy as np
 import subprocess as subp
 import SCM
 import zipfile
-import gdal
+from osgeo import gdal
 
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_io_lib as io_lib
