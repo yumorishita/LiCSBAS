@@ -86,7 +86,7 @@ import re
 import sys
 import time
 import shutil
-import gdal
+from osgeo import gdal
 import glob
 import numpy as np
 import subprocess as subp

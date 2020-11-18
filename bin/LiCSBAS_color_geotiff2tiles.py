@@ -53,7 +53,7 @@ import sys
 import time
 import shutil
 import glob
-import gdal
+from osgeo import gdal
 import numpy as np
 import subprocess as subp
 import multiprocessing as multi

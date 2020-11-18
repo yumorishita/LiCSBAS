@@ -83,7 +83,7 @@ import time
 import shutil
 import glob
 import numpy as np
-import gdal
+from osgeo import gdal
 import multiprocessing as multi
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
