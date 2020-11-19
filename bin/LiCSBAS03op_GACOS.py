@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """
-v1.5.3 20201118 Yu Morishita, GSI
+v1.5.4 20201119 Yu Morishita, GSI
 
-========
-Overview
-========
-This script applies a tropospheric correction to unw data using GACOS data. GACOS data may be automatically downloaded from COMET-LiCS web at step01 (if available), or could be externally obtained by requesting on a GACOS web. 
+This script applies a tropospheric correction to unw data using GACOS data. GACOS data may be automatically downloaded from COMET-LiCS web at step01 (if available), or could be externally obtained by requesting on a GACOS web (http://www.gacos.net/).
 If you request the GACOS data through the GACOS web, the dates and time of interest can be found in baselines and slc.mli.par, respectively. These are also available on the COMET-LiCS web portal. Once the GACOS data are ready, download the tar.gz, uncompress it, and put into GACOS dir. 
 Existing files are not re-created to save time, i.e., only the newly available data will be processed. The impact of the correction can be visually checked by showing GACOS_info.png and */*.gacos.png. This step is optional.
 
@@ -22,7 +19,8 @@ Inputs in GEOCml*/ :
 
 Inputs in GACOS/ :
  - yyyymmdd.sltd.geo.tif  and/or 
- - yyyymmdd.ztd[.rsc]
+ - yyyymmdd.ztd[.rsc]     and/or
+ - yyyymmdd.ztd.tif
 
 Outputs in GEOCml*GACOS/
  - yyyymmdd_yyyymmdd/
@@ -51,6 +49,8 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole] [--n_para i
 """
 #%% Change log
 '''
+v1.5.4 20201119 Yu Morishita, GSI
+ - New GACOS format (ztd.tif) available
 v1.5.3 20201118 Yu Morishita, GSI
  - Again Bug fix of multiprocessing
 v1.5.2 20201116 Yu Morishita, GSI
@@ -159,7 +159,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.5.3"; date=20201118; author="Y. Morishita"
+    ver="1.5.4"; date=20201119; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -405,9 +405,11 @@ def convert_wrapper(ix_im):
         print('  Finished {0:4}/{1:4}th sltd...'.format(ix_im, len(imdates2)), flush=True)
 
     ztdfile = os.path.join(gacosdir, imd+'.ztd')
+    ztdtiffile = os.path.join(gacosdir, imd+'.ztd.tif')
     sltdtiffile = os.path.join(gacosdir, imd+'.sltd.geo.tif')
 
     if os.path.exists(sltdtiffile):
+        print('    Use {}.sltd.geo.tif'.format(imd), flush=True)
         infile = os.path.basename(sltdtiffile)
         try: ### Cut and resapmle. Already in rad.
             sltd_geo = gdal.Warp("", sltdtiffile, format='MEM', outputBounds=outputBounds, width=width_geo, height=length_geo, resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
@@ -415,7 +417,20 @@ def convert_wrapper(ix_im):
             print ('  {} cannot open. Skip'.format(infile), flush=True)
             return imd
 
+    elif os.path.exists(ztdtiffile):
+        print('    Use {}.ztd.tif'.format(imd), flush=True)
+        infile = os.path.basename(ztdtiffile)
+        try: ### Cut and resapmle ztd to geo
+            ztd_geo = gdal.Warp("", ztdtiffile, format='MEM', outputBounds=outputBounds, width=width_geo, height=length_geo, resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
+        except: ## if broken
+            print ('  {} cannot open. Skip'.format(infile), flush=True)
+            return imd
+
+        ### Meter to rad, slantrange
+        sltd_geo = ztd_geo/LOSu*m2r_coef ## LOSu=cos(inc)
+
     elif os.path.exists(ztdfile):
+        print('    Use {}.ztd[.rsc]'.format(imd), flush=True)
         infile = os.path.basename(ztdfile)
         hdrfile = os.path.join(sltddir, imd+'.hdr')
         bilfile = os.path.join(sltddir, imd+'.bil')
@@ -444,12 +459,12 @@ def convert_wrapper(ix_im):
         sltd_geo = ztd_geo/LOSu*m2r_coef ## LOSu=cos(inc)
 
     else:
-        print('  There is no ztd|sltd.geo.tif for {}!'.format(imd), flush=True)
+        print('    No {}.ztd|ztd.tif|sltd.geo.tif! Skip.'.format(imd), flush=True)
         return imd ## Next imd
 
     ### Skip if no data in the area
     if np.all((sltd_geo==0)|np.isnan(sltd_geo)):
-        print('  There is no valid data in {}!'.format(infile), flush=True)
+        print('    No valid data in {}! Skip.'.format(infile), flush=True)
         return imd ## Next imd
 
     ### Fill hole is specified
