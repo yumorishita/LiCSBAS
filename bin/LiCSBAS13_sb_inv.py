@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """
-v1.4.5 20201118 Yu Morishita, GSI
+v1.4.6 20201119 Yu Morishita, GSI
 
-========
-Overview
-========
 This script inverts the SB network of unw to obtain the time series and velocity 
 using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
 A stable reference point is determined after the inversion. RMS of the time series
@@ -72,6 +69,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.6 20201119 Yu Morishita, GSI
+ - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.4.5 20201118 Yu Morishita, GSI
  - Again Bug fix of multiprocessing
 v1.4.4 20201116 Yu Morishita, GSI
@@ -132,14 +131,14 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.5"; date=20201118; author="Y. Morishita"
+    ver="1.4.6"; date=20201119; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ## For parallel processing
     global n_para_gap, G, Aloop, unwpatch, imdates, incdir, ifgdir, length, width,\
         coef_r2m, ifgdates, ref_unw, cycle, keep_incfile, resdir, restxtfile, \
-        cmap_vel, wavelength
+        cmap_vel, cmap_wrap, wavelength
 
 
     #%% Set default
@@ -161,6 +160,7 @@ def main(argv=None):
     cmap_vel = SCM.roma.reversed()
     cmap_noise = 'viridis'
     cmap_noise_r = 'viridis_r'
+    cmap_wrap = SCM.romaO
     q = multi.get_context('fork')
 
 
@@ -827,7 +827,7 @@ def inc_png_wrapper(imx):
     data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [unw, inc, inc-unw]]
     title3 = ['Daisy-chain IFG ({}pi/cycle)'.format(cycle*2), 'Inverted ({}pi/cycle)'.format(cycle*2), 'Difference ({}pi/cycle)'.format(cycle*2)]
     pngfile = os.path.join(incdir, '{}.increment.png'.format(ifgd))
-    plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+    plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
     if not keep_incfile:
         os.remove(incfile)

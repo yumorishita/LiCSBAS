@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """
-v1.4.3 20201118 Yu Morishita, GSI
+v1.4.4 20201119 Yu Morishita, GSI
 
-========
-Overview
-========
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
 ===============
@@ -67,6 +64,8 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
 """
 #%% Change log
 '''
+v1.4.4 20201119 Yu Morishita, GSI
+ - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.4.3 20201118 Yu Morishita, GSI
  - Again Bug fix of multiprocessing
 v1.4.2 20201116 Yu Morishita, GSI
@@ -123,14 +122,14 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.3"; date=20201118; author="Y. Morishita"
+    ver="1.4.4"; date=20201119; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ## for parallel processing
     global cum, mask, deg_ramp, hgt_linearflag, hgt, hgt_min, hgt_max,\
     filtcumdir, filtincdir, imdates, cycle, coef_r2m, models, \
-    filtwidth_yr, filtwidth_km, dt_cum, x_stddev, y_stddev, mask2
+    filtwidth_yr, filtwidth_km, dt_cum, x_stddev, y_stddev, mask2, cmap_wrap
     ## global cum_org from hdf5 contaminate in paralell warpper? So pass them by arg.
 
 
@@ -157,6 +156,7 @@ def main(argv=None):
     
     cmap_vel = SCM.roma.reversed()
     cmap_noise_r = 'viridis_r'
+    cmap_wrap = SCM.romaO
     q = multi.get_context('fork')
 
 
@@ -599,7 +599,7 @@ def deramp_wrapper(args):
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum_bf, fit_hgt, _cum*mask]]
         title3 = ['Before hgt-linear (STD: {:.1f}mm)'.format(std_before), 'hgt-linear phase ({:.1f}mm/km)'.format(model[-1]*1000), 'After hgt-linear (STD: {:.1f}mm)'.format(std_after)]
         pngfile = os.path.join(filtcumdir, imdates[i]+'_hgt_linear.png')
-        plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+        plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
         
         pngfile = os.path.join(filtcumdir, imdates[i]+'_hgt_corr.png')
         title = '{} ({:.1f}mm/km, based on {}<=hgt<={})'.format(imdates[i], model[-1]*1000, hgt_min, hgt_max)
@@ -615,7 +615,7 @@ def deramp_wrapper(args):
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [_cum_org*mask, ramp, _cum_org*mask-ramp]]
         pngfile = os.path.join(filtcumdir, imdates[i]+'_deramp.png')
         deramp_title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{})'.format(deg_ramp), 'After deramp ({}pi/cycle)'.format(cycle*2)]
-        plot_lib.make_3im_png(data3, pngfile, 'insar', deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+        plot_lib.make_3im_png(data3, pngfile, cmap_wrap, deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
  
     return _cum, model
  
@@ -637,7 +637,7 @@ def deramp_wrapper2(args):
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [inc+fit_hgt-fit_hgt1, fit_hgt-fit_hgt1, inc]]
         title3 = ['Before hgt-linear (STD: {:.1f}mm)'.format(std_before), 'hgt-linear phase ({:.1f}mm/km)'.format((models[i][-1]-models[i-1][-1])*1000), 'After hgt-linear (STD: {:.1f}mm)'.format(std_after)]
         pngfile = os.path.join(filtincdir, '{}_{}_hgt_linear.png'.format(imdates[i-1], imdates[i]))
-        plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+        plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
         pngfile = os.path.join(filtincdir, '{}_{}_hgt_corr.png'.format(imdates[i-1], imdates[i]))
         title = '{}_{} ({:.1f}mm/km, based on {}<=hgt<={})'.format(imdates[i-1], imdates[i], (models[i][-1]-models[i-1][-1])*1000, hgt_min, hgt_max)
@@ -657,7 +657,7 @@ def deramp_wrapper2(args):
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [inc_org, ramp-ramp1, inc_org-(ramp-ramp1)]]
         pngfile = os.path.join(filtincdir, '{}_{}_deramp.png'.format(imdates[i-1], imdates[i]))
         deramp_title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{})'.format(deg_ramp), 'After deramp ({}pi/cycle)'.format(cycle*2)]
-        plot_lib.make_3im_png(data3, pngfile, 'insar', deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+        plot_lib.make_3im_png(data3, pngfile, cmap_wrap, deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
 
 #%% 
@@ -711,7 +711,7 @@ def filter_wrapper(i):
     data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum[i, :, :]*mask, cum_hptlps*mask, _cum_filt*mask]]
     title3 = ['Before filter ({}pi/cycle)'.format(cycle*2), 'Filter phase ({}pi/cycle)'.format(cycle*2), 'After filter ({}pi/cycle)'.format(cycle*2)]
     pngfile = os.path.join(filtcumdir, imdates[i]+'_filt.png')
-    plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+    plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
     
     return _cum_filt
 
@@ -729,7 +729,7 @@ def filter_wrapper2(args):
               'Filter phase ({}pi/cycle)'.format(cycle*2),
               'After filter ({}pi/cycle)'.format(cycle*2)]
     pngfile = os.path.join(filtincdir, '{}_{}_filt.png'.format(imdates[i-1], imdates[i]))
-    plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+    plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
     
 #%% main

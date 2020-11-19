@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5.4 20201119 Yu Morishita, GSI
+v1.5.5 20201119 Yu Morishita, GSI
 
 This script applies a tropospheric correction to unw data using GACOS data. GACOS data may be automatically downloaded from COMET-LiCS web at step01 (if available), or could be externally obtained by requesting on a GACOS web (http://www.gacos.net/).
 If you request the GACOS data through the GACOS web, the dates and time of interest can be found in baselines and slc.mli.par, respectively. These are also available on the COMET-LiCS web portal. Once the GACOS data are ready, download the tar.gz, uncompress it, and put into GACOS dir. 
@@ -49,6 +49,8 @@ LiCSBAS03op_GACOS.py -i in_dir -o out_dir [-g gacosdir] [--fillhole] [--n_para i
 """
 #%% Change log
 '''
+v1.5.5 20201119 Yu Morishita, GSI
+ - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.5.4 20201119 Yu Morishita, GSI
  - New GACOS format (ztd.tif) available
 v1.5.3 20201118 Yu Morishita, GSI
@@ -85,6 +87,7 @@ import glob
 import numpy as np
 from osgeo import gdal
 import multiprocessing as multi
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -159,14 +162,14 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.5.4"; date=20201119; author="Y. Morishita"
+    ver="1.5.5"; date=20201119; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ### For parallel processing
     global imdates2, gacosdir, outputBounds, width_geo, length_geo, resampleAlg,\
         sltddir, LOSu, m2r_coef, fillholeflag, ifgdates2,\
-        in_dir, out_dir, length_unw, width_unw, cycle
+        in_dir, out_dir, length_unw, width_unw, cycle, cmap_wrap
 
 
     #%% Set default
@@ -181,7 +184,7 @@ def main(argv=None):
         n_para = multi.cpu_count()
 
     q = multi.get_context('fork')
-
+    cmap_wrap = SCM.romaO
 
     #%% Read options
     try:
@@ -532,12 +535,12 @@ def correct_wrapper(i):
     data3 = [np.angle(np.exp(1j*(data/cycle))*cycle) for data in [unw, unw_cor, dsltd]]
     title3 = ['unw_org (STD: {:.1f} rad)'.format(std_unw), 'unw_cor (STD: {:.1f} rad)'.format(std_unwcor), 'dsltd ({:.1f}% reduced)'.format(rate)]
     pngfile = os.path.join(out_dir1, ifgd+'.gacos.png')
-    plot_lib.make_3im_png(data3, pngfile, 'insar', title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+    plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
     
     ## Output png for corrected unw
     pngfile = os.path.join(out_dir1, ifgd+'.unw.png')
     title = '{} ({}pi/cycle)'.format(ifgd, cycle*2)
-    plot_lib.make_im_png(np.angle(np.exp(1j*unw_cor/cycle)*cycle), pngfile, 'insar', title, -np.pi, np.pi, cbar=False)
+    plot_lib.make_im_png(np.angle(np.exp(1j*unw_cor/cycle)*cycle), pngfile, cmap_wrap, title, -np.pi, np.pi, cbar=False)
 
     return 2, [ifgd, std_unw, std_unwcor, rate]
 

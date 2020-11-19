@@ -2,9 +2,6 @@
 """
 v1.9 20201111 Yu Morishita, GSI
 
-========
-Overview
-========
 This script displays an image file.
 
 =====
@@ -20,7 +17,7 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
  -c  Colormap name (see below for available colormap)
      - https://matplotlib.org/tutorials/colors/colormaps.html
      - http://www.fabiocrameri.ch/colourmaps.php
-     - insar
+     - insar (GAMMA standard rainbow color for wrapped phase)
      (Default: SCM.roma_r, reverse of SCM.roma)
  --cmin|cmax    Min|max values of color (Default: None (auto))
  --auto_crange  % of color range used for automatic determination (Default: 99)

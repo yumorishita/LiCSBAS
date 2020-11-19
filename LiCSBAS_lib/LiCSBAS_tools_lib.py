@@ -82,7 +82,7 @@ def comp_size_time(file_remote, file_local):
 #%%
 def cmap_insar():
     """
-    How to use cmap_insar:
+    How to use cmap_insar (GAMMA standard rainbow cmap):
         import matplotlib as mpl
         from matplotlib import pyplot as plt
         cdict = cmap_insar()

@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """
-v1.3.3 20201118 Yu Morishita, GSI
+v1.3.4 20201119 Yu Morishita, GSI
 
-========
-Overview
-========
 This script masks specified areas or low coherence areas in the unw data. The masking is effective when the unw data include areas which have many unwrapping errors and are not of interest, and can improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
 
 ===============
@@ -42,6 +39,8 @@ LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f 
 """
 #%% Change log
 '''
+v1.3.4 20201119 Yu Morishita, GSI
+ - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.3.3 20201118 Yu Morishita, GSI
  - Again Bug fix of multiprocessing
 v1.3.2 20201116 Yu Morishita, GSI
@@ -67,6 +66,7 @@ import shutil
 import time
 import numpy as np
 import multiprocessing as multi
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -84,12 +84,12 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.3.3"; date=20201118; author="Y. Morishita"
+    ver="1.3.4"; date=20201119; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ### For paralell processing
-    global ifgdates2, in_dir, out_dir, length, width, bool_mask, cycle
+    global ifgdates2, in_dir, out_dir, length, width, bool_mask, cycle, cmap_wrap
 
 
     #%% Set default
@@ -104,6 +104,7 @@ def main(argv=None):
         n_para = multi.cpu_count()
 
     cmap_noise = 'viridis'
+    cmap_wrap = SCM.romaO
     q = multi.get_context('fork')
 
 
@@ -314,7 +315,7 @@ def mask_wrapper(ifgix):
     ## Output png for masked unw
     pngfile = os.path.join(out_dir1, ifgd+'.unw.png')
     title = '{} ({}pi/cycle)'.format(ifgd, cycle*2)
-    plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, 'insar', title, -np.pi, np.pi, cbar=False)
+    plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, cmap_wrap, title, -np.pi, np.pi, cbar=False)
 
 
 #%% main

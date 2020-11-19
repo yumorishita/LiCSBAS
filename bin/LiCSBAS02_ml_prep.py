@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """
-v1.7.3 202011118 Yu Morishita, GSI
+v1.7.4 202011119 Yu Morishita, GSI
 
-========
-Overview
-========
 This script converts GeoTIFF files of unw and cc to float32 and uint8 format, respectively, for further time series analysis, and also downsamples (multilooks) data if specified. Existing files are not re-created to save time, i.e., only the newly available data will be processed.
 
 ====================
@@ -48,6 +45,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 """
 #%% Change log
 '''
+v1.7.4 20201119 Yu Morishita, GSI
+ - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.7.3 20201118 Yu Morishita, GSI
  - Again Bug fix of multiprocessing
 v1.7.2 20201116 Yu Morishita, GSI
@@ -82,7 +81,6 @@ v1.0 20190731 Yu Morishita, Uni of Leeds and GSI
 #%% Import
 import getopt
 import os
-import re
 import sys
 import time
 import shutil
@@ -91,6 +89,7 @@ import glob
 import numpy as np
 import subprocess as subp
 import multiprocessing as multi
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -109,12 +108,12 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.7.3"; date=202011118; author="Y. Morishita"
+    ver="1.7.4"; date=20201119; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ### For parallel processing
-    global ifgdates2, geocdir, outdir, nlook, n_valid_thre, cycle, cmap
+    global ifgdates2, geocdir, outdir, nlook, n_valid_thre, cycle, cmap_wrap
 
 
     #%% Set default
@@ -127,7 +126,7 @@ def main(argv=None):
     except:
         n_para = multi.cpu_count()
 
-    cmap = 'insar'
+    cmap_wrap = SCM.romaO 
     cycle = 3
     n_valid_thre = 0.5
     q = multi.get_context('fork')
@@ -444,7 +443,7 @@ def convert_wrapper(i):
 
     ### Make png
     unwpngfile = os.path.join(ifgdir1, ifgd+'.unw.png')
-    plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), unwpngfile, cmap, ifgd+'.unw', vmin=-np.pi, vmax=np.pi, cbar=False)
+    plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), unwpngfile, cmap_wrap, ifgd+'.unw', vmin=-np.pi, vmax=np.pi, cbar=False)
     
     return 0
 

@@ -8,6 +8,8 @@ Python3 library of loop closure check functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.5.1 20201119 Yu Morishita, GSI
+ - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.5 20201006 Yu Morishita, GSI
  - Update make_loop_png
 v1.4 20200828 Yu Morishita, GSI
@@ -27,7 +29,6 @@ import os
 import numpy as np
 import SCM
 import LiCSBAS_io_lib as io_lib
-import LiCSBAS_tools_lib as tools_lib
 
 os.environ['QT_QPA_PLATFORM']='offscreen'
 import warnings
@@ -120,12 +121,10 @@ def identify_bad_ifg(bad_ifg_cand, good_ifg):
 
 #%% 
 def make_loop_png(unw12, unw23, unw13, loop_ph, png, titles4, cycle):
-    ### Load color map for InSAR
-    cdict = tools_lib.cmap_insar()
-    plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
-    plt.rcParams['axes.titlesize'] = 10
+    cmap_wrap = SCM.romaO
 
     ### Settings    
+    plt.rcParams['axes.titlesize'] = 10
     data = [unw12, unw23, unw13]
 
     length, width = unw12.shape
@@ -145,7 +144,7 @@ def make_loop_png(unw12, unw23, unw13, loop_ph, png, titles4, cycle):
     for i in range(3):
         data_wrapped = np.angle(np.exp(1j*(data[i]/cycle))*cycle)
         ax = fig.add_subplot(2, 2, i+1) #index start from 1
-        ax.imshow(data_wrapped, vmin=-np.pi, vmax=+np.pi, cmap='insar', interpolation='nearest')
+        ax.imshow(data_wrapped, vmin=-np.pi, vmax=+np.pi, cmap=cmap_wrap, interpolation='nearest')
         ax.set_title('{}'.format(titles4[i]))
         ax.set_xticklabels([])
         ax.set_yticklabels([])
