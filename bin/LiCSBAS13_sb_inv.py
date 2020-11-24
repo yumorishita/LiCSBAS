@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.6 20201119 Yu Morishita, GSI
+v1.4.7 20201124 Yu Morishita, GSI
 
 This script inverts the SB network of unw to obtain the time series and velocity 
 using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
@@ -69,6 +69,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.7 20201124 Yu Morishita, GSI
+ - Comporess hdf5 file
 v1.4.6 20201119 Yu Morishita, GSI
  - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.4.5 20201118 Yu Morishita, GSI
@@ -131,7 +133,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.6"; date=20201119; author="Y. Morishita"
+    ver="1.4.7"; date=20201124; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -162,6 +164,7 @@ def main(argv=None):
     cmap_noise_r = 'viridis_r'
     cmap_wrap = SCM.romaO
     q = multi.get_context('fork')
+    compress = 'gzip'
 
 
     #%% Read options
@@ -434,10 +437,10 @@ def main(argv=None):
     cumh5.create_dataset('imdates', data=[np.int32(imd) for imd in imdates])
     if not np.all(np.abs(np.array(bperp))<=1):# if not dummy
         cumh5.create_dataset('bperp', data=bperp)
-    cum = cumh5.require_dataset('cum', (n_im, length, width), dtype=np.float32)
-    vel = cumh5.require_dataset('vel', (length, width), dtype=np.float32)
-    vconst = cumh5.require_dataset('vintercept', (length, width), dtype=np.float32)
-    gap = cumh5.require_dataset('gap', (n_im-1, length, width), dtype=np.int8)
+    cum = cumh5.require_dataset('cum', (n_im, length, width), dtype=np.float32, compression=compress)
+    vel = cumh5.require_dataset('vel', (length, width), dtype=np.float32, compression=compress)
+    vconst = cumh5.require_dataset('vintercept', (length, width), dtype=np.float32, compression=compress)
+    gap = cumh5.require_dataset('gap', (n_im-1, length, width), dtype=np.int8, compression=compress)
 
     if width == width_geo and length == length_geo: ## if geocoded
         cumh5.create_dataset('corner_lat', data=lat1)
@@ -534,7 +537,7 @@ def main(argv=None):
             p = q.Pool(n_para_gap)
             _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)), dtype=object)
             p.close()
-        
+
             ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt        
             gap_patch[:, ix_unnan_pt] = np.hstack(_result[:, 1]) #n_im-1, n_pt
             ns_ifg_noloop_patch[ix_unnan_pt] = np.hstack(_result[:, 2])
@@ -749,7 +752,6 @@ def main(argv=None):
 
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
     print('Output directory: {}\n'.format(os.path.relpath(tsadir)))
-
 
 
 #%% 

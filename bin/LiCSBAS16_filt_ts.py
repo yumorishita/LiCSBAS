@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.4 20201119 Yu Morishita, GSI
+v1.4.5 20201124 Yu Morishita, GSI
 
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
@@ -64,6 +64,8 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
 """
 #%% Change log
 '''
+v1.4.5 20201124 Yu Morishita, GSI
+ - Comporess hdf5 file
 v1.4.4 20201119 Yu Morishita, GSI
  - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.4.3 20201118 Yu Morishita, GSI
@@ -122,7 +124,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.4.4"; date=20201119; author="Y. Morishita"
+    ver="1.4.5"; date=20201124; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -158,6 +160,7 @@ def main(argv=None):
     cmap_noise_r = 'viridis_r'
     cmap_wrap = SCM.romaO
     q = multi.get_context('fork')
+    compress = 'gzip'
 
 
     #%% Read options
@@ -270,7 +273,7 @@ def main(argv=None):
 
     ### Save dates and other info into cumf
     cumfh5.create_dataset('imdates', data=cumh5['imdates'])
-    cumfh5.create_dataset('gap', data=cumh5['gap'])
+    cumfh5.create_dataset('gap', data=cumh5['gap'], compression=compress)
     if 'bperp' in list(cumh5.keys()): ## if dummy, no bperp field
         cumfh5.create_dataset('bperp', data=cumh5['bperp'])
     else:
@@ -422,7 +425,7 @@ def main(argv=None):
 
 
     #%% Filter each image
-    cum_filt = cumfh5.require_dataset('cum', (n_im, length, width), dtype=np.float32)
+    cum_filt = cumfh5.require_dataset('cum', (n_im, length, width), dtype=np.float32, compression=compress)
 
     print('\nHP filter in time, LP filter in space,', flush=True)
     print('with {} parallel processing...'.format(n_para), flush=True)
@@ -523,8 +526,8 @@ def main(argv=None):
         vconst_mskd.tofile(vconstfile+'.mskd')
         vel_mskd.tofile(velfile+'.mskd')
 
-    cumfh5.create_dataset('vel', data=vel.reshape(length, width))
-    cumfh5.create_dataset('vintercept', data=vconst.reshape(length, width))
+    cumfh5.create_dataset('vel', data=vel.reshape(length, width), compression=compress)
+    cumfh5.create_dataset('vintercept', data=vconst.reshape(length, width), compression=compress)
 
 
     #%% Add info and close
