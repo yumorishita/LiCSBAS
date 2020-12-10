@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.6.2 20201118 Yu Morishita, GSI
+v1.6.3 20201207 Yu Morishita, GSI
 
 ========
 Overview
@@ -38,6 +38,9 @@ LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos] 
 """
 #%% Change log
 '''
+v1.6.3 20201207 Yu Morishita, GSI
+ - Download network.png
+ - Search latest epoch for mli to save times
 v1.6.2 20201118 Yu Morishita, GSI
  - Again Bug fix of multiprocessing
 v1.6.1 20201116 Yu Morishita, GSI
@@ -89,7 +92,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver='1.6.2'; date=20201118; author="Y. Morishita"
+    ver='1.6.3'; date=20201207; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -179,15 +182,23 @@ def main(argv=None):
         print('Download {}'.format(enutif), flush=True)
         tools_lib.download_data(url, enutif)
 
+    print('', flush=True)
 
-    #%% baselines and metadata.txt
+
+    #%% baselines, network.png and metadata.txt
     print('Download baselines', flush=True)
     url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'baselines')
     tools_lib.download_data(url, 'baselines')
 
+    print('Download network.png', flush=True)
+    url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'network.png')
+    tools_lib.download_data(url, 'network.png')
+
     print('Download metadata.txt', flush=True)
     url = os.path.join(LiCSARweb, trackID, frameID, 'metadata', 'metadata.txt')
     tools_lib.download_data(url, 'metadata.txt')
+
+    print('', flush=True)
 
 
     #%% mli
@@ -196,7 +207,7 @@ def main(argv=None):
         print('{} already exist. Skip.'.format(mlitif), flush=True)
     else:
         ### Get available dates
-        print('Searching earliest epoch for mli...', flush=True)
+        print('Searching latest epoch for mli...', flush=True)
         url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
         response = requests.get(url)
         
@@ -208,9 +219,9 @@ def main(argv=None):
         _imdates = np.int32(np.array(imdates_all))
         _imdates = (_imdates[(_imdates>=startdate)*(_imdates<=enddate)]).astype('str').tolist()
         
-        ## Find earliest date in which mli is available
+        ## Find latest date in which mli is available
         imd1 = []
-        for i, imd in enumerate(_imdates):
+        for i, imd in enumerate(reversed(_imdates)):
             if np.mod(i, 10) == 0:
                 print("\r  {0:3}/{1:3}".format(i, len(_imdates)), end='', flush=True)
             url_epoch = os.path.join(url, imd)
@@ -220,7 +231,7 @@ def main(argv=None):
             soup = BeautifulSoup(html_doc, "html.parser")
             tag = soup.find(href=re.compile(r"\d{8}.geo.mli.tif"))
             if tag is not None:
-                print('\n{} found as earliest.'.format(imd))
+                print('\n{} found as latest.'.format(imd))
                 imd1 = imd
                 break
     
@@ -231,6 +242,8 @@ def main(argv=None):
             tools_lib.download_data(url_mli, mlitif)
         else:
             print('\nNo mli available on {}'.format(url), file=sys.stderr, flush=True)
+
+    print('', flush=True)
 
 
     #%% GACOS if specified
@@ -298,6 +311,8 @@ def main(argv=None):
         else:
             print('No GACOS data available from {} to {}'.format(startdate, enddate), flush=True)
     
+    print('', flush=True)
+
 
     #%% unw and cc
     ### Get available dates
@@ -375,7 +390,7 @@ def main(argv=None):
     
     ### Download unw with parallel
     if n_unw_dl != 0:
-        print('Download unw ({} parallel)...'.format(n_para), flush=True)
+        print('\nDownload unw ({} parallel)...'.format(n_para), flush=True)
         args = [(i, ifgd, n_unw_dl,
                  os.path.join(url_ifgdir, ifgd, '{}.geo.unw.tif'.format(ifgd)),
                  os.path.join(ifgd, '{}.geo.unw.tif'.format(ifgd))
@@ -387,7 +402,7 @@ def main(argv=None):
    
     ### Download cc with parallel
     if n_cc_dl != 0:
-        print('Download cc ({} parallel)...'.format(n_para), flush=True)
+        print('\nDownload cc ({} parallel)...'.format(n_para), flush=True)
         args = [(i, ifgd, n_cc_dl,
                  os.path.join(url_ifgdir, ifgd, '{}.geo.cc.tif'.format(ifgd)),
                  os.path.join(ifgd, '{}.geo.cc.tif'.format(ifgd))
@@ -416,6 +431,7 @@ def download_wrapper(args):
     print('  Donwnloading {} ({}/{})...'.format(ifgd, i+1, n_dl), flush=True)
     if not os.path.exists(dir_data): os.mkdir(dir_data)
     tools_lib.download_data(url_data, path_data)
+    return
 
 
 #%%

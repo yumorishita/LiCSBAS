@@ -8,22 +8,24 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
-v1.6 20200911 Yu Morioshita, GSI
+v1.6.1 20201207 Yu Morishita, GSI
+ - Check size and retry if error in download_data
+v1.6 20200911 Yu Morishita, GSI
  - STDOUT time and size in download_data
  - Add convert_size
-v1.5 20200828 Yu Morioshita, GSI
+v1.5 20200828 Yu Morishita, GSI
  - Update for matplotlib >= 3.3
  - Use nearest interpolation for insar cmap to avoid aliasing
-v1.4 20200703 Yu Morioshita, GSI
+v1.4 20200703 Yu Morishita, GSI
  - Replace problematic terms
  - Small bug (shift) fix in read_range_geo
-v1.3 20200503 Yu Morioshita, GSI
+v1.3 20200503 Yu Morishita, GSI
  - Update download_data (thanks to sahitono)
-v1.2 20200227 Yu Morioshita, Uni of Leeds and GSI
+v1.2 20200227 Yu Morishita, Uni of Leeds and GSI
  - Add read_point and fit2dh
-v1.1 20190916 Yu Morioshita, Uni of Leeds and GSI
+v1.1 20190916 Yu Morishita, Uni of Leeds and GSI
  - Add read_range_line and read_range_line_geo
-v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 """
 import os
@@ -135,28 +137,35 @@ def convert_size(size_bytes):
 
 
 #%% 
-def download_data(url, file):
-    try:
-       start = time.time() 
-       with requests.get(url) as res:
-            res.raise_for_status()
-            with open(file, "wb") as output:
-                output.write(res.content)
-       elapsed = int(time.time()-start)
-       if elapsed==0: elapsed=elapsed+1
-       fsize = convert_size(os.path.getsize(file))
-       speed = convert_size(int(os.path.getsize(file)/elapsed))
-       print('  {}, {}, {}s, {}/s'.format(os.path.basename(file),
-                                          fsize, elapsed, speed))
+def download_data(url, file, n_retry=3):
+    for i in range(n_retry):
+        try:
+            start = time.time()
+            with requests.get(url) as res:
+                res.raise_for_status()
+                size_remote = int(res.headers.get("Content-Length"))
+                with open(file, "wb") as output:
+                     output.write(res.content)
+                size_local = os.path.getsize(file)
+                if size_remote != size_local: ### Different size
+                    raise IOError('Downloaded file not complete')
 
-    except:
-        print(
-            "    Error while downloading from {}".format(url),
-            file=sys.stderr,
-            flush=True,
-        )
-        return
+            elapsed = int(time.time()-start)
+            if elapsed==0: elapsed=elapsed+1
+            fsize = convert_size(os.path.getsize(file))
+            speed = convert_size(int(os.path.getsize(file)/elapsed))
+            print('    {}, {}, {}s, {}/s'.format(os.path.basename(file),
+                   fsize, elapsed, speed), flush=True)
+            return # success
+    
+        except Exception as e:
+            print(    '    {} for {} in {}th try'.format(
+                e.__class__.__name__, os.path.basename(url), i+1), flush=True)
+            pass # try again
 
+    print("    Error while downloading from {}".format(url),
+          file=sys.stderr, flush=True)
+    return # fail
 
 
 #%%
