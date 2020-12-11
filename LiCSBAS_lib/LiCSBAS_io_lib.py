@@ -8,6 +8,8 @@ Python3 library of input/output functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.2.1 20201211 Yu Morioshita, GSI
+ - Skip invalid lines in baselines file in read_bperp_file
 v1.2 20200703 Yu Morioshita, GSI
  - Replace problematic terms
 v1.1 20200227 Yu Morioshita, Uni of Leeds and GSI
@@ -121,7 +123,8 @@ def read_bperp_file(bperp_file, imdates):
         bperp_dict[line[0]] = '0.00' ## single prime. unnecessary?
         with open(bperp_file) as f:
             for l in f:
-                bperp_dict[l.split()[1]] = l.split()[2]
+                if len(l.split()) == 4:
+                    bperp_dict[l.split()[1]] = l.split()[2]
         
     else: ## old format
         with open(bperp_file) as f:
