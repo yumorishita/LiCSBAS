@@ -8,6 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.6.2 20201225 Yu Morishita, GSI
+ - Avoid error when remote file is empty
 v1.6.1 20201207 Yu Morishita, GSI
  - Check size and retry if error in download_data
 v1.6 20200911 Yu Morishita, GSI
@@ -66,6 +68,9 @@ def comp_size_time(file_remote, file_local):
     response = requests.head(file_remote, allow_redirects=True)
     
     if response.status_code != 200:
+        return 3
+    elif response.headers.get("Content-Length") is None:
+        ## Remote file exist but empty
         return 3
 
     size_remote = int(response.headers.get("Content-Length"))
