@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.9 20201111 Yu Morishita, GSI
+v1.9.1 20210108 Yu Morishita, GSI
 
 This script displays an image file.
 
@@ -33,6 +33,8 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 #%% Change log
 '''
+v1.9.1 20210108 Yu Morishita, GSI
+ - Simultaneously usable png and kmz
 v1.9 20201111 Yu Morishita, GSI
  - Data GeoTIFF or NetCDF available
 v1.8.1 20200916 Yu Morishita, GSI
@@ -105,7 +107,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver="1.9"; date=20201111; author="Y. Morishita"
+    ver="1.9.1"; date=20210108; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -301,7 +303,7 @@ if __name__ == "__main__":
             os.remove(pngcfile)
         print('\nOutput: {}\n'.format(kmzname))
         
-        sys.exit(0)
+        if not pngname: sys.exit(0)
 
 
     #%% Plot figure
