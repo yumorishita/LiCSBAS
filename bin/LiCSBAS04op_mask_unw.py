@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3.4 20201119 Yu Morishita, GSI
+v1.3.5 20210105 Yu Morishita, GSI
 
 This script masks specified areas or low coherence areas in the unw data. The masking is effective when the unw data include areas which have many unwrapping errors and are not of interest, and can improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
 
@@ -39,6 +39,8 @@ LiCSBAS04op_mask_unw.py -i in_dir -o out_dir [-c coh_thre] [-r x1:x2/y1:y2] [-f 
 """
 #%% Change log
 '''
+v1.3.5 20210105 Yu Morishita, GSI
+ - Fill 0 by nan in unw
 v1.3.4 20201119 Yu Morishita, GSI
  - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.3.3 20201118 Yu Morishita, GSI
@@ -84,7 +86,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.3.4"; date=20201119; author="Y. Morishita"
+    ver="1.3.5"; date=20210105; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -298,7 +300,8 @@ def mask_wrapper(ifgix):
 
     unwfile = os.path.join(in_dir, ifgd, ifgd+'.unw')
     unw = io_lib.read_img(unwfile, length, width)
-
+    unw[unw==0] = np.nan
+        
     ### Mask
     unw[bool_mask] = np.nan
 

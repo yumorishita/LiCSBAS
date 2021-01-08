@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2.4 20201119 Yu Morishita, GSI
+v1.2.5 20210105 Yu Morishita, GSI
 
 This script clips a specified rectangular area of interest from unw and cc data. The clipping can make the data size smaller and processing faster, and improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
 
@@ -39,6 +39,8 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
 """
 #%% Change log
 '''
+v1.2.5 20210105 Yu Morishita, GSI
+ - Fill 0 by nan in unw
 v1.2.4 20201119 Yu Morishita, GSI
  - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.2.3 20201118 Yu Morishita, GSI
@@ -85,7 +87,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.2.4"; date=20201119; author="Y. Morishita"
+    ver="1.2.5"; date=20210105; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -311,6 +313,7 @@ def clip_wrapper(ifgix):
     ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
     
     unw = io_lib.read_img(unwfile, length, width)
+    unw[unw==0] = np.nan
     if os.path.getsize(ccfile) == length*width:
         ccformat = np.uint8
     elif os.path.getsize(ccfile) == length*width*4:
