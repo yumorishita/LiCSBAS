@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200703 Yu Morishita, GSI
+v1.2.1 20210107 Yu Morishita, GSI
 
 ========
 Overview
@@ -27,6 +27,8 @@ LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/
 """
 #%% Change log
 '''
+v1.2.1 20210107 Yu Morishita, GSI
+ - Replace jet with SCM.roma_r
 v1.2 20200703 Yu Morishita, GSI
  - Add --ref_geo option
 v1.1 20190813 Yu Morishita, Uni of Leeds and GSI
@@ -43,6 +45,7 @@ import re
 import time
 import numpy as np
 import h5py as h5
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
@@ -61,7 +64,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.2; date=20200703; author="Y. Morishita"
+    ver="1.2.1"; date=20210107; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -75,6 +78,7 @@ def main(argv=None):
     refarea_geo = []
     maskfile = []
     pngflag = False
+    cmap = SCM.roma.reversed()
 
 
     #%% Read options
@@ -186,7 +190,7 @@ def main(argv=None):
     if pngflag:
         pngfile = outfile+'.png'
         title = '{} (Ref X/Y {}:{}/{}:{})'.format(outfile, refx1, refx2, refy1, refy2)
-        plot_lib.make_im_png(cum_dif, pngfile, 'jet', title)
+        plot_lib.make_im_png(cum_dif, pngfile, cmap, title)
     
 
     #%% Finish

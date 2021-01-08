@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200703 Yu Morishita, GSI
+v1.3.1 20210107 Yu Morishita, GSI
 
 ========
 Overview
@@ -30,6 +30,8 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
 """
 #%% Change log
 '''
+v1.3.1 20210107 Yu Morishita, GSI
+ - Replace jet with SCM.roma_r
 v1.3 20200703 Yu Morishita, GSI
  - Add --ref_geo option
 v1.2 20190807 Yu Morishita, Uni of Leeds and GSI
@@ -49,6 +51,7 @@ import time
 import numpy as np
 import datetime as dt
 import h5py as h5
+import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -68,7 +71,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver=1.3; date=20200703; author="Y. Morishita"
+    ver="1.3.1"; date=20210107; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -83,6 +86,7 @@ def main(argv=None):
     vstdflag = False
     sinflag = False
     pngflag = False
+    cmap = SCM.roma.reversed()
 
 
     #%% Read options
@@ -255,7 +259,7 @@ def main(argv=None):
     if pngflag:
         pngfile = outfile+'.png'
         title = 'n_im: {}, Ref X/Y {}:{}/{}:{}'.format(n_im, refx1, refx2, refy1, refy2)
-        plot_lib.make_im_png(vel, pngfile, 'jet', title)
+        plot_lib.make_im_png(vel, pngfile, cmap, title)
 
         if sinflag:
             amp_max = np.nanpercentile(amp, 99)
@@ -263,7 +267,7 @@ def main(argv=None):
             plot_lib.make_im_png(delta_t, dtfile+'.png', 'hsv', title)
 
         if vstdflag:
-            plot_lib.make_im_png(vstd, vstdfile+'.png', 'jet', title)
+            plot_lib.make_im_png(vstd, vstdfile+'.png', cmap, title)
     
 
     #%% Finish
