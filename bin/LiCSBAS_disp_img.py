@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.9.1 20210108 Yu Morishita, GSI
+v1.10.0 20210120 Yu Morishita, GSI
 
 This script displays an image file.
 
@@ -8,8 +8,8 @@ This script displays an image file.
 Usage
 =====
 LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
-  [--cmax float] [--auto_crange float] [--cycle float] [--nodata float]
-  [--bigendian] [--png pngname] [--kmz kmzname]
+  [--cmax float] [--auto_crange float] [--n_color int] [--cycle float]
+  [--nodata float] [--bigendian] [--png pngname] [--kmz kmzname]
 
  -i  Input image file in float32, uint8, GeoTIFF, or NetCDF
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
@@ -21,6 +21,7 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
      (Default: SCM.roma_r, reverse of SCM.roma)
  --cmin|cmax    Min|max values of color (Default: None (auto))
  --auto_crange  % of color range used for automatic determination (Default: 99)
+ --n_color    Number of rgb quantization levels (Default: 256)
  --cycle        Value*2pi/cycle only if cyclic cmap (i.e., insar or SCM.*O*)
                 (Default: 3 (6pi/cycle))
  --nodata       Nodata value (only for float32) (Default: 0)
@@ -33,6 +34,9 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 #%% Change log
 '''
+v1.10 20210120 Yu Morishita, GSI
+ - Add --n_color option
+ - Bug fix in creating kmz with standard cmap
 v1.9.1 20210108 Yu Morishita, GSI
  - Simultaneously usable png and kmz
 v1.9 20201111 Yu Morishita, GSI
@@ -91,7 +95,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 
     with open(kmlfile, "w") as f:
         print('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document><GroundOverlay>\n<name>{}</name>\n<description>{}</description>\n<Icon><href>{}</href></Icon>\n<altitude>0</altitude>\n<tessellate>0</tessellate>\n<altitudeMode>clampToGround</altitudeMode>\n<LatLonBox><south>{}</south><north>{}</north><west>{}</west><east>{}</east></LatLonBox>\n</GroundOverlay></Document></kml>'.format(name, description, pngfile, lat1, lat2, lon1, lon2), file=f)
-        
+
     with zipfile.ZipFile(kmzfile, 'w', compression=zipfile.ZIP_DEFLATED) as f:
         f.write(kmlfile)
         f.write(pngfile)
@@ -107,7 +111,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver="1.9.1"; date=20210108; author="Y. Morishita"
+    ver="1.10.0"; date=20210120; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -119,6 +123,7 @@ if __name__ == "__main__":
     cmin = None
     cmax = None
     auto_crange = 99.0
+    n_color = 256
     cycle = 3.0
     nodata = 0
     endian = 'little'
@@ -126,11 +131,11 @@ if __name__ == "__main__":
     kmzname = []
     interp = 'nearest' #'antialiased'
 
-    
+
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "cycle=", "nodata=", "bigendian", "png=", "kmz="])
+            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "n_color=", "cycle=", "nodata=", "bigendian", "png=", "kmz="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -149,6 +154,8 @@ if __name__ == "__main__":
                 cmax = float(a)
             elif o == '--auto_crange':
                 auto_crange = float(a)
+            elif o == '--n_color':
+                n_color = int(a)
             elif o == '--cycle':
                 cycle = float(a)
             elif o == '--nodata':
@@ -170,21 +177,23 @@ if __name__ == "__main__":
         print("  "+str(err.msg), file=sys.stderr)
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         sys.exit(2)
-    
-    
-    #%% Set cmap if SCM
+
+
+    #%% Set cmap if SCM or insar
     if cmap_name.startswith('SCM'):
+        cmap = [] ## Not necessary
         if cmap_name.endswith('_r'):
             exec("cmap = {}.reversed()".format(cmap_name[:-2]))
         else:
             exec("cmap = {}".format(cmap_name))
+        cmap_name = cmap_name.replace('SCM.', '')
+        plt.register_cmap(name=cmap_name, cmap=cmap, lut=n_color)
     elif cmap_name == 'insar':
         cdict = tools_lib.cmap_insar()
         plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
-        cmap='insar'
-    else:
-        cmap = cmap_name
-        
+
+    cmap = plt.get_cmap(cmap_name, n_color)
+
 
     #%% Get info and Read data
     if gdal.IdentifyDriver(infile): ## If Geotiff or grd
@@ -200,7 +209,7 @@ if __name__ == "__main__":
         lon_e_p = lon_w_p+dlon*width
         if data.dtype == np.float32:
             data[data==nodata] = np.nan
-        
+
     else: ## Not GeoTIFF
         if not parfile:
             print('\nERROR: No par file given, -p is not optional!\n', file=sys.stderr)
@@ -208,7 +217,7 @@ if __name__ == "__main__":
         elif not os.path.exists(parfile):
             print('\nERROR: No {} exists!\n'.format(parfile), file=sys.stderr)
             sys.exit(2)
-    
+
         try:
             try:
                 ### EQA.dem_par
@@ -221,13 +230,13 @@ if __name__ == "__main__":
         except:
             print('No fields about width/length found in {}!'.format(parfile), file=sys.stderr)
             sys.exit(2)
-    
+
         if kmzname:
             try:
                 ### EQA.dem_par
                 dlat = float(io_lib.get_param_par(parfile, 'post_lat'))
                 dlon = float(io_lib.get_param_par(parfile, 'post_lon'))
-    
+
                 lat_n_g = float(io_lib.get_param_par(parfile, 'corner_lat')) #grid reg
                 lon_w_g = float(io_lib.get_param_par(parfile, 'corner_lon')) #grid reg
                 ## Grid registration to pixel registration by shifing half pixel
@@ -238,7 +247,7 @@ if __name__ == "__main__":
             except:
                 print('No fields about geo for kmz found in {}!'.format(parfile), file=sys.stderr)
                 sys.exit(2)
-    
+
         ### Read data
         if os.path.getsize(infile) == length*width:
             print('File format: uint8')
@@ -297,12 +306,12 @@ if __name__ == "__main__":
             description = '<![CDATA[<img style="max-width:200px;" src="{}">]]>'.format(os.path.basename(pngcfile))
 
         make_kmz(lat_s_p, lat_n_p, lon_w_p, lon_e_p, pngnametmp, kmzname, pngcfile, description)
-        
+
         os.remove(pngnametmp)
         if pngcfile:
             os.remove(pngcfile)
         print('\nOutput: {}\n'.format(kmzname))
-        
+
         if not pngname: sys.exit(0)
 
 
@@ -318,7 +327,7 @@ if __name__ == "__main__":
     else:
         plt.colorbar()
     plt.tight_layout()
-    
+
     if pngname:
         plt.savefig(pngname)
         plt.close()
