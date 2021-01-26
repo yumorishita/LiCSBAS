@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.13.1 20201016 Yu Morishita, GSI
+v1.13.2 20210126 Yu Morishita, GSI
 
 ========
 Overview
@@ -21,8 +21,8 @@ Inputs
 Usage
 =====
 LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_dir]
-    [-u U.geo] [-r x1:x2/y1:y2] [--ref_geo lon1/lon2/lat1/lat2] [-p x/y] 
-    [--p_geo lon/lat] [-c cmap] [--nomask] [--vmin float] [--vmax float] 
+    [-u U.geo] [-r x1:x2/y1:y2] [--ref_geo lon1/lon2/lat1/lat2] [-p x/y]
+    [--p_geo lon/lat] [-c cmap] [--nomask] [--vmin float] [--vmax float]
     [--auto_crange float] [--dmin float] [--dmax float] [--ylen float]
     [--ts_png pngfile]
 
@@ -54,6 +54,9 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
 """
 #%% Change log
 '''
+v1.13.2 20210126 Yu Morishita, GSI
+ - Small bug fix in -r and noise indices
+ - Change initial point to center of ref area
 v1.13.1 20201016 Yu Morishita, GSI
  - Use log10 to display mli
 v1.13 20200902 Yu Morishita, GSI
@@ -148,16 +151,16 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
     if model == 3: # Annual+Q
         sin = np.sin(2*np.pi*imdates_years)
         cos = np.cos(2*np.pi*imdates_years)
-        A = np.concatenate((A, (imdates_years**2)[:, np.newaxis], 
+        A = np.concatenate((A, (imdates_years**2)[:, np.newaxis],
                             sin[:, np.newaxis], cos[:, np.newaxis]), axis=1)
         sin = np.sin(2*np.pi*xvalues_years)
         cos = np.cos(2*np.pi*xvalues_years)
-        An = np.concatenate((An, (xvalues_years**2)[:, np.newaxis], 
+        An = np.concatenate((An, (xvalues_years**2)[:, np.newaxis],
                              sin[:, np.newaxis], cos[:, np.newaxis]), axis=1)
 
     result = sm.OLS(dph, A, missing='drop').fit()
     yvalues = result.predict(An)
-    
+
     return yvalues
 
 
@@ -166,7 +169,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver=1.13; date=20200902; author="Y. Morishita"
+    ver="1.13.2"; date=20210126; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -189,7 +192,7 @@ if __name__ == "__main__":
     vmax = None
     cmap = "SCM.roma_r"
     auto_crange = 99.0
-    
+
     #%% Read options
     try:
         try:
@@ -274,7 +277,7 @@ if __name__ == "__main__":
     ### cumfile2
     if not cumfile2 and os.path.basename(cumfile) == 'cum_filt.h5' and os.path.exists(os.path.join(cumdir, 'cum.h5')):
         cumfile2 = os.path.join(cumdir, 'cum.h5')
-    
+
     if cumfile2 and not os.path.exists(cumfile2):
         print('\nNo {} found. Not use.'.format(cumfile2))
         cumfile2 = []
@@ -306,7 +309,7 @@ if __name__ == "__main__":
 
     ### U.geo
     if not LOSufile: #if not given
-        LOSufile = os.path.join(os.path.dirname(cumdir), 
+        LOSufile = os.path.join(os.path.dirname(cumdir),
            os.path.basename(cumdir).replace('TS_', ''), 'U.geo') ## Default
     if not os.path.exists(LOSufile):
         print('\nNo U.geo file found. Not use.')
@@ -341,7 +344,7 @@ if __name__ == "__main__":
         geocod_flag = False
         aspect = 1
         print('No latlon field found in {}. Skip.'.format(cumfile))
-            
+
     ### Set initial ref area
     if refarea:
         if not tools_lib.read_range(refarea, width, length):
@@ -378,9 +381,9 @@ if __name__ == "__main__":
         else:
             point_x, point_y = tools_lib.bl2xy(point_lon, point_lat, width, length, lat1, dlat, lon1, dlon)
     else:
-        point_x = refx1
-        point_y = refy1
-    
+        point_x = int((refx2+refx1)/2)
+        point_y = int((refy2+refy1)/2)
+
 
     ### Filter info
     if 'deramp_flag' in list(cumh5.keys()):
@@ -393,7 +396,7 @@ if __name__ == "__main__":
         if 'hgt_linear_flag' in list(cumh5.keys()):
             if cumh5['hgt_linear_flag'][()] == 1:
                 deramp = deramp+', hgt-linear'
-            
+
         filtwidth_km = float(cumh5['filtwidth_km'][()])
         filtwidth_yr = float(cumh5['filtwidth_yr'][()])
         filtwidth_day = int(np.round(filtwidth_yr*365.25))
@@ -412,7 +415,7 @@ if __name__ == "__main__":
     else:
         print('Reference date set to {}'.format(mdate))
         ix_m = imdates.index(mdate)
-    
+
     cum_ref = cum[ix_m, :, :]
 
     ### cumfile2
@@ -422,7 +425,7 @@ if __name__ == "__main__":
         cum2 = cumh52['cum']
         cum2_ref = cum2[ix_m, :, :]
         vel2 = cumh52['vel']
-        
+
         if 'deramp_flag' in list(cumh52.keys()):
             deramp_flag2 = cumh52['deramp_flag'][()]
             if len(deramp_flag2) == 0: # no deramp
@@ -435,16 +438,16 @@ if __name__ == "__main__":
             label2 = '2: s={:.1f}km, t={:.2f}yr ({}d){}'.format(filtwidth_km2, filtwidth_yr2, filtwidth_day2, deramp2)
         else:
             label2 = '2: No filter'
-        
+
 
     #%% Read Mask (1: unmask, 0: mask, nan: no cum data)
     mask_base = np.ones((length, width), dtype=np.float32)
     mask_base[np.isnan(cum[ix_m, :, :])] = np.nan
-    
+
     if maskflag:
         print('Reading {} as mask'.format(os.path.relpath(maskfile)))
         mask_vel = io_lib.read_img(maskfile, length, width)
-        
+
         mask_vel[mask_vel==0] = np.nan ## 0->nan
         mask = mask_vel
     else:
@@ -461,10 +464,10 @@ if __name__ == "__main__":
     #%% Read noise indecies
     mapdict_data = {}
     mapdict_unit = {}
-    names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc', 
+    names = ['mask', 'coh_avg', 'n_unw', 'vstd', 'maxTlen', 'n_gap', 'stc',
              'n_ifg_noloop', 'n_loop_err', 'resid', 'mli', 'hgt']
     units = ['', '', '', 'mm/yr', 'yr', '', 'mm', '', '', 'mm', 'log10', 'm']
-    files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile, 
+    files = [maskfile, coh_avgfile, n_unwfile, vstdfile, maxTlenfile, n_gapfile,
              stcfile, n_ifg_noloopfile, n_loop_errfile, residfile, mlifile, hgtfile]
 #    for name, file in zip(names, files):
     for i, name in enumerate(names):
@@ -512,19 +515,19 @@ if __name__ == "__main__":
     #%% Plot figure of cumulative displacement and velocity
     figsize_x = 6 if length > width else 9
     figsize_y = (figsize_x-2)*length*aspect/width+1
-    if figsize_y < 5: figsize_y = 5 
+    if figsize_y < 5: figsize_y = 5
     figsize = (figsize_x, figsize_y)
     pv = plt.figure('Velocity / Cumulative Displacement', figsize)
     axv = pv.add_axes([0.15,0.15,0.83,0.83])
     axt2 = pv.text(0.01, 0.99, 'Left-doubleclick:\n Plot time series\nRight-drag:\n Change ref area', fontsize=8, va='top')
     axt = pv.text(0.01, 0.78, 'Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)'.format(refx1, refx2, refy1, refy2), fontsize=8, va='bottom')
-    
+
     ### Fisrt show
     rax, = axv.plot([refx1h, refx2h, refx2h, refx1h, refx1h],
                     [refy1h, refy1h, refy2h, refy2h, refy1h], '--k', alpha=0.8)
     data = vel*mask-np.nanmean((vel*mask)[refy1:refy2+1, refx1:refx2+1])
     cax = axv.imshow(data, clim=[vmin, vmax], cmap=cmap, aspect=aspect, interpolation='nearest')
-        
+
     axv.set_title('vel')
 
     cbr = pv.colorbar(cax, orientation='vertical')
@@ -538,8 +541,8 @@ if __name__ == "__main__":
         global refx1, refx2, refy1, refy2, dmin, dmax
         ## global cannot change existing values... why?
 
-        refx1p, refx2p, refy1p, refy2p = refx1, refx2, refy1, refy2 ## Previous 
-        
+        refx1p, refx2p, refy1p, refy2p = refx1, refx2, refy1, refy2 ## Previous
+
         x1, y1 = eclick.xdata, eclick.ydata
         x2, y2 = erelease.xdata, erelease.ydata
         if x1 <= x2: refx1, refx2 = [int(np.round(x1)), int(np.round(x2))]
@@ -554,7 +557,7 @@ if __name__ == "__main__":
 
         refx1h = refx1-0.5; refx2h = refx2-0.5 ## Shift half for plot
         refy1h = refy1-0.5; refy2h = refy2-0.5
-        
+
         axt.set_text('Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)'.format(refx1, refx2, refy1, refy2))
         rax.set_data([refx1h, refx2h, refx2h, refx1h, refx1h],
             [refy1h, refy1h, refy2h, refy2h, refy1h])
@@ -565,7 +568,7 @@ if __name__ == "__main__":
             refvalue_lastcum = np.nanmean((cum[-1, refy1:refy2, refx1:refx2]-cum_ref[refy1:refy2, refx1:refx2])*mask[refy1:refy2, refx1:refx2])
             dmin = dmin_auto - refvalue_lastcum
             dmax = dmax_auto - refvalue_lastcum
-    
+
         ### Update draw
         if not cum_disp_flag:  ## vel or noise indice
             val_selected = radio_vel.value_selected
@@ -574,21 +577,21 @@ if __name__ == "__main__":
         else:  ## cumulative displacement
             time_selected = tslider.val
             tslider.set_val(time_selected)
-    
+
         if lastevent:  ## Time series plot
             printcoords(lastevent)
-    
+
     RS = RectangleSelector(axv, line_select_callback, drawtype='box', useblit=True, button=[3], spancoords='pixels', interactive=False)
 
     plt.connect('key_press_event', RS)
-    
+
 
     #%% Check box for mask ON/OFF
     if maskflag:
         axbox = pv.add_axes([0.01, 0.2, 0.1, 0.08])
         visibility = True
         check = CheckButtons(axbox, ['mask', ], [visibility, ])
-        
+
         def func(label):
             global mask, visibility
             if visibility:
@@ -605,7 +608,7 @@ if __name__ == "__main__":
             radio_vel.set_active(val_ind)
 
         check.on_clicked(func)
-    
+
 
     #%% Radio buttom for velocity selection
     ## Add vel to mapdict
@@ -619,12 +622,12 @@ if __name__ == "__main__":
     mapdict_vel.update(mapdict_data)
     mapdict_data = mapdict_vel  ## To move vel to top
     axrad_vel = pv.add_axes([0.01, 0.3, 0.13, len(mapdict_data)*0.025+0.04])
-    
-    ### Radio buttons        
+
+    ### Radio buttons
     radio_vel = RadioButtons(axrad_vel, tuple(mapdict_data.keys()))
     for label in radio_vel.labels:
         label.set_fontsize(8)
-    
+
     def show_vel(val_ind):
         global vmin, vmax, cum_disp_flag
         cum_disp_flag = False
@@ -638,13 +641,13 @@ if __name__ == "__main__":
             cax.set_cmap(cmap)
             cax.set_clim(vmin, vmax)
             cbr.set_label('mm/yr')
-                
-        elif val_ind == 'mask': 
+
+        elif val_ind == 'mask':
             data = mapdict_data[val_ind]
             cax.set_cmap('viridis')
             cax.set_clim(0, 1)
             cbr.set_label('')
-            
+
         else:  ## Other noise indices
             data = mapdict_data[val_ind]*mask
             if val_ind=='mli': data = np.log10(data)
@@ -658,13 +661,13 @@ if __name__ == "__main__":
             elif val_ind=='hgt': cmap2 = 'terrain'
             cax.set_cmap(cmap2)
             cax.set_clim(cmin_ind, cmax_ind)
-        
+
         cbr.set_label(mapdict_unit[val_ind])
         cax.set_data(data)
         axv.set_title(val_ind)
 
         pv.canvas.draw()
-        
+
     radio_vel.on_clicked(show_vel)
 
 
@@ -694,7 +697,7 @@ if __name__ == "__main__":
         axv.set_title('%s (Ref: %s)'%(dstr, dstr_ref))
         newv = (cum[timenearest, :, :]-cum_ref)*mask
         newv = newv-np.nanmean(newv[refy1:refy2, refx1:refx2])
-            
+
         cax.set_data(newv)
         cax.set_cmap(cmap)
         cax.set_clim(dmin, dmax)
@@ -735,14 +738,14 @@ if __name__ == "__main__":
     models = ['Linear', 'Annual+L', 'Quad', 'Annual+Q']
     visibilities = [True, True, False, False]
     fitcheck = CheckButtons(fitbox, models, visibilities)
-    
+
     def fitfunc(label):
         index = models.index(label)
         visibilities[index] = not visibilities[index]
         lines1[index].set_visible(not lines1[index].get_visible())
         if cumfile2:
             lines2[index].set_visible(not lines2[index].get_visible())
-        
+
         pts.canvas.draw()
 
     fitcheck.on_clicked(fitfunc)
@@ -750,7 +753,7 @@ if __name__ == "__main__":
     ### First show of selected point in image window
     pax, = axv.plot([point_y], [point_x], 'k', linewidth=3)
     pax2, = axv.plot([point_y], [point_x], 'Pk')
-    
+
     ### Plot time series at clicked point
     lastevent = []
     def printcoords(event):
@@ -764,7 +767,7 @@ if __name__ == "__main__":
             return
         else:
             lastevent = event  ## Update last event
-            
+
         ii = np.int(np.round(event.ydata))
         jj = np.int(np.round(event.xdata))
 
@@ -789,7 +792,8 @@ if __name__ == "__main__":
             if key.startswith('vel'): ## Not plot here
                 continue
             elif key.startswith('n_') or key=='mask':
-                noisetxt = noisetxt+'{}: {:d} {}\n'.format(key, int(val), unit)
+                val = 'nan' if np.isnan(val) else int(val)
+                noisetxt = noisetxt+'{}: {} {}\n'.format(key, val, unit)
             else:
                 noisetxt = noisetxt+'{}: {:.2f} {}\n'.format(key, val, unit)
 
@@ -797,11 +801,11 @@ if __name__ == "__main__":
             noisetxt = noisetxt+'Inc_agl: {:.1f} deg\n'.format(inc_agl_deg[ii, jj])
             noisetxt = noisetxt+'LOS u: {:.3f}\n'.format(LOSu[ii, jj])
 
-        ### Get lat lon and show Ref info at side 
+        ### Get lat lon and show Ref info at side
         if geocod_flag:
             lat, lon = tools_lib.xy2bl(jj, ii, lat1, dlat, lon1, dlon)
             axtref.set_text('Lat:{:.5f}\nLon:{:.5f}\n\nRef area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}\n\n{}'.format(lat, lon, refx1, refx2, refy1, refy2, imdates[ix_m], noisetxt))
-        else: 
+        else:
             axtref.set_text('Ref area:\n X {}:{}\n Y {}:{}\n (start from 0)\nRef date:\n {}\n\n{}'.format(refx1, refx2, refy1, refy2, imdates[ix_m], noisetxt))
 
         ### If masked
@@ -822,7 +826,7 @@ if __name__ == "__main__":
         ### If not masked
         ### cumfile
         vel1p = vel[ii, jj]-np.nanmean((vel*mask)[refy1:refy2, refx1:refx2])
-        
+
         dcum_ref = cum_ref[ii, jj]-np.nanmean(cum_ref[refy1:refy2, refx1:refx2]*mask[refy1:refy2, refx1:refx2])
 #        dcum_ref = 0
         dph = cum[:, ii, jj]-np.nanmean(cum[:, refy1:refy2, refx1:refx2]*mask[refy1:refy2, refx1:refx2], axis=(1, 2)) - dcum_ref
@@ -850,7 +854,7 @@ if __name__ == "__main__":
             for model, vis in enumerate(visibilities):
                 yvalues = calc_model(dphf, imdates_ordinal, xvalues, model)
                 lines2[model], = axts.plot(xvalues_dt, yvalues, 'r-', visible=vis, alpha=0.6, zorder=2)
-                
+
             axts.scatter(imdates_dt, dphf, c='r', label=label2, alpha=0.6, zorder=4)
             axts.set_title('vel(1) = {:.1f} mm/yr, vel(2) = {:.1f} mm/yr @({}, {})'.format(vel1p, vel2p, jj, ii), fontsize=10)
 
@@ -861,7 +865,7 @@ if __name__ == "__main__":
                 gap_dates_dt = imdates_dt[0:-1][gap1p]-imdates_dt[1:][gap1p]
                 gap_dt = imdates_dt[1:][gap1p]+gap_dates_dt/2
                 axts.vlines(gap_dt, 0, 1, transform=axts.get_xaxis_transform(), zorder=1, label=label_gap, alpha=0.6, colors='k')
-        
+
         ### Y axis
         if ylen:
             vlim = [np.nanmedian(dph)-ylen/2, np.nanmedian(dph)+ylen/2]
@@ -896,4 +900,4 @@ if __name__ == "__main__":
         warnings.simplefilter('ignore', UserWarning)
         plt.show()
     pv.canvas.mpl_disconnect(cid)
-    
+
