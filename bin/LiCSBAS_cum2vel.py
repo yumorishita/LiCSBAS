@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3.1 20210107 Yu Morishita, GSI
+v1.3.2 20210125 Yu Morishita, GSI
 
 ========
 Overview
@@ -11,7 +11,7 @@ This script calculates velocity and its standard deviation from cum*.h5 and outp
 Usage
 =====
 LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x2/y1:y2]
-    [--ref_geo lon1/lon2/lat1/lat2] [--vstd] [--sin] [--mask maskfile] [--png] 
+    [--ref_geo lon1/lon2/lat1/lat2] [--vstd] [--sin] [--mask maskfile] [--png]
 
  -s  Start date of period to calculate velocity (Default: first date)
  -e  End date of period to calculate velocity (Default: last date)
@@ -30,6 +30,8 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
 """
 #%% Change log
 '''
+v1.3.2 20210125 Yu Morishita, GSI
+ - Change cmap for vstd, amp, dt
 v1.3.1 20210107 Yu Morishita, GSI
  - Replace jet with SCM.roma_r
 v1.3 20200703 Yu Morishita, GSI
@@ -65,13 +67,13 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver="1.3.1"; date=20210107; author="Y. Morishita"
+    ver="1.3.2"; date=20210125; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -87,6 +89,9 @@ def main(argv=None):
     sinflag = False
     pngflag = False
     cmap = SCM.roma.reversed()
+    cmap_vstd = 'viridis_r'
+    cmap_amp = 'viridis_r'
+    cmap_dt = SCM.romaO.reversed()
 
 
     #%% Read options
@@ -157,15 +162,15 @@ def main(argv=None):
         refarea = cumh5['refarea'][()]
         refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
 
-    
+
     #%% Setting
     ### Dates
     if not imd_s:
         imd_s = imdates[0]
-        
+
     if not imd_e:
         imd_e = imdates[-1]
-        
+
     ### mask
     if maskfile:
         mask = io_lib.read_img(maskfile, length, width)
@@ -174,20 +179,20 @@ def main(argv=None):
     else:
         mask = np.ones((length, width), dtype=np.float32)
         suffix_mask = ''
-        
+
     ### Find date index if not exist in imdates
     if not imd_s in imdates:
         for imd in imdates:
             if int(imd) >= int(imd_s): ## First larger one than imd_s
                 imd_s = imd
                 break
-        
+
     if not imd_e in imdates:
         for imd in imdates[::-1]:
             if int(imd) <= int(imd_e): ## Last smaller one than imd_e
                 imd_e = imd
                 break
-        
+
     ix_s = imdates.index(imd_s)
     ix_e = imdates.index(imd_e)+1 #+1 for python custom
     n_im = ix_e-ix_s
@@ -195,11 +200,11 @@ def main(argv=None):
     ### Calc dt in year
     imdates_dt = ([dt.datetime.strptime(imd, '%Y%m%d').toordinal() for imd in imdates[ix_s:ix_e]])
     dt_cum = np.float32((np.array(imdates_dt)-imdates_dt[0])/365.25)
-    
+
     ### Outfile
     if not outfile:
         outfile = '{}_{}.vel{}'.format(imd_s, imd_e, suffix_mask)
-        
+
 
     #%% Display info
     print('')
@@ -217,18 +222,18 @@ def main(argv=None):
     ### Read cum data
     cum_tmp = cum[ix_s:ix_e, :, :]*mask
     cum_ref = np.nanmean(cum[ix_s:ix_e, refy1:refy2, refx1:refx2]*mask[refy1:refy2, refx1:refx2], axis=(1, 2))
-    
+
     if np.all(np.isnan(cum_ref)):
         print('\nERROR: Ref area has only NaN value!\n', file=sys.stderr)
         return 2
-    
+
     cum_tmp = cum_tmp-cum_ref[:, np.newaxis, np.newaxis]
 
     ### Extract not nan points
     bool_allnan = np.all(np.isnan(cum_tmp), axis=0)
     cum_tmp = cum_tmp.reshape(n_im, length*width)[:, ~bool_allnan.ravel()].transpose()
-        
-    
+
+
     if not sinflag: ## Linear function
         print('Calc velocity...')
         vel[~bool_allnan], vconst[~bool_allnan] = inv_lib.calc_vel(cum_tmp, dt_cum)
@@ -239,12 +244,12 @@ def main(argv=None):
         delta_t = np.zeros((length, width), dtype=np.float32)*np.nan
         ampfile = outfile.replace('vel', 'amp')
         dtfile = outfile.replace('vel', 'dt')
-        
+
         vel[~bool_allnan], vconst[~bool_allnan], amp[~bool_allnan], delta_t[~bool_allnan] = inv_lib.calc_velsin(cum_tmp, dt_cum, imdates[0])
         vel.tofile(outfile)
         amp.tofile(ampfile)
         delta_t.tofile(dtfile)
-    
+
     ### vstd
     if vstdflag:
         vstdfile = outfile.replace('vel', 'vstd')
@@ -263,12 +268,12 @@ def main(argv=None):
 
         if sinflag:
             amp_max = np.nanpercentile(amp, 99)
-            plot_lib.make_im_png(amp, ampfile+'.png', 'viridis', title, vmax=amp_max)
-            plot_lib.make_im_png(delta_t, dtfile+'.png', 'hsv', title)
+            plot_lib.make_im_png(amp, ampfile+'.png', cmap_amp, title, vmax=amp_max)
+            plot_lib.make_im_png(delta_t, dtfile+'.png', cmap_dt, title)
 
         if vstdflag:
-            plot_lib.make_im_png(vstd, vstdfile+'.png', cmap, title)
-    
+            plot_lib.make_im_png(vstd, vstdfile+'.png', cmap_vstd, title)
+
 
     #%% Finish
     elapsed_time = time.time()-start
@@ -280,7 +285,10 @@ def main(argv=None):
     print('\n{} Successfully finished!!\n'.format(os.path.basename(argv[0])))
     print('Output: {}'.format(outfile), flush=True)
     if vstdflag:
-        print('       {}'.format(vstdfile), flush=True)
+        print('        {}'.format(vstdfile), flush=True)
+    if sinflag:
+        print('        {}'.format(ampfile), flush=True)
+        print('        {}'.format(dtfile), flush=True)
     print('')
 
 
