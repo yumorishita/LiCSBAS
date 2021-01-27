@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-v1.4.7 20201124 Yu Morishita, GSI
+v1.4.8 20210127 Yu Morishita, GSI
 
-This script inverts the SB network of unw to obtain the time series and velocity 
+This script inverts the SB network of unw to obtain the time series and velocity
 using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
 A stable reference point is determined after the inversion. RMS of the time series
-wrt median among all points is calculated for each point. Then the point with 
+wrt median among all points is calculated for each point. Then the point with
 minimum RMS and minimum n_gap is selected as new stable reference point.
 
 ===============
@@ -47,7 +47,7 @@ Outputs in TS_GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile] 
+LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile]
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
@@ -69,6 +69,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.4.8 20210127 Yu Morishita, GSI
+ - Automatically reduce mem_size if available RAM is small
 v1.4.7 20201124 Yu Morishita, GSI
  - Comporess hdf5 file
 v1.4.6 20201119 Yu Morishita, GSI
@@ -108,6 +110,7 @@ import os
 import sys
 import re
 import time
+import psutil
 import h5py as h5
 import numpy as np
 import datetime as dt
@@ -127,13 +130,13 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver="1.4.7"; date=20201124; author="Y. Morishita"
+    ver="1.4.8"; date=20210127; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -147,7 +150,7 @@ def main(argv=None):
     ifgdir = []
     tsadir = []
     inv_alg = 'LS'
-    
+
     try:
         n_para = len(os.sched_getaffinity(0))
     except:
@@ -213,7 +216,7 @@ def main(argv=None):
 
     if not tsadir:
         tsadir = os.path.join(os.path.dirname(ifgdir), 'TS_'+os.path.basename(ifgdir))
-    
+
     if not os.path.isdir(tsadir):
         print('\nNo {} exists!'.format(tsadir), file=sys.stderr)
         return 1
@@ -237,7 +240,7 @@ def main(argv=None):
     restxtfile = os.path.join(infodir,'13resid.txt')
 
     cumh5file = os.path.join(tsadir,'cum.h5')
-    
+
 
     #%% Check files
     try:
@@ -253,11 +256,19 @@ def main(argv=None):
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         return 2
 
-      
+
     #%% Set preliminaly reference
     with open(reffile, "r") as f:
         refarea = f.read().split()[0]  #str, x1/x2/y1/y2
     refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
+
+
+    #%% Check RAM
+    mem_avail = (psutil.virtual_memory().available)/2**20 #MB
+    if memory_size > mem_avail/2:
+        print('\nNot enough memory available compared to mem_size ({} MB).'.format(memory_size))
+        print('Reduce mem_size automatically to {} MB.'.format(int(mem_avail/2)))
+        memory_size = int(mem_avail/2)
 
 
     #%% Read data information
@@ -279,7 +290,7 @@ def main(argv=None):
     lat1 = float(io_lib.get_param_par(dempar, 'corner_lat'))
     lon1 = float(io_lib.get_param_par(dempar, 'corner_lon'))
     if width == width_geo and length == length_geo: ## Geocoded
-        print('In geographical coordinates', flush=True)
+        print('\nIn geographical coordinates', flush=True)
         centerlat = lat1+dlat*(length/2)
         ra = float(io_lib.get_param_par(dempar, 'ellipsoid_ra'))
         recip_f = float(io_lib.get_param_par(dempar, 'ellipsoid_reciprocal_flattening'))
@@ -287,12 +298,12 @@ def main(argv=None):
         pixsp_a = 2*np.pi*rb/360*abs(dlat)
         pixsp_r = 2*np.pi*ra/360*dlon*np.cos(np.deg2rad(centerlat))
     else:
-        print('In radar coordinates', flush=True)
+        print('\nIn radar coordinates', flush=True)
         pixsp_r_org = float(io_lib.get_param_par(mlipar, 'range_pixel_spacing'))
         pixsp_a = float(io_lib.get_param_par(mlipar, 'azimuth_pixel_spacing'))
         inc_agl = float(io_lib.get_param_par(mlipar, 'incidence_angle'))
         pixsp_r = pixsp_r_org/np.sin(np.deg2rad(inc_agl))
-     
+
 
     ### Set n_unw_r_thre and cycle depending on L- or C-band
     if wavelength > 0.2: ## L-band
@@ -309,7 +320,7 @@ def main(argv=None):
     imdates_all = tools_lib.ifgdates2imdates(ifgdates_all)
     n_im_all = len(imdates_all)
     n_ifg_all = len(ifgdates_all)
-    
+
     ### Read bad_ifg11 and 12
     bad_ifg11 = io_lib.read_ifg_list(bad_ifg11file)
     bad_ifg12 = io_lib.read_ifg_list(bad_ifg12file)
@@ -351,7 +362,7 @@ def main(argv=None):
     else: #dummy
         bperp_all = np.random.random(len(imdates_all)).tolist()
         bperp = np.random.random(n_im).tolist()
-        
+
     pngfile = os.path.join(netdir, 'network13_all.png')
     plot_lib.plot_network(ifgdates_all, bperp_all, [], pngfile)
 
@@ -367,7 +378,7 @@ def main(argv=None):
         n_store_data = n_ifg*3+n_im*2+n_im*0.3 #
     else:
         n_store_data = n_ifg*2+n_im*2+n_im*0.3 #not sure
-        
+
 
     n_patch, patchrow = tools_lib.get_patchrow(width, length, n_store_data, memory_size)
 
@@ -416,18 +427,18 @@ def main(argv=None):
         unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
         f = open(unwfile, 'rb')
         f.seek(countf*4, os.SEEK_SET) #Seek for >=2nd path, 4 means byte
-        
+
         ### Read unw data (mm) at ref area
         unw = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))[:, refx1:refx2]*coef_r2m
-        
+
         unw[unw == 0] = np.nan
         if np.all(np.isnan(unw)):
             print('All nan in ref area in {}.'.format(ifgd))
             print('Rerun LiCSBAS12.')
             return 1
-        
+
         ref_unw.append(np.nanmean(unw))
-        
+
         f.close()
 
 
@@ -453,16 +464,16 @@ def main(argv=None):
     for i_patch, rows in enumerate(patchrow):
         print('\nProcess {0}/{1}th line ({2}/{3}th patch)...'.format(rows[1], patchrow[-1][-1], i_patch+1, n_patch), flush=True)
         start2 = time.time()
-        
+
         #%% Read data
         ### Allocate memory
         lengththis = rows[1] - rows[0]
         n_pt_all = lengththis*width
         unwpatch = np.zeros((n_ifg, lengththis, width), dtype=np.float32)
-        
+
         if inv_alg == 'WLS':
             cohpatch = np.zeros((n_ifg, lengththis, width), dtype=np.float32)
-        
+
         ### For each ifg
         print("  Reading {0} ifg's unw data...".format(n_ifg), flush=True)
         countf = width*rows[0]
@@ -471,7 +482,7 @@ def main(argv=None):
             unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
             f = open(unwfile, 'rb')
             f.seek(countf*4, os.SEEK_SET) #Seek for >=2nd patch, 4 means byte
-            
+
             ### Read unw data (mm) at patch area
             unw = np.fromfile(f, dtype=np.float32, count=countl).reshape((lengththis, width))*coef_r2m
             unw[unw == 0] = np.nan # Fill 0 with nan
@@ -483,7 +494,7 @@ def main(argv=None):
             if inv_alg == 'WLS':
                 cohfile = os.path.join(ifgdir, ifgd, ifgd+'.cc')
                 f = open(cohfile, 'rb')
-                
+
                 if os.path.getsize(cohfile) == length*width: ## uint8 format
                     f.seek(countf, os.SEEK_SET) #Seek for >=2nd patch
                     cohpatch[i, :, :] = (np.fromfile(f, dtype=np.uint8, count=countl).reshape((lengththis, width))).astype(np.float32)/255
@@ -520,28 +531,28 @@ def main(argv=None):
             gap_patch = np.zeros((n_im-1, n_pt_all), dtype=np.int8)
             ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
             maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-    
+
             ### Determine n_para
             n_pt_patch_min = 1000
             if n_pt_patch_min*n_para > n_pt_unnan:
                 ## Too much n_para
                 n_para_gap = int(np.floor(n_pt_unnan/n_pt_patch_min))
-                if n_para_gap == 0: n_para_gap = 1 
+                if n_para_gap == 0: n_para_gap = 1
             else:
                 n_para_gap = n_para
-    
+
             print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
             print('  with {} parallel processing...'.format(n_para_gap), flush=True)
-    
+
             ### Devide unwpatch by n_para for parallel processing
             p = q.Pool(n_para_gap)
             _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)), dtype=object)
             p.close()
 
-            ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt        
+            ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt
             gap_patch[:, ix_unnan_pt] = np.hstack(_result[:, 1]) #n_im-1, n_pt
             ns_ifg_noloop_patch[ix_unnan_pt] = np.hstack(_result[:, 2])
-    
+
             ### maxTlen
             _maxTlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
             _Tlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
@@ -558,39 +569,39 @@ def main(argv=None):
                 inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_para_inv)
             else:
                 inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_para_inv)
-    
+
             ### Set to valuables
             inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan
             vel_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
             vconst_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-    
+
             inc_patch[:, ix_unnan_pt] = inc_tmp
             vel_patch[ix_unnan_pt] = vel_tmp
             vconst_patch[ix_unnan_pt] = vconst_tmp
-    
+
             ### Calculate residuals
             res_patch = np.zeros((n_ifg, n_pt_all), dtype=np.float32)*np.nan
             res_patch[:, ix_unnan_pt] = unwpatch.T-np.dot(G, inc_tmp)
-    
+
             res_sumsq = np.nansum(res_patch**2, axis=0)
             res_n = np.float32((~np.isnan(res_patch)).sum(axis=0))
             res_n[res_n==0] = np.nan # To avoid 0 division
             res_rms_patch = np.sqrt(res_sumsq/res_n)
-    
+
             ### Cumulative displacememt
             cum_patch = np.zeros((n_im, n_pt_all), dtype=np.float32)*np.nan
             cum_patch[1:, :] = np.cumsum(inc_patch, axis=0)
-    
+
             ## Fill 1st image with 0 at unnan points from 2nd images
             bool_unnan_pt = ~np.isnan(cum_patch[1, :])
             cum_patch[0, bool_unnan_pt] = 0
-    
+
             ## Drop (fill with nan) interpolated cum by 2 continuous gaps
             for i in range(n_im-2): ## from 1->n_im-1
-                gap2 = gap_patch[i, :]+gap_patch[i+1, :] 
+                gap2 = gap_patch[i, :]+gap_patch[i+1, :]
                 bool_gap2 = (gap2==2) ## true if 2 continuous gaps for each point
                 cum_patch[i+1, :][bool_gap2] = np.nan
-    
+
             ## Last (n_im th) image. 1 gap means interpolated
             cum_patch[-1, :][gap_patch[-1, :]==1] = np.nan
 
@@ -607,8 +618,8 @@ def main(argv=None):
             ns_gap_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
             ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
             maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-            
-            
+
+
         #%% Output data and image
         ### cum.h5 file
         cum[:, rows[0]:rows[1], :] = cum_patch.reshape((n_im, lengththis, width))
@@ -640,7 +651,7 @@ def main(argv=None):
             file = os.path.join(resultsdir, names[i])
             with open(file, openmode) as f:
                 data[i].tofile(f)
-            
+
 
         #%% Finish patch
         elapsed_time2 = int(time.time()-start2)
@@ -664,7 +675,7 @@ def main(argv=None):
     mask_n_gap = np.float32(n_gap==min_n_gap)
     mask_n_gap[mask_n_gap==0] = np.nan
     rms_cum_wrt_med = rms_cum_wrt_med*mask_n_gap
-    
+
     ### Find stable reference
     min_rms = np.nanmin(rms_cum_wrt_med)
     refy1s, refx1s = np.where(rms_cum_wrt_med==min_rms)
@@ -719,7 +730,7 @@ def main(argv=None):
     p = q.Pool(_n_para)
     p.map(resid_png_wrapper, range(n_ifg))
     p.close()
-    
+
     ### Velocity and noise indices
     cmins = [None, None, None, None, None, None]
     cmaxs = [None, None, None, None, None, None]
@@ -732,7 +743,7 @@ def main(argv=None):
         data = io_lib.read_img(file, length, width)
 
         pngfile = file+'.png'
-        
+
         ## Get color range if None
         if cmins[i] is None:
             cmins[i] = np.nanpercentile(data, 1)
@@ -754,13 +765,13 @@ def main(argv=None):
     print('Output directory: {}\n'.format(os.path.relpath(tsadir)))
 
 
-#%% 
+#%%
 def count_gaps_wrapper(i):
     print("    Running {:2}/{:2}th patch...".format(i+1, n_para_gap), flush=True)
     n_pt_patch = int(np.ceil(unwpatch.shape[0]/n_para_gap))
     n_im = G.shape[1]+1
     n_loop, n_ifg = Aloop.shape
-    
+
     if i*n_pt_patch >= unwpatch.shape[0]:
         # Nothing to do
         return
@@ -777,7 +788,7 @@ def count_gaps_wrapper(i):
     del ns_unw_unnan4inc
 
     ### n_ifg_noloop
-    # n_ifg*(n_pt,n_ifg)->(n_loop,n_pt) 
+    # n_ifg*(n_pt,n_ifg)->(n_loop,n_pt)
     # Number of ifgs for each loop at eath point.
     # 3 means complete loop, 1 or 2 means broken loop.
     ns_ifg4loop = np.array([(np.abs(Aloop[j, :])*
@@ -785,7 +796,7 @@ def count_gaps_wrapper(i):
                             .sum(axis=1) for j in range(n_loop)])
     bool_loop = (ns_ifg4loop==3) #(n_loop,n_pt) identify complete loop only
     del ns_ifg4loop
-    
+
     # n_loop*(n_loop,n_pt)*n_pt->(n_ifg,n_pt)
     # Number of loops for each ifg at eath point.
     ns_loop4ifg = np.array([(
@@ -796,11 +807,11 @@ def count_gaps_wrapper(i):
 
     ns_ifg_noloop_tmp = (ns_loop4ifg==0).sum(axis=0) #n_pt
     del ns_loop4ifg
-    
+
     ns_nan_ifg = np.isnan(unwpatch[i*n_pt_patch:(i+1)*n_pt_patch, :]).sum(axis=1)
     #n_pt, nan ifg count
     _ns_ifg_noloop_patch = ns_ifg_noloop_tmp - ns_nan_ifg
-    
+
     return _ns_gap_patch, _gap_patch, _ns_ifg_noloop_patch
 
 
@@ -809,15 +820,15 @@ def inc_png_wrapper(imx):
     imd = imdates[imx]
     if imd == imdates[-1]:
         return #skip last for increment
-    
+
     ## Comparison of increment and daisy chain pair
     ifgd = '{}_{}'.format(imd, imdates[imx+1])
     incfile = os.path.join(incdir, '{}.inc'.format(ifgd))
     unwfile = os.path.join(ifgdir, ifgd, '{}.unw'.format(ifgd))
     pngfile = os.path.join(incdir, '{}.inc_comp.png'.format(ifgd))
-    
+
     inc = io_lib.read_img(incfile, length, width)
-    
+
     try:
         unw = io_lib.read_img(unwfile, length, width)*coef_r2m
         ix_ifg = ifgdates.index(ifgd)
@@ -842,7 +853,7 @@ def resid_png_wrapper(i):
     resid_rms = np.sqrt(np.nanmean(resid**2))
     with open(restxtfile, "a") as f:
         print('{} {:5.2f}'.format(ifgd, resid_rms), file=f)
-    
+
     pngfile = infile+'.png'
     title = 'Residual (mm) of {} (RMS:{:.2f}mm)'.format(ifgd, resid_rms)
     plot_lib.make_im_png(resid, pngfile, cmap_vel, title, -wavelength/2*1000, wavelength/2*1000)
