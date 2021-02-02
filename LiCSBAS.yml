@@ -9,5 +9,6 @@ dependencies:
   - h5py
   - matplotlib
   - numpy
+  - psutil
   - requests
   - statsmodels

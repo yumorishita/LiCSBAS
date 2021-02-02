@@ -5,5 +5,6 @@ gdal>=2.4
 h5py
 matplotlib
 numpy
+psutil
 requests
 statsmodels
