@@ -368,10 +368,10 @@ def get_cmap(cmap_name, cmapN=256):
     All cmap can be reversed with "_r"
     """
     flag = 0 # mpl
-    if cmap_name == 'cm_insar':
+    if cmap_name.startswith('cm_insar'):
         _cmap = cm_insar()
         flag = 1
-    elif cmap_name == 'cm_isce':
+    elif cmap_name.startswith('cm_isce'):
         _cmap = cm_isce()
         flag = 1
     elif cmap_name.startswith('SCM'):
@@ -390,25 +390,19 @@ def get_cmap(cmap_name, cmapN=256):
     if flag >= 2:
         cmdir = os.path.dirname(CMAP.__file__)
         name = cmap_name.split('.')[1]
-        if not cmap_name.endswith('_r'):
-            if flag == 2:
-                file = os.path.join(cmdir, name, name+'.txt')
-                cm_data = np.loadtxt(file)
-            elif flag == 3:
-                file = os.path.join(cmdir, name+'.csv')
-                cm_data = np.loadtxt(file, delimiter=',')
-            _cmap = LSC.from_list(name, cm_data)
-        else: # Reversed
-            if flag == 2:
-                file = os.path.join(cmdir, name[:-2], name[:-2]+'.txt')
-                cm_data = np.loadtxt(file)
-            elif flag == 3:
-                file = os.path.join(cmdir, name[:-2]+'.csv')
-                cm_data = np.loadtxt(file, delimiter=',')
-
-            _cmap = LSC.from_list(name, np.flip(cm_data, axis=0))
+        if cmap_name.endswith('_r'):
+            name = name[:-2]
+        if flag == 2:
+            file = os.path.join(cmdir, name, name+'.txt')
+            cm_data = np.loadtxt(file)
+        elif flag == 3:
+            file = os.path.join(cmdir, name+'.csv')
+            cm_data = np.loadtxt(file, delimiter=',')
+        _cmap = LSC.from_list(name, cm_data)
 
     if flag >= 1:
+        if cmap_name.endswith('_r'):
+            _cmap = _cmap.reversed()
         plt.cm.register_cmap(name = cmap_name, cmap = _cmap)
 
     cmap = plt.get_cmap(cmap_name, cmapN)
