@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3 20200904 Yu Morishita, GSI
+v1.4 20210205 Yu Morishita, GSI
 
 ========
 Overview
@@ -13,10 +13,20 @@ Usage
 LiCSBAS_color_geotiff.py -i infile [-c cmap] [-o outfile] [--cmin float] [--cmax float] [--n_color int] [--no_colorbar]
 
  -i  Input data GeoTIFF file
- -c  Colormap name (Default: SCM.roma_r. See below for available colormap)
-     - https://matplotlib.org/tutorials/colors/colormaps.html
-     - http://www.fabiocrameri.ch/colourmaps.php (e.g., SCM.roma)
-     - insar (n_color=16)
+ -c  Colormap name (Default: SCM.roma_r, reverse of SCM.roma)
+     Available colormaps (all cmap can be reversed with "_r"):
+     - Matplotlib predefined name (e.g. viridis)
+       https://matplotlib.org/tutorials/colors/colormaps.html
+     - Scientific colour maps (e.g. SCM.roma)
+       http://www.fabiocrameri.ch/colourmaps.php
+     - Generic Mapping Tools (e.g. GMT.polar)
+       https://docs.generic-mapping-tools.org/dev/cookbook/cpts.html
+     - cmocean (e.g. cmocean.phase)
+       https://matplotlib.org/cmocean/
+     - colorcet (e.g. colorcet.CET_C1)
+       https://colorcet.holoviz.org/
+     - cm_insar (GAMMA standard rainbow color for wrapped phase)
+     - cm_isce (ISCE standard rainbow color for wrapped phase)
  -o  Output colored GeoTIFF file (Default: [infile%.tif].cmap_cmin_cmax.tif)
  --cmin|cmax  Min|max values of color (Default: None (auto))
  --n_color    Number of rgb quantization levels (Default: 256)
@@ -25,6 +35,8 @@ LiCSBAS_color_geotiff.py -i infile [-c cmap] [-o outfile] [--cmin float] [--cmax
 """
 #%% Change log
 '''
+v1.4 20210205 Yu Morishita, GSI
+ - More cmap available
 v1.3 20200904 Yu Morishita, GSI
  - Avoid segmentation fault
 v1.2 20200827 Yu Morishita, GSI
@@ -42,11 +54,11 @@ import os
 import sys
 #import gdal  # may cause segmentation fault in savefig?
 import time
-import SCM
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import LiCSBAS_tools_lib as tools_lib
+from osgeo import gdal
 
 class Usage(Exception):
     """Usage context manager"""
@@ -58,9 +70,9 @@ class Usage(Exception):
 ## Not use def main to use global valuables
 if __name__ == "__main__":
     argv = sys.argv
-        
+
     start = time.time()
-    ver=1.3; date=20200904; author="Y. Morishita"
+    ver=1.4; date=20210205; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -73,7 +85,7 @@ if __name__ == "__main__":
     cmax = None
     n_color = 256
     cbar_flag = True
-    
+
     gdal_option = ['COMPRESS=DEFLATE']
 
     #%% Read options
@@ -115,37 +127,11 @@ if __name__ == "__main__":
         sys.exit(2)
 
 
-    #%% Set cmap if SCM
-    if cmap_name.startswith('SCM'):
-        cmap = [] ## Not necessary
-        if cmap_name.endswith('_r'):
-            exec("cmap = {}.reversed()".format(cmap_name[:-2]))
-        else:
-            exec("cmap = {}".format(cmap_name))
-        cmap_name = cmap_name.replace('SCM.', '')
-        plt.register_cmap(name=cmap_name, cmap=cmap, lut=n_color)
-    elif cmap_name == 'insar':
-        cdict = tools_lib.cmap_insar()
-        plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
+    #%% Set cmap
+    cmap = tools_lib.get_cmap(cmap_name, n_color)
 
-
-    cmap = plt.get_cmap(cmap_name, n_color)
-        
-
-    #%% colorbar
-    if cbar_flag:
-        fig, ax = plt.subplots(figsize=(3, 1))
-        norm = mpl.colors.Normalize(cmin, cmax)
-        mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
-        cbarfile = "{}_{}_{}.pdf".format(cmap_name, cmin, cmax)
-        plt.tight_layout()
-        plt.savefig(cbarfile, transparent=True)
-        plt.close()
-    
 
     #%% Set color range
-    from osgeo import gdal
-    
     ### Auto
     if cmin is None:
         cmin = gdal.Info(infile, computeMinMax=True, format="json")["bands"][0]['computedMin']
@@ -178,16 +164,16 @@ if __name__ == "__main__":
                        format="GTiff", creationOptions=gdal_option, addAlpha=4)
 
 
-    #%% colorbar. Move before import gdal to avoid segmentation fault 
-    # if cbar_flag:
-    #     fig, ax = plt.subplots(figsize=(3, 1))
-    #     norm = mpl.colors.Normalize(cmin, cmax)
-    #     mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
-    #     cbarfile = "{}_{}_{}.pdf".format(cmap_name, cmin, cmax)
-    #     plt.tight_layout()
-    #     plt.savefig(cbarfile, transparent=True)
-    #     plt.close()
-        
+    #%% colorbar. Move before import gdal to avoid segmentation fault
+    if cbar_flag:
+        fig, ax = plt.subplots(figsize=(3, 1))
+        norm = mpl.colors.Normalize(cmin, cmax)
+        mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+        cbarfile = "{}_{}_{}.pdf".format(cmap_name, cmin, cmax)
+        plt.tight_layout()
+        plt.savefig(cbarfile, transparent=True)
+        plt.close()
+
 
     #%% Remove intermediate files
     os.remove(colorfile)

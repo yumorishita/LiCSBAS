@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.10.0 20210120 Yu Morishita, GSI
+v1.11.0 20210205 Yu Morishita, GSI
 
 This script displays an image file.
 
@@ -14,11 +14,20 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
  -i  Input image file in float32, uint8, GeoTIFF, or NetCDF
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
      (Not required if input is GeoTIFF or NetCDF)
- -c  Colormap name (see below for available colormap)
-     - https://matplotlib.org/tutorials/colors/colormaps.html
-     - http://www.fabiocrameri.ch/colourmaps.php
-     - insar (GAMMA standard rainbow color for wrapped phase)
-     (Default: SCM.roma_r, reverse of SCM.roma)
+ -c  Colormap name (Default: SCM.roma_r, reverse of SCM.roma)
+     Available colormaps (all cmap can be reversed with "_r"):
+     - Matplotlib predefined name (e.g. viridis)
+       https://matplotlib.org/tutorials/colors/colormaps.html
+     - Scientific colour maps (e.g. SCM.roma)
+       http://www.fabiocrameri.ch/colourmaps.php
+     - Generic Mapping Tools (e.g. GMT.polar)
+       https://docs.generic-mapping-tools.org/dev/cookbook/cpts.html
+     - cmocean (e.g. cmocean.phase)
+       https://matplotlib.org/cmocean/
+     - colorcet (e.g. colorcet.CET_C1)
+       https://colorcet.holoviz.org/
+     - cm_insar (GAMMA standard rainbow color for wrapped phase)
+     - cm_isce (ISCE standard rainbow color for wrapped phase)
  --cmin|cmax    Min|max values of color (Default: None (auto))
  --auto_crange  % of color range used for automatic determination (Default: 99)
  --n_color    Number of rgb quantization levels (Default: 256)
@@ -34,6 +43,9 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
 
 #%% Change log
 '''
+v1.11 20210205 Yu Morishita, GSI
+ - More cmap available
+ - Show colorbar for cyclic cmaps
 v1.10 20210120 Yu Morishita, GSI
  - Add --n_color option
  - Bug fix in creating kmz with standard cmap
@@ -71,11 +83,11 @@ v1.0 20190729 Yu Morishita, Uni of Leeds and GSI
 import getopt
 import sys
 import os
+import re
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import subprocess as subp
-import SCM
 import zipfile
 from osgeo import gdal
 
@@ -111,7 +123,7 @@ def make_kmz(lat1, lat2, lon1, lon2, pngfile, kmzfile, pngcfile, description):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver="1.10.0"; date=20210120; author="Y. Morishita"
+    ver="1.11.0"; date=20210205; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -179,22 +191,6 @@ if __name__ == "__main__":
         sys.exit(2)
 
 
-    #%% Set cmap if SCM or insar
-    if cmap_name.startswith('SCM'):
-        cmap = [] ## Not necessary
-        if cmap_name.endswith('_r'):
-            exec("cmap = {}.reversed()".format(cmap_name[:-2]))
-        else:
-            exec("cmap = {}".format(cmap_name))
-        cmap_name = cmap_name.replace('SCM.', '')
-        plt.register_cmap(name=cmap_name, cmap=cmap, lut=n_color)
-    elif cmap_name == 'insar':
-        cdict = tools_lib.cmap_insar()
-        plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
-
-    cmap = plt.get_cmap(cmap_name, n_color)
-
-
     #%% Get info and Read data
     if gdal.IdentifyDriver(infile): ## If Geotiff or grd
         geotiff = gdal.Open(infile)
@@ -257,8 +253,17 @@ if __name__ == "__main__":
             data[data==nodata] = np.nan
 
 
-    #%% Set cyclic and color range
-    if cmap_name == 'insar' or (cmap_name.startswith('SCM') and 'O' in cmap_name):
+    #%% Get cmap, set cyclic and color range
+    cmap = tools_lib.get_cmap(cmap_name, n_color)
+
+    if cmap_name == 'cm_insar' or \
+            cmap_name == 'cm_isce' or \
+            (cmap_name.startswith('SCM') and 'O' in cmap_name) or \
+            'GMT.cyclic' in cmap_name or \
+            'cmocean.phase' in cmap_name or \
+            (cmap_name.startswith('colorcet') and
+             re.search(r'C[1-5]', cmap_name) is not None):
+        print('\n{} is a cyclic cmap.'.format(cmap_name))
         cyclic= True
         data = np.angle(np.exp(1j*(data/cycle))*cycle)
         cmin = -np.pi
@@ -292,18 +297,20 @@ if __name__ == "__main__":
         plt.close()
 
         ### Make cbar png
+        fig, ax = plt.subplots(figsize=(3, 1))
+        norm = mpl.colors.Normalize(cmin, cmax)
+        cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+        pngcfile = kmzname.replace('.kmz', '_ctmp.png')
+        plt.tight_layout()
         if cyclic:
-            description = '{}*2pi/cycle'.format(cycle)
-            pngcfile = []
+            cbar.set_ticks([])
+            descr_cycle = '{}*2pi/cycle'.format(cycle)
         else:
-            fig, ax = plt.subplots(figsize=(3, 1))
-            norm = mpl.colors.Normalize(cmin, cmax)
-            mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
-            pngcfile = kmzname.replace('.kmz', '_ctmp.png')
-            plt.tight_layout()
-            plt.savefig(pngcfile, transparent=True)
-            plt.close()
-            description = '<![CDATA[<img style="max-width:200px;" src="{}">]]>'.format(os.path.basename(pngcfile))
+            descr_cycle = ''
+        plt.savefig(pngcfile, transparent=True)
+        plt.close()
+
+        description = '<![CDATA[{}<img style="max-width:200px;" src="{}">]]>'.format(descr_cycle, os.path.basename(pngcfile))
 
         make_kmz(lat_s_p, lat_n_p, lon_w_p, lon_e_p, pngnametmp, kmzname, pngcfile, description)
 
@@ -324,6 +331,8 @@ if __name__ == "__main__":
     plt.imshow(data, clim=[cmin, cmax], cmap=cmap, interpolation=interp)
     if cyclic:
         plt.title('{}*2pi/cycle'.format(cycle))
+        cbar = plt.colorbar()
+        cbar.set_ticks([])
     else:
         plt.colorbar()
     plt.tight_layout()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.13.2 20210126 Yu Morishita, GSI
+v1.13.3 20210205 Yu Morishita, GSI
 
 ========
 Overview
@@ -38,9 +38,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
  --ref_geo   Initial reference area in geographical coordinates.
  -p    Initial selected point for time series plot (Default: ref point)
  --p_geo     Initial selected point in geographical coordinates.
- -c    Color map for velocity and cumulative displacement
-       - https://matplotlib.org/tutorials/colors/colormaps.html
-       - http://www.fabiocrameri.ch/colourmaps.php
+ -c    Color map for velocity and cumulative displacement.
+       See help of LiCSBAS_disp_img.py.
        (Default: SCM.roma_r, reverse of SCM.roma)
  --nomask     Not use mask (Default: use mask)
  --vmin|vmax  Min|max values of color for velocity map (Default: auto)
@@ -54,6 +53,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
 """
 #%% Change log
 '''
+v1.13.3 20210205 Yu Morishita, GSI
+ - More cmap available
 v1.13.2 20210126 Yu Morishita, GSI
  - Small bug fix in -r and noise indices
  - Change initial point to center of ref area
@@ -169,7 +170,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver="1.13.2"; date=20210126; author="Y. Morishita"
+    ver="1.13.3"; date=20210205; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -190,7 +191,7 @@ if __name__ == "__main__":
     ts_pngfile = []
     vmin = None
     vmax = None
-    cmap = "SCM.roma_r"
+    cmap_name = "SCM.roma_r"
     auto_crange = 99.0
 
     #%% Read options
@@ -224,7 +225,7 @@ if __name__ == "__main__":
             elif o == '--p_geo':
                 point_geo = a
             elif o == '-c':
-                cmap = a
+                cmap_name = a
             elif o == '--nomask':
                 maskflag = False
             elif o == '--vmin':
@@ -249,12 +250,9 @@ if __name__ == "__main__":
         sys.exit(2)
 
 
-    #%% Set cmap if SCM
-    if cmap.startswith('SCM'):
-        if cmap.endswith('_r'):
-            exec("cmap = {}.reversed()".format(cmap[:-2]))
-        else:
-            exec("cmap = {}".format(cmap))
+    #%% Set cmap
+    cmap = tools_lib.get_cmap(cmap_name)
+
 
     #%% Set files
     ### cumfile

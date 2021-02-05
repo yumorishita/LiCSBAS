@@ -8,6 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.7 20210205 Yu Morishita, GSI
+ - Add cm_insar, cm_isce, get_cmap
 v1.6.2 20201225 Yu Morishita, GSI
  - Avoid error when remote file is empty
 v1.6.1 20201207 Yu Morishita, GSI
@@ -38,8 +40,10 @@ import requests
 import dateutil
 import datetime as dt
 import numpy as np
-import statsmodels.api as sm
 import warnings
+from matplotlib.colors import LinearSegmentedColormap as LSC
+from matplotlib import pyplot as plt
+
 
 #%%
 def bl2xy(lon, lat, width, length, lat1, postlat, lon1, postlon):
@@ -50,7 +54,7 @@ def bl2xy(lon, lat, width, length, lat1, postlat, lon1, postlon):
     """
     x = int(np.round((lon - lon1)/postlon))
     y = int(np.round((lat - lat1)/postlat))
-    
+
     return [x, y]
 
 
@@ -66,7 +70,7 @@ def comp_size_time(file_remote, file_local):
     """
 
     response = requests.head(file_remote, allow_redirects=True)
-    
+
     if response.status_code != 200:
         return 3
     elif response.headers.get("Content-Length") is None:
@@ -87,6 +91,63 @@ def comp_size_time(file_remote, file_local):
 
 
 #%%
+def cm_insar():
+    rgbs = np.zeros((256,3), dtype=np.uint8)
+
+    for kk in range(85):
+        rgbs[kk,0] = kk*3
+        rgbs[kk,1] = 255-kk*3
+        rgbs[kk,2] = 255
+
+    rgbs[85:170,0] = rgbs[0:85,2]
+    rgbs[85:170,1] = rgbs[0:85,0]
+    rgbs[85:170,2] = rgbs[0:85,1]
+
+    rgbs[170:255,0] = rgbs[0:85,1]
+    rgbs[170:255,1] = rgbs[0:85,2]
+    rgbs[170:255,2] = rgbs[0:85,0]
+
+    rgbs[255,0] = 0
+    rgbs[255,1] = 255
+    rgbs[255,2] = 255
+
+    rgbs = np.roll(rgbs, int(256/2), axis=0)  #shift green to the center
+    rgbs = (rgbs/255.0*200+55)/255.0
+
+    return LSC.from_list('cm_insar', rgbs)
+
+
+#%%
+def cm_isce():
+    # https://github.com/insarlab/MintPy/blob/main/mintpy/objects/colors.py#L199
+    # Almost same as GAMMA except for bottom RGB (0vs0.2), shift and flip
+    rgbs = np.zeros((256,3), dtype=np.uint8)
+
+    for kk in range(85):
+        rgbs[kk,0] = kk*3
+        rgbs[kk,1] = 255-kk*3
+        rgbs[kk,2] = 255
+
+    rgbs[85:170,0] = rgbs[0:85,2]
+    rgbs[85:170,1] = rgbs[0:85,0]
+    rgbs[85:170,2] = rgbs[0:85,1]
+
+    rgbs[170:255,0] = rgbs[0:85,1]
+    rgbs[170:255,1] = rgbs[0:85,2]
+    rgbs[170:255,2] = rgbs[0:85,0]
+
+    rgbs[255,0] = 0
+    rgbs[255,1] = 255
+    rgbs[255,2] = 255
+
+    rgbs = np.roll(rgbs, int(256/2-214), axis=0)  #shift green to the center
+    rgbs = np.flipud(rgbs)   #flip up-down so that orange is in the later half (positive)
+    rgbs = rgbs/255.0
+
+    return LSC.from_list('cm_isce', rgbs)
+
+
+#%%
 def cmap_insar():
     """
     How to use cmap_insar (GAMMA standard rainbow cmap):
@@ -96,7 +157,7 @@ def cmap_insar():
         plt.register_cmap(cmap=mpl.colors.LinearSegmentedColormap('insar', cdict))
         plt.register_cmap(name='insar', data=cdict)
         plt.imshow(array, cmap='insar', vmin=-np.pi, vmax=np.pi, interpolation='nearest')
-        
+
     Note:
         - Input array should be wrapped and in radian
         - To wrap unwrapped phase, np.angle(np.exp(1j*unw/cycle)*cycle)
@@ -115,18 +176,18 @@ def cmap_insar():
 
     redtuple=[]
     greentuple=[]
-    bluetuple=[]    
+    bluetuple=[]
     for j in range(18):
         redtuple.append((phase[j],red_norm[j],red_norm[j+1]))
         greentuple.append((phase[j],green_norm[j],green_norm[j+1]))
         bluetuple.append((phase[j],blue_norm[j],blue_norm[j+1]))
-   
+
     redtuple=tuple(redtuple)
-    greentuple=tuple(greentuple)    
+    greentuple=tuple(greentuple)
     bluetuple=tuple(bluetuple)
-        
+
     cdict = { 'red': redtuple, 'green': greentuple, 'blue': bluetuple }
-    
+
     return cdict
 
 
@@ -141,7 +202,7 @@ def convert_size(size_bytes):
    return "%s%s" % (s, size_name[i])
 
 
-#%% 
+#%%
 def download_data(url, file, n_retry=3):
     for i in range(n_retry):
         try:
@@ -162,7 +223,7 @@ def download_data(url, file, n_retry=3):
             print('    {}, {}, {}s, {}/s'.format(os.path.basename(file),
                    fsize, elapsed, speed), flush=True)
             return # success
-    
+
         except Exception as e:
             print(    '    {} for {} in {}th try'.format(
                 e.__class__.__name__, os.path.basename(url), i+1), flush=True)
@@ -177,7 +238,7 @@ def download_data(url, file, n_retry=3):
 def fit2d(A,w=None,deg="1"):
     """
     Estimate best fit plain with indicated degree of polynomial.
-    
+
     Inputs:
         A : Input ndarray (can include nan)
         w : Wieight (1/std**2) for each element of A (with the same dimention as A)
@@ -185,17 +246,18 @@ def fit2d(A,w=None,deg="1"):
          - 1   -> a+bx+cy (ramp)
          - bl -> a+bx+cy+dxy (biliner)
          - 2   -> a+bx+cy+dxy+ex**2_fy**2 (2d polynomial)
-     
+
     Returns:
         Afit : Best fit plain with the same demention as A
         m    : set of parameters of best fit plain (a,b,c...)
-    
+
     """
+    import statsmodels.api as sm
 
     ### Make design matrix G
     length,width = A.shape #read dimension
     Xgrid,Ygrid = np.meshgrid(np.arange(width),np.arange(length)) #mesh grid
-    
+
     if str(deg) == "1":
         G = np.stack((np.ones((length*width)), Xgrid.flatten(), Ygrid.flatten())).T
     elif str(deg) == "bl":
@@ -205,7 +267,7 @@ def fit2d(A,w=None,deg="1"):
     else:
         print('\nERROR: Not proper deg ({}) is used\n'.format(deg), file=sys.stderr)
         return False
-        
+
     ### Handle nan by 0 padding and 0 weight
     # Not drop in sm because cannot return Afit
     if np.any(np.isnan(A)):
@@ -222,7 +284,7 @@ def fit2d(A,w=None,deg="1"):
         results = sm.OLS(A.ravel(), G).fit()
     else: ## Weighted LS
         results = sm.WLS(A.ravel(), G, weights=w.ravel()).fit()
-       
+
     m = results.params
     Afit = np.float32(results.predict().reshape((length,width)))
 
@@ -233,7 +295,7 @@ def fit2d(A,w=None,deg="1"):
 def fit2dh(A, deg, hgt, hgt_min, hgt_max):
     """
     Estimate best fit 2d ramp and topography-correlated component simultaneously.
-    
+
     Inputs:
         A   : Input ndarray (can include nan)
         deg : degree of polynomial for fitting ramp
@@ -245,12 +307,13 @@ def fit2dh(A, deg, hgt, hgt_min, hgt_max):
               If blank, don*t estimate topo-corr component.
         hgt_min : Minimum hgt to take into account in hgt-linear
         hgt_max : Maximum hgt to take into account in hgt-linear
-    
+
     Returns:
         Afit : Best fit solution with the same demention as A
         m    : Set of parameters of best fit plain (a,b,c...)
-    
+
     """
+    import statsmodels.api as sm
 
     ### Make design matrix G
     length, width = A.shape
@@ -271,7 +334,7 @@ def fit2dh(A, deg, hgt, hgt_min, hgt_max):
             print('\nERROR: Not proper deg ({}) is used\n'.format(deg), file=sys.stderr)
             return False
         G = sm.add_constant(G)
-    
+
     if len(hgt) > 0:
         _hgt = hgt.copy()  ## Not to overwrite hgt in main
         _hgt[np.isnan(_hgt)] = 0
@@ -292,12 +355,74 @@ def fit2dh(A, deg, hgt, hgt_min, hgt_max):
 
 
 #%%
+def get_cmap(cmap_name, cmapN=256):
+    """
+    Return cmap (LinearSegmentedColormap).
+    cmap_name can be:
+        - Matplotlib predefined name (e.g. viridis)
+        - Scientific colour maps (e.g. SCM.roma)
+        - Generic Mapping Tools (e.g. GMT.polar)
+        - cmocean (e.g. cmocean.phase)
+        - colorcet (e.g. colorcet.CET_C1)
+        - cm_insar, cm_isce
+    All cmap can be reversed with "_r"
+    """
+    flag = 0 # mpl
+    if cmap_name == 'cm_insar':
+        _cmap = cm_insar()
+        flag = 1
+    elif cmap_name == 'cm_isce':
+        _cmap = cm_isce()
+        flag = 1
+    elif cmap_name.startswith('SCM'):
+        import SCM as CMAP
+        flag = 2
+    elif cmap_name.startswith('GMT'):
+        import GMT as CMAP
+        flag = 2
+    elif cmap_name.startswith('cmocean'):
+        import cmocean as CMAP
+        flag = 2
+    elif cmap_name.startswith('colorcet'):
+        import colorcet as CMAP
+        flag = 3
+
+    if flag >= 2:
+        cmdir = os.path.dirname(CMAP.__file__)
+        name = cmap_name.split('.')[1]
+        if not cmap_name.endswith('_r'):
+            if flag == 2:
+                file = os.path.join(cmdir, name, name+'.txt')
+                cm_data = np.loadtxt(file)
+            elif flag == 3:
+                file = os.path.join(cmdir, name+'.csv')
+                cm_data = np.loadtxt(file, delimiter=',')
+            _cmap = LSC.from_list(name, cm_data)
+        else: # Reversed
+            if flag == 2:
+                file = os.path.join(cmdir, name[:-2], name[:-2]+'.txt')
+                cm_data = np.loadtxt(file)
+            elif flag == 3:
+                file = os.path.join(cmdir, name[:-2]+'.csv')
+                cm_data = np.loadtxt(file, delimiter=',')
+
+            _cmap = LSC.from_list(name, np.flip(cm_data, axis=0))
+
+    if flag >= 1:
+        plt.cm.register_cmap(name = cmap_name, cmap = _cmap)
+
+    cmap = plt.get_cmap(cmap_name, cmapN)
+
+    return cmap
+
+
+#%%
 def get_ifgdates(ifgdir):
     """
     Get ifgdates and imdates in ifgdir.
-    
+
     Returns:
-        ifgdates : List of dates of ifgs 
+        ifgdates : List of dates of ifgs
         imdates  : List of dates of images
     """
     ifgdates = [str(k) for k in sorted(os.listdir(ifgdir))
@@ -314,7 +439,7 @@ def get_ifgdates(ifgdir):
 def get_patchrow(width, length, n_data, memory_size):
     """
     Get patch number of rows for memory size (in MB).
-    
+
     Returns:
         n_patch : Number of patches (int)
         patchrow : List of the number of rows for each patch.
@@ -368,7 +493,7 @@ def multilook(array, nlook_r, nlook_c, n_valid_thre=0.5):
     n_valid = np.sum(~np.isnan(array_reshape), axis=(1, 3))
     bool_invalid = n_valid < n_valid_thre*nlook_r*nlook_c
     array_ml[bool_invalid] = np.nan
-    
+
     return array_ml
 
 
@@ -384,7 +509,7 @@ def read_point(point_str, width, length):
         print("\nERROR:", file=sys.stderr)
         print("Point format seems to be wrong (should be x/y)", file=sys.stderr)
         return False
-    
+
     return [x, y]
 
 
@@ -407,7 +532,7 @@ def read_range(range_str, width, length):
         print("\nERROR:", file=sys.stderr)
         print("Range format seems to be wrong (should be x1:x2/y1:y2)", file=sys.stderr)
         return False
-    
+
     return [x1, x2, y1, y2]
 
 
@@ -423,7 +548,7 @@ def read_range_line(range_str, width, length):
         print("\nERROR:", file=sys.stderr)
         print("Range format seems to be wrong (must be x1,y1/x2,y2)", file=sys.stderr)
         return False
-    
+
     return [x1, x2, y1, y2]
 
 
@@ -437,7 +562,7 @@ def read_range_geo(range_str, width, length, lat1, postlat, lon1, postlon):
     """
     lat2 = lat1+postlat*(length-1)
     lon2 = lon1+postlon*(width-1)
-    
+
     if re.match('[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?/[+-]?\d+(?:\.\d+)?', range_str):
         lon_w, lon_e, lat_s, lat_n = [float(s) for s in range_str.split('/')]
         x1 = int(np.round((lon_w - lon1)/postlon)) if lon_w > lon1 else 0
@@ -448,7 +573,7 @@ def read_range_geo(range_str, width, length, lat1, postlat, lon1, postlon):
         print("\nERROR:", file=sys.stderr)
         print("Range format seems to be wrong (should be lon1/lon2/lat1/lat2)", file=sys.stderr)
         return False
-    
+
     return [x1, x2, y1, y2]
 
 
@@ -469,7 +594,7 @@ def read_range_line_geo(range_str, width, length, lat_n, postlat, lon_w, postlon
         print("\nERROR:", file=sys.stderr)
         print("Range format seems to be wrong (should be lon1,lat1/lon2,lat2)", file=sys.stderr)
         return False
-    
+
     return [x1, x2, y1, y2]
 
 
@@ -480,5 +605,5 @@ def xy2bl(x, y, lat1, dlat, lon1, dlon):
     """
     lat = lat1+dlat*y
     lon = lon1+dlon*x
-    
+
     return lat, lon
