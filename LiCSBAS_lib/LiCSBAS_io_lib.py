@@ -8,6 +8,8 @@ Python3 library of input/output functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.3 20210209 Yu Morioshita, GSI
+ - Add make_geotiff
 v1.2.1 20201211 Yu Morioshita, GSI
  - Skip invalid lines in baselines file in read_bperp_file
 v1.2 20200703 Yu Morioshita, GSI
@@ -24,6 +26,7 @@ import numpy as np
 import subprocess as subp
 import datetime as dt
 import statsmodels.api as sm
+from osgeo import gdal, osr
 
 
 #%%
@@ -37,8 +40,31 @@ def make_dummy_bperp(bperp_file, imdates):
             elif np.mod(i, 4)==0: bp = -np.random.rand()/2 #-0.5~0
 
             ifg_dt = dt.datetime.strptime(imd, '%Y%m%d').toordinal() - dt.datetime.strptime(imdates[0], '%Y%m%d').toordinal()
-            
+
             print('{:3d} {} {} {:5.2f} {:4d} {} {:4d} {} {:5.2f}'.format(i, imdates[0], imd, bp, ifg_dt, 0, ifg_dt, 0, bp), file=f)
+
+
+#%%
+def make_geotiff(data, latn_p, lonw_p, dlat, dlon, outfile, compress_option):
+    length, width = data.shape
+    if data.dtype == np.float32:
+        dtype = gdal.GDT_Float32
+        nodata = np.nan  ## or 0?
+    elif data.dtype == np.uint8:
+        dtype = gdal.GDT_Byte
+        nodata = None
+
+    driver = gdal.GetDriverByName('GTiff')
+    outRaster = driver.Create(outfile, width, length, 1, dtype, options=compress_option)
+    outRaster.SetGeoTransform((lonw_p, dlon, 0, latn_p, 0, dlat))
+    outband = outRaster.GetRasterBand(1)
+    outband.WriteArray(data)
+    if nodata is not None: outband.SetNoDataValue(nodata)
+    outRaster.SetMetadataItem('AREA_OR_POINT', 'Area')
+    outRasterSRS = osr.SpatialReference()
+    outRasterSRS.ImportFromEPSG(4326)
+    outRaster.SetProjection(outRasterSRS.ExportToWkt())
+    outband.FlushCache()
 
 
 #%%
@@ -69,7 +95,7 @@ def make_tstxt(x, y, imdates, ts, tsfile, refx1, refx2, refy1, refy2, gap, lat=N
     imdates_yr = (imdates_ordinal-imdates_ordinal[0])/365.25
     A = sm.add_constant(imdates_yr) #[1, t]
     vconst, vel = sm.OLS(ts, A, missing='drop').fit().params
-    
+
     ### Identify gaps
     ixs_gap = np.where(gap==1)[0] # n_im-1, bool
     gap_str = ''
@@ -106,7 +132,7 @@ def read_bperp_file(bperp_file, imdates):
 
     Old bperp_file contains (m: primary (master), s:secondary,
                              sm: single prime):
-        num    mdate    sdate   bp   dt  dt_m_sm dt_s_sm bp_m_sm bp_s_sm 
+        num    mdate    sdate   bp   dt  dt_m_sm dt_s_sm bp_m_sm bp_s_sm
           1 20170218 20170326 96.6 36.0    -12.0    24.0    34.2   130.9
           2 20170302 20170314 32.4 12.0      0.0    12.0     0.0    32.4
 
@@ -114,7 +140,7 @@ def read_bperp_file(bperp_file, imdates):
     """
     bperp = []
     bperp_dict = {}
-    
+
     ### Determine type of bperp_file; old or not
     with open(bperp_file) as f:
         line = f.readline().split() #list
@@ -125,20 +151,20 @@ def read_bperp_file(bperp_file, imdates):
             for l in f:
                 if len(l.split()) == 4:
                     bperp_dict[l.split()[1]] = l.split()[2]
-        
+
     else: ## old format
         with open(bperp_file) as f:
             for l in f:
                 bperp_dict[l.split()[1]] = l.split()[-2]
                 bperp_dict[l.split()[2]] = l.split()[-1]
-            
+
     for imd in imdates:
         if imd in bperp_dict:
             bperp.append(float(bperp_dict[imd]))
         else: ## If no key exists
             print('ERROR: bperp for {} not found!'.format(imd), file=sys.stderr)
             return False
-    
+
     return bperp
 
 
@@ -148,12 +174,12 @@ def read_img(file, length, width, dtype=np.float32, endian='little'):
     Read image data into numpy array.
     endian: 'little' or 'big' (not 'little' is regarded as 'big')
     """
-    
+
     if endian == 'little':
         data = np.fromfile(file, dtype=dtype).reshape((length, width))
     else:
         data = np.fromfile(file, dtype=dtype).byteswap().reshape((length, width))
-    
+
     return data
 
 
@@ -171,7 +197,7 @@ def read_ifg_list(ifg_listfile):
             ifgdates.append(ifgd)
             line = f.readline()
     f.close()
-    
+
     return ifgdates
 
 

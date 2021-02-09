@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1.1 20201112 Yu Morishita, GSI
+v1.1.2 20210209 Yu Morishita, GSI
 
 This script decomposes 2 (or more) LOS displacement data to EW and UD components assuming no NS displacement (neglecting NS). Positive values in the decomposed data mean eastward and upward displacement. The multiple LOS input data can have different coverage and resolution as they are resampled to the common area and resolution during the processing.
 
@@ -13,12 +13,16 @@ Usage
 =====
 LiCSBAS_decomposeLOS.py -f files.txt [-o outfile] [-r resampleAlg] [--out_stats]
 
- -f  Text file containing input GeoTIFF file paths of LOS displacement 
-     (or velocity), E and N components of LOS unit vector
+ -f  Text file containing input GeoTIFF file paths of LOS displacement
+     (or velocity) and E and N components of LOS unit vector from >=2 directions
+     Note: GeoTIFF files can be created by LiCSBAS_flt2geotiff.py
      Format:
          dispfile1 Efile1 Nfile1
          dispfile2 Efile2 Nfile2
          ...
+     Example:
+         046D_vel.geo.tif 046D_E.geo.tif 046D_N.geo.tif
+         068A_vel.geo.tif 068A_E.geo.tif 068A_N.geo.tif
  -o  Prefix of output decomposed file (Default: no prefix, [EW|UD].geo.tif)
  -r  Resampling algorithm (Default: bilinear)
      (see https://gdal.org/programs/gdalwarp.html#cmdoption-gdalwarp-r)
@@ -27,8 +31,8 @@ LiCSBAS_decomposeLOS.py -f files.txt [-o outfile] [-r resampleAlg] [--out_stats]
 """
 #%% Change log
 '''
-v1.1.1 20201112 Yu Morishita, GSI
- - Small bug fix
+v1.1.2 20210209 Yu Morishita, GSI
+ - Move make_geotiff to library
 v1.1 20200608 Yu Morishita, GSI
  - Add --out_stats option
 v1.0 20200528 Yu Morishita, GSI
@@ -43,6 +47,7 @@ from osgeo import gdal, osr
 import numpy as np
 import time
 from decimal import Decimal
+import LiCSBAS_io_lib as io_lib
 
 class Usage(Exception):
     """Usage context manager"""
@@ -50,40 +55,15 @@ class Usage(Exception):
         self.msg = msg
 
 
-#%% 
-def make_geotiff(data, length, width, latn_p, lonw_p, dlat, dlon, outfile, compress_option):
-
-    if data.dtype == np.float32:
-        dtype = gdal.GDT_Float32
-        nodata = np.nan  ## or 0?
-    elif data.dtype == np.uint8:
-        dtype = gdal.GDT_Byte
-        nodata = None
-
-    driver = gdal.GetDriverByName('GTiff')
-    outRaster = driver.Create(outfile, width, length, 1, dtype, options=compress_option)
-    outRaster.SetGeoTransform((lonw_p, dlon, 0, latn_p, 0, dlat))
-    outband = outRaster.GetRasterBand(1)
-    outband.WriteArray(data)
-    if nodata is not None: outband.SetNoDataValue(nodata)
-    outRaster.SetMetadataItem('AREA_OR_POINT', 'Point')
-    outRasterSRS = osr.SpatialReference()
-    outRasterSRS.ImportFromEPSG(4326)
-    outRaster.SetProjection(outRasterSRS.ExportToWkt())
-    outband.FlushCache()
-
-    return
-
-
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver='1.1.1'; date=20201112; author="Y. Morishita"
+    ver='1.1.2'; date=20210209; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -91,7 +71,7 @@ def main(argv=None):
     #%% Set default
     infiletxt = []
     out_prefix = ''
-    resampleAlg = 'bilinear' #'cubicspline'# 'near' # 'cubic' 
+    resampleAlg = 'bilinear' #'cubicspline'# 'near' # 'cubic'
     out_stats_flag = False
     compress_option = ['COMPRESS=DEFLATE', 'PREDICTOR=3']
     compress_option_uint = ['COMPRESS=DEFLATE', 'PREDICTOR=1']
@@ -144,7 +124,7 @@ def main(argv=None):
     n_data = len(data_tifs)
     print('\nNumber of input LOS data: {}'.format(n_data))
 
-    
+
     #%% Identify area with at least 1 each from E and W
     ### All latlon values in this script are in pixel registration
     print('\nRead area of each GeoTIFF... ')
@@ -203,7 +183,7 @@ def main(argv=None):
     lon_e = lon_e_E if lon_e_E < lon_e_W else lon_e_W
     lat_s = lat_s_E if lat_s_E > lat_s_W else lat_s_W
     lat_n = lat_n_E if lat_n_E < lat_n_W else lat_n_W
-    
+
     width = int((lon_e-lon_w)/dlon)
     lon_e = lon_w + dlon*width
     length = int((lat_s-lat_n)/dlat)
@@ -276,10 +256,10 @@ def main(argv=None):
     det = (a11*a22-a12**2)
     det[det==0] = np.nan ## To avoid zero division
     detinv = 1/det
-    
+
     ew_part = detinv*(a22*be-a12*bu)
     ud_part = detinv*(-a12*be+a11*bu)
-    
+
     ew = np.zeros_like(bool_valid, dtype=np.float32)*np.nan
     ew[bool_valid] = ew_part
     ud = np.zeros_like(bool_valid, dtype=np.float32)*np.nan
@@ -289,31 +269,31 @@ def main(argv=None):
     #%% Save geotiff
     outfileEW = out_prefix + 'EW.geo.tif'
     outfileUD = out_prefix + 'UD.geo.tif'
-    make_geotiff(ew, length, width, lat_n, lon_w, dlat, dlon, outfileEW, compress_option)
-    make_geotiff(ud, length, width, lat_n, lon_w, dlat, dlon, outfileUD, compress_option)
+    io_lib.make_geotiff(ew, lat_n, lon_w, dlat, dlon, outfileEW, compress_option)
+    io_lib.make_geotiff(ud, lat_n, lon_w, dlat, dlon, outfileUD, compress_option)
 
 
     #%% Stats
     if out_stats_flag:
         if n_data >= 3:
             for i in range(n_data):
-                outfile_resid = out_prefix + 'resid_LOS{}.geo.tif'.format(i+1) 
+                outfile_resid = out_prefix + 'resid_LOS{}.geo.tif'.format(i+1)
                 data_part_list[i][data_part_list[i]==0] = np.nan
                 resid_los_part = data_part_list[i] - \
                     (LOSe_part_list[i]*ew_part + LOSu_part_list[i]*ud_part)
                 resid_los = np.zeros_like(bool_valid, dtype=np.float32)*np.nan
-                resid_los[bool_valid] = resid_los_part                    
-                make_geotiff(resid_los, length, width, lat_n, lon_w, dlat, dlon, outfile_resid, compress_option)
+                resid_los[bool_valid] = resid_los_part
+                io_lib.make_geotiff(resid_los, lat_n, lon_w, dlat, dlon, outfile_resid, compress_option)
 
         ### n_data
-        outfile_n_data = out_prefix + 'n_data_fromE.geo.tif' 
-        make_geotiff(n_data_fromE, length, width, lat_n, lon_w, dlat, dlon, outfile_n_data, compress_option_uint)
-        outfile_n_data = out_prefix + 'n_data_fromW.geo.tif' 
-        make_geotiff(n_data_fromW, length, width, lat_n, lon_w, dlat, dlon, outfile_n_data, compress_option_uint)
-        outfile_n_data = out_prefix + 'n_data_total.geo.tif' 
-        make_geotiff(n_data_total, length, width, lat_n, lon_w, dlat, dlon, outfile_n_data, compress_option_uint)
-            
-    
+        outfile_n_data = out_prefix + 'n_data_fromE.geo.tif'
+        io_lib.make_geotiff(n_data_fromE, lat_n, lon_w, dlat, dlon, outfile_n_data, compress_option_uint)
+        outfile_n_data = out_prefix + 'n_data_fromW.geo.tif'
+        io_lib.make_geotiff(n_data_fromW, lat_n, lon_w, dlat, dlon, outfile_n_data, compress_option_uint)
+        outfile_n_data = out_prefix + 'n_data_total.geo.tif'
+        io_lib.make_geotiff(n_data_total, lat_n, lon_w, dlat, dlon, outfile_n_data, compress_option_uint)
+
+
     #%% Finish
     elapsed_time = time.time()-start
     hour = int(elapsed_time/3600)

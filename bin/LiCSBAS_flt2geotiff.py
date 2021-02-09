@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5 20200902 Yu Morishita, GSI
+v1.5.1 20210209 Yu Morishita, GSI
 
 ========
 Overview
@@ -26,6 +26,8 @@ LiCSBAS_flt2geotiff.py -i infile -p dempar [-o outfile] [--zero2nan] [--nan2zero
 
 #%% Change log
 '''
+v1.5.1 20210209 Yu Morishita, GSI
+ - Move make_geotiff to library
 v1.5 20200902 Yu Morishita, GSI
  - Do not add .geo when already added
 v1.4 20200214 Yu Morishita, Uni of Leeds and GSI
@@ -58,13 +60,13 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-        
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver=1.5; date=20200902; author="Y. Morishita"
+    ver="1.5.1"; date=20210209; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -153,16 +155,16 @@ def main(argv=None):
             data.byteswap().tofile(infile+'.bigendian')
             infile = infile+'.bigendian'
 
-       
+
         print('{} {} {} {} {}'.format(gamma_comm, dempar, infile, dtype, outfile))
         call=[gamma_comm, dempar, infile, dtype, outfile]
         subp.run(call)
-        
+
         if endian == 'little':
             ### Remove temporary file
             os.remove(infile)
-        
-        
+
+
     #%% if gdal and osr available
     else:
         print('Use gdal module')
@@ -174,35 +176,25 @@ def main(argv=None):
 
         width = int(io_lib.get_param_par(dempar, 'width'))
         length = int(io_lib.get_param_par(dempar, 'nlines'))
-        
+
         dlat = float(io_lib.get_param_par(dempar, 'post_lat'))
         dlon = float(io_lib.get_param_par(dempar, 'post_lon'))
-        
+
         lat_n_g = float(io_lib.get_param_par(dempar, 'corner_lat')) #grid reg
         lon_w_g = float(io_lib.get_param_par(dempar, 'corner_lon')) #grid reg
-        
+
         ## Grid registration to pixel registration by shifing half pixel
         lat_n_p = lat_n_g - dlat/2
         lon_w_p = lon_w_g - dlon/2
-                
+
         data = io_lib.read_img(infile, length, width, endian=endian)
 
         if zero2nan_flag: ### Replace 0 with nan
             data[data==0] = np.nan
         if nan2zero_flag: ### Replace nan with 0
             data[np.isnan(data)] = 0
-    
-        driver = gdal.GetDriverByName('GTiff')
-        outRaster = driver.Create(outfile, width, length, 1, gdal.GDT_Float32, options=compress_option)
-        outRaster.SetGeoTransform((lon_w_p, dlon, 0, lat_n_p, 0, dlat))
-        outband = outRaster.GetRasterBand(1)
-        outband.WriteArray(data)
-        if nodata is not None: outband.SetNoDataValue(nodata)
-        outRaster.SetMetadataItem('AREA_OR_POINT', 'Point')
-        outRasterSRS = osr.SpatialReference()
-        outRasterSRS.ImportFromEPSG(4326)
-        outRaster.SetProjection(outRasterSRS.ExportToWkt())
-        outband.FlushCache()
+
+        io_lib.make_geotiff(data, lat_n_p, lon_w_p, dlat, dlon, outfile, compress_option)
 
 
     #%% Finish
