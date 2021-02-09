@@ -194,7 +194,7 @@ def main(argv=None):
         if nan2zero_flag: ### Replace nan with 0
             data[np.isnan(data)] = 0
 
-        io_lib.make_geotiff(data, lat_n_p, lon_w_p, dlat, dlon, outfile, compress_option)
+        io_lib.make_geotiff(data, lat_n_p, lon_w_p, dlat, dlon, outfile, compress_option, nodata)
 
 
     #%% Finish

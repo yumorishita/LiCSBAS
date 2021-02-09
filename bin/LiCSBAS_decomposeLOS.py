@@ -269,8 +269,8 @@ def main(argv=None):
     #%% Save geotiff
     outfileEW = out_prefix + 'EW.geo.tif'
     outfileUD = out_prefix + 'UD.geo.tif'
-    io_lib.make_geotiff(ew, lat_n, lon_w, dlat, dlon, outfileEW, compress_option)
-    io_lib.make_geotiff(ud, lat_n, lon_w, dlat, dlon, outfileUD, compress_option)
+    io_lib.make_geotiff(ew, lat_n, lon_w, dlat, dlon, outfileEW, compress_option, np.nan)
+    io_lib.make_geotiff(ud, lat_n, lon_w, dlat, dlon, outfileUD, compress_option, np.nan)
 
 
     #%% Stats
@@ -283,7 +283,7 @@ def main(argv=None):
                     (LOSe_part_list[i]*ew_part + LOSu_part_list[i]*ud_part)
                 resid_los = np.zeros_like(bool_valid, dtype=np.float32)*np.nan
                 resid_los[bool_valid] = resid_los_part
-                io_lib.make_geotiff(resid_los, lat_n, lon_w, dlat, dlon, outfile_resid, compress_option)
+                io_lib.make_geotiff(resid_los, lat_n, lon_w, dlat, dlon, outfile_resid, compress_option, np.nan)
 
         ### n_data
         outfile_n_data = out_prefix + 'n_data_fromE.geo.tif'

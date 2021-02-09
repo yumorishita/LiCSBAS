@@ -45,14 +45,12 @@ def make_dummy_bperp(bperp_file, imdates):
 
 
 #%%
-def make_geotiff(data, latn_p, lonw_p, dlat, dlon, outfile, compress_option):
+def make_geotiff(data, latn_p, lonw_p, dlat, dlon, outfile, compress_option, nodata=None):
     length, width = data.shape
     if data.dtype == np.float32:
         dtype = gdal.GDT_Float32
-        nodata = np.nan  ## or 0?
     elif data.dtype == np.uint8:
         dtype = gdal.GDT_Byte
-        nodata = None
 
     driver = gdal.GetDriverByName('GTiff')
     outRaster = driver.Create(outfile, width, length, 1, dtype, options=compress_option)
