@@ -11,4 +11,5 @@ dependencies:
   - numpy
   - psutil
   - requests
+  - shapely
   - statsmodels
