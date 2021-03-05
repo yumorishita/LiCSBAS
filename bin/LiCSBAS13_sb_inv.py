@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.8 20210127 Yu Morishita, GSI
+v1.5.0 20210305 Yu Morishita, GSI
 
 This script inverts the SB network of unw to obtain the time series and velocity
 using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
@@ -47,7 +47,7 @@ Outputs in TS_GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile]
+LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile] [--gpu]
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
@@ -65,10 +65,14 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
      (Default: 1 and 0.5 for C- and L-band, respectively)
  --keep_incfile
      Not remove inc and resid files (Default: remove them)
+ --gpu        Use GPU (Need cupy module)
 
 """
 #%% Change log
 '''
+v1.5 20210305 Yu Morishita, GSI
+ - Add GPU option
+ - Speed up by activating n_para_inv and OMP_NUM_THREADS=1
 v1.4.8 20210127 Yu Morishita, GSI
  - Automatically reduce mem_size if available RAM is small
 v1.4.7 20201124 Yu Morishita, GSI
@@ -136,7 +140,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.4.8"; date=20210127; author="Y. Morishita"
+    ver="1.5"; date=20210305; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -150,12 +154,16 @@ def main(argv=None):
     ifgdir = []
     tsadir = []
     inv_alg = 'LS'
+    gpu = False
 
     try:
         n_para = len(os.sched_getaffinity(0))
     except:
         n_para = multi.cpu_count()
-    n_para_inv = 1
+
+    os.environ["OMP_NUM_THREADS"] = "1"
+    # Because np.linalg.lstsq use full CPU but not much faster than 1CPU.
+    # Instead parallelize by multiprocessing
 
     memory_size = 4000
     gamma = 0.0001
@@ -173,7 +181,10 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:t:", ["help",  "mem_size=", "gamma=", "n_unw_r_thre=", "keep_incfile", "inv_alg=", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hd:t:",
+                                       ["help",  "mem_size=", "gamma=",
+                                        "n_unw_r_thre=", "keep_incfile",
+                                        "inv_alg=", "n_para=", "gpu"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -196,6 +207,8 @@ def main(argv=None):
                 inv_alg = a
             elif o == '--n_para':
                 n_para = int(a)
+            elif o == '--gpu':
+                gpu = True
 
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
@@ -203,6 +216,9 @@ def main(argv=None):
             raise Usage('No {} dir exists!'.format(ifgdir))
         elif not os.path.exists(os.path.join(ifgdir, 'slc.mli.par')):
             raise Usage('No slc.mli.par file exists in {}!'.format(ifgdir))
+        if gpu:
+            print("\nGPU option is activated. Need cupy module.\n")
+            import cupy as cp
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -240,6 +256,12 @@ def main(argv=None):
     restxtfile = os.path.join(infodir,'13resid.txt')
 
     cumh5file = os.path.join(tsadir,'cum.h5')
+
+    if n_para > 32:
+        # Emprically >32 does not make much faster despite using large resource
+        n_para_inv = 32
+    else:
+        n_para_inv = n_para
 
 
     #%% Check files
@@ -531,27 +553,74 @@ def main(argv=None):
             gap_patch = np.zeros((n_im-1, n_pt_all), dtype=np.int8)
             ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
             maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-
-            ### Determine n_para
-            n_pt_patch_min = 1000
-            if n_pt_patch_min*n_para > n_pt_unnan:
-                ## Too much n_para
-                n_para_gap = int(np.floor(n_pt_unnan/n_pt_patch_min))
-                if n_para_gap == 0: n_para_gap = 1
-            else:
-                n_para_gap = n_para
-
             print('\n  Identifing gaps, and counting n_gap and n_ifg_noloop,')
-            print('  with {} parallel processing...'.format(n_para_gap), flush=True)
 
-            ### Devide unwpatch by n_para for parallel processing
-            p = q.Pool(n_para_gap)
-            _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)), dtype=object)
-            p.close()
+            if gpu:
+                print('  using GPU...', flush=True)
+                n_loop, _ = Aloop.shape
+                unwpatch_cp = cp.asarray(unwpatch)
+                G_cp = cp.asarray(G)
+                Aloop_cp = cp.asarray(Aloop)
 
-            ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt
-            gap_patch[:, ix_unnan_pt] = np.hstack(_result[:, 1]) #n_im-1, n_pt
-            ns_ifg_noloop_patch[ix_unnan_pt] = np.hstack(_result[:, 2])
+                ns_unw_unnan4inc = cp.array(
+                    [(G_cp[:, i]*(~cp.isnan(unwpatch_cp))).sum(
+                        axis=1, dtype=cp.int16) for i in range(n_im-1)])
+                # n_ifg*(n_pt,n_ifg) -> (n_im-1,n_pt)
+                ns_gap_patch[ix_unnan_pt] = cp.asnumpy(
+                    (ns_unw_unnan4inc==0).sum(axis=0)) #n_pt
+                gap_patch[:, ix_unnan_pt] = cp.asnumpy(ns_unw_unnan4inc==0)
+
+                del ns_unw_unnan4inc
+                del G_cp
+
+                ### n_ifg_noloop
+                # n_ifg*(n_pt,n_ifg)->(n_loop,n_pt)
+                # Number of ifgs for each loop at eath point.
+                # 3 means complete loop, 1 or 2 means broken loop.
+                ns_ifg4loop = cp.array([
+                        (cp.abs(Aloop_cp[i, :])*(~cp.isnan(unwpatch_cp))).sum(axis=1)
+                        for i in range(n_loop)])
+                bool_loop = (ns_ifg4loop==3)
+                #(n_loop,n_pt) identify complete loop only
+
+                # n_loop*(n_loop,n_pt)*n_pt->(n_ifg,n_pt)
+                # Number of loops for each ifg at eath point.
+                ns_loop4ifg = cp.array([(
+                        (cp.abs(Aloop_cp[:, i])*bool_loop.T).T*
+                        (~cp.isnan(unwpatch_cp[:, i]))
+                        ).sum(axis=0) for i in range(n_ifg)]) #
+
+                ns_ifg_noloop_tmp = (ns_loop4ifg==0).sum(axis=0) #n_pt
+                ns_nan_ifg = cp.isnan(unwpatch_cp).sum(axis=1) #n_pt, nan ifg count
+                ns_ifg_noloop_patch[ix_unnan_pt] = cp.asnumpy(
+                    ns_ifg_noloop_tmp - ns_nan_ifg)
+
+                del bool_loop, ns_ifg4loop, ns_loop4ifg
+                del ns_ifg_noloop_tmp, ns_nan_ifg
+                del unwpatch_cp, Aloop_cp
+
+            else:
+                ### Determine n_para
+                n_pt_patch_min = 1000
+                if n_pt_patch_min*n_para > n_pt_unnan:
+                    ## Too much n_para
+                    n_para_gap = int(np.floor(n_pt_unnan/n_pt_patch_min))
+                    if n_para_gap == 0: n_para_gap = 1
+                else:
+                    n_para_gap = n_para
+
+                print('  with {} parallel processing...'.format(n_para_gap),
+                      flush=True)
+
+                ### Devide unwpatch by n_para for parallel processing
+                p = q.Pool(n_para_gap)
+                _result = np.array(p.map(count_gaps_wrapper, range(n_para_gap)),
+                                   dtype=object)
+                p.close()
+
+                ns_gap_patch[ix_unnan_pt] = np.hstack(_result[:, 0]) #n_pt
+                gap_patch[:, ix_unnan_pt] = np.hstack(_result[:, 1]) #n_im-1, n_pt
+                ns_ifg_noloop_patch[ix_unnan_pt] = np.hstack(_result[:, 2])
 
             ### maxTlen
             _maxTlen = np.zeros((n_pt_unnan), dtype=np.float32) #temporaly
@@ -566,9 +635,11 @@ def main(argv=None):
             #%% Time series inversion
             print('\n  Small Baseline inversion by {}...\n'.format(inv_alg), flush=True)
             if inv_alg == 'WLS':
-                inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(unwpatch, varpatch, G, dt_cum, gamma, n_para_inv)
+                inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas_wls(
+                    unwpatch, varpatch, G, dt_cum, gamma, n_para_inv)
             else:
-                inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(unwpatch, G, dt_cum, gamma, n_para_inv)
+                inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(
+                    unwpatch, G, dt_cum, gamma, n_para_inv, gpu)
 
             ### Set to valuables
             inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan

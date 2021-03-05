@@ -41,6 +41,7 @@ p05_clip_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 p11_unw_thre=""	# default: 0.3
 p11_coh_thre=""	# default: 0.05
 p12_loop_thre=""	# default: 1.5 rad
+p13_gpu="n"	# y/n. default: n
 p15_coh_thre=""	# default: 0.05
 p15_n_unw_r_thre=""	# default: 1.5
 p15_vstd_thre=""	# default: 100 mm/yr
@@ -285,6 +286,7 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   if [ ! -z $p13_n_para ];then p13_op="$p13_op --n_para $p13_n_para"; fi
   if [ ! -z $p13_n_unw_r_thre ];then p13_op="$p13_op --n_unw_r_thre $p13_n_unw_r_thre"; fi
   if [ $p13_keep_incfile == "y" ];then p13_op="$p13_op --keep_incfile"; fi
+  if [ $p13_gpu == "y" ];then p13_op="$p13_op --gpu"; fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS13_sb_inv.py $p13_op"
