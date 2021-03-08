@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.5 20201124 Yu Morishita, GSI
+v1.4.6 20210308 Yu Morishita, GSI
 
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
@@ -13,7 +13,7 @@ Inputs in TS_GEOCml*/ :
    - mask
    - hgt (if --hgt_linear option is used)
  - info/13parameters.txt
- 
+
 Outputs in TS_GEOCml*/ :
  - cum_filt.h5
  - 16filt_cum/
@@ -47,7 +47,7 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
  -y  Width of temporal filter in yr (Default: auto, avg_interval*3)
  -r  Degree of deramp [1, bl, 2] (Default: no deramp)
      1: 1d ramp, bl: bilinear, 2: 2d polynomial
- --hgt_linear Subtract topography-correlated component using a linear method 
+ --hgt_linear Subtract topography-correlated component using a linear method
               (Default: Not apply)
  --hgt_min    Minumum hgt to take into account in hgt-linear (Default: 200m)
  --hgt_max    Maximum hgt to take into account in hgt-linear (Default: 10000m, no effect)
@@ -58,12 +58,14 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
  --range_geo   Range used in deramp and hgt_linear in geographical coordinates (deg).
  --ex_range    Range EXCLUDED in deramp and hgt_linear. Index starts from 0.
               0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
- --ex_range_geo  Range EXCLUDED in deramp and hgt_linear in geographical 
+ --ex_range_geo  Range EXCLUDED in deramp and hgt_linear in geographical
                  coordinates (deg).
 
 """
 #%% Change log
 '''
+v1.4.6 20210308 Yu Morishita, GSI
+ - Not use multiprocessing when n_para=1
 v1.4.5 20201124 Yu Morishita, GSI
  - Comporess hdf5 file
 v1.4.4 20201119 Yu Morishita, GSI
@@ -118,13 +120,13 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver="1.4.5"; date=20201124; author="Y. Morishita"
+    ver="1.4.6"; date=20210308; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -148,14 +150,14 @@ def main(argv=None):
         n_para = len(os.sched_getaffinity(0))
     except:
         n_para = multi.cpu_count()
-        
+
     range_str = []
     range_geo_str = []
     ex_range_str = []
     ex_range_geo_str = []
 
     cumname = 'cum.h5'
-    
+
     cmap_vel = SCM.roma.reversed()
     cmap_noise_r = 'viridis_r'
     cmap_wrap = SCM.romaO
@@ -247,7 +249,7 @@ def main(argv=None):
     filtcumdir = os.path.join(tsadir, '16filt_cum')
     if os.path.exists(filtcumdir): shutil.rmtree(filtcumdir)
     os.mkdir(filtcumdir)
-    
+
     cumffile = os.path.join(tsadir, 'cum_filt.h5')
 
     vconstfile = os.path.join(resultsdir, 'vintercept.filt')
@@ -305,7 +307,7 @@ def main(argv=None):
         hgt = io_lib.read_img(hgtfile, length, width)
         hgt[np.isnan(hgt)] = 0
     else:
-        hgt = []   
+        hgt = []
 
 
     #%% --range[_geo] and --ex_range[_geo]
@@ -338,7 +340,7 @@ def main(argv=None):
         else:
             ex_x1, ex_x2, ex_y1, ex_y2 = tools_lib.read_range_geo(ex_range_geo_str, width, length, lat1, dlat, lon1, dlon)
             ex_range_str = '{}:{}/{}:{}'.format(ex_x1, ex_x2, ex_y1, ex_y2)
-            
+
     ### Make range mask
     mask2 = np.ones((length, width), dtype=np.float32)
     if range_str:
@@ -346,7 +348,7 @@ def main(argv=None):
         mask2[y1:y2, x1:x2] = 1
     if ex_range_str:
         mask2[ex_y1:ex_y2, ex_x1:ex_x2] = np.nan
-    
+
 
     #%% Display settings
     print('')
@@ -399,22 +401,25 @@ def main(argv=None):
             print('\nDeramp ifgs with the degree of {},'.format(deg_ramp), flush=True)
         else:
             print('\nDeramp ifgs with the degree of {} and hgt-linear,'.format(deg_ramp), flush=True)
-        print('with {} parallel processing...'.format(n_para), flush=True)
 
-        args = [(i, cum_org[i, :, :]) for i in range(n_im)]
+        if n_para == 1:
+            models = np.zeros(n_im, dtype=object)
+            for i in range(n_im):
+                cum[i, :, :], models[i] = deramp_wrapper((i, cum_org[i, :, :]))
+        else:
+            print('with {} parallel processing...'.format(n_para), flush=True)
+            args = [(i, cum_org[i, :, :]) for i in range(n_im)]
+            ### Parallel processing
+            p = q.Pool(n_para)
+            _result = np.array(p.map(deramp_wrapper, args), dtype=object)
+            p.close()
+            del args
 
-        ### Parallel processing
-        p = q.Pool(n_para)
-        _result = np.array(p.map(deramp_wrapper, args), dtype=object)
-        p.close()
-        del args
+            models = _result[:, 1]
+            for i in range(n_im):
+                cum[i, :, :] = _result[i, 0]
+            del _result
 
-        models = _result[:, 1]
-        for i in range(n_im):
-            cum[i, :, :] = _result[i, 0]
-        del _result
-
- 
         ### Only for output increment png files
         print('\nCreate png for increment with {} parallel processing...'.format(n_para), flush=True)
         args = [(i, cum_org[i, :, :], cum_org[i-1, :, :]) for i in range(1, n_im)]
@@ -428,12 +433,16 @@ def main(argv=None):
     cum_filt = cumfh5.require_dataset('cum', (n_im, length, width), dtype=np.float32, compression=compress)
 
     print('\nHP filter in time, LP filter in space,', flush=True)
-    print('with {} parallel processing...'.format(n_para), flush=True)
 
-    ### Parallel processing
-    p = q.Pool(n_para)
-    cum_filt[:, :, :] = np.array(p.map(filter_wrapper, range(n_im)), dtype=np.float32)
-    p.close()
+    if n_para == 1:
+        for i in range(n_im):
+            cum_filt[i, :, :] = np.float32(filter_wrapper(i))
+    else:
+        print('with {} parallel processing...'.format(n_para), flush=True)
+        ### Parallel processing
+        p = q.Pool(n_para)
+        cum_filt[:, :, :] = np.array(p.map(filter_wrapper, range(n_im)), dtype=np.float32)
+        p.close()
 
 
     ### Only for output increment png files
@@ -459,7 +468,7 @@ def main(argv=None):
     mask_n_gap = np.float32(n_gap==min_n_gap)
     mask_n_gap[mask_n_gap==0] = np.nan
     rms_cum_wrt_med = rms_cum_wrt_med*mask_n_gap
-    
+
     ### Find stable reference
     min_rms = np.nanmin(rms_cum_wrt_med)
     refy1s, refx1s = np.where(rms_cum_wrt_med==min_rms)
@@ -497,14 +506,14 @@ def main(argv=None):
     G = np.stack((np.ones_like(dt_cum), dt_cum), axis=1)
     vconst = np.zeros((length, width), dtype=np.float32)*np.nan
     vel = np.zeros((length, width), dtype=np.float32)*np.nan
-    
+
     bool_unnan = ~np.isnan(cum_filt[0, :, :]).reshape(length, width) ## not all nan
     cum_pt = cum_filt[()].reshape(n_im, length*width)[:, bool_unnan.ravel()] #n_im x n_pt
     n_pt_unnan = bool_unnan.sum()
     vconst_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
     vel_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
-    
-    bool_nonan_pt = np.all(~np.isnan(cum_pt), axis=0) 
+
+    bool_nonan_pt = np.all(~np.isnan(cum_pt), axis=0)
 
     ### First, calc vel point without nan
     print('  First, solving {0:6}/{1:6}th points with full cum...'.format(bool_nonan_pt.sum(), n_pt_unnan), flush=True)
@@ -512,7 +521,7 @@ def main(argv=None):
 
     ### Next, calc vel point with nan
     print('  Next, solving {0:6}/{1:6}th points with nan in cum...'.format((~bool_nonan_pt).sum(), n_pt_unnan), flush=True)
-    
+
     mask_cum = ~np.isnan(cum_pt[:, ~bool_nonan_pt])
     vconst_tmp[~bool_nonan_pt], vel_tmp[~bool_nonan_pt] = inv_lib.censored_lstsq_slow(G, cum_pt[:, ~bool_nonan_pt], mask_cum)
     vconst[bool_unnan], vel[bool_unnan] = vconst_tmp, vel_tmp
@@ -535,11 +544,11 @@ def main(argv=None):
     cumfh5.create_dataset('filtwidth_km', data=filtwidth_km)
     cumfh5.create_dataset('deramp_flag', data=deg_ramp)
     cumfh5.create_dataset('hgt_linear_flag', data=hgt_linearflag*1)
-    
+
     cumh5.close()
     cumfh5.close()
 
- 
+
     #%% Output image
     pngfile = os.path.join(resultsdir,'vel.filt.png')
     title = 'Filtered velocity (mm/yr)'
@@ -560,7 +569,7 @@ def main(argv=None):
         vmin = np.nanpercentile(vel_mskd, 1)
         vmax = np.nanpercentile(vel_mskd, 99)
         plot_lib.make_im_png(vel_mskd, pngfile, cmap_vel, title, vmin, vmax)
-    
+
         ## vintercept
         pngfile = os.path.join(resultsdir,'vintercept.filt.mskd.png')
         title = 'Masked intercept of filtered velocity (mm)'
@@ -591,11 +600,11 @@ def deramp_wrapper(args):
 
     fit, model = tools_lib.fit2dh(_cum_org*mask*mask2, deg_ramp, hgt, hgt_min, hgt_max)  ## fit is not masked
     _cum = _cum_org-fit
-    
+
     if hgt_linearflag:
         fit_hgt = hgt*model[-1]*mask  ## extract only hgt-linear component
         cum_bf = _cum+fit_hgt ## After deramp before hgt-linear
-    
+
         ## Output comparison image of hgt_linear
         std_before = np.nanstd(cum_bf)
         std_after = np.nanstd(_cum*mask)
@@ -603,37 +612,37 @@ def deramp_wrapper(args):
         title3 = ['Before hgt-linear (STD: {:.1f}mm)'.format(std_before), 'hgt-linear phase ({:.1f}mm/km)'.format(model[-1]*1000), 'After hgt-linear (STD: {:.1f}mm)'.format(std_after)]
         pngfile = os.path.join(filtcumdir, imdates[i]+'_hgt_linear.png')
         plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
-        
+
         pngfile = os.path.join(filtcumdir, imdates[i]+'_hgt_corr.png')
         title = '{} ({:.1f}mm/km, based on {}<=hgt<={})'.format(imdates[i], model[-1]*1000, hgt_min, hgt_max)
         plot_lib.plot_hgt_corr(cum_bf, fit_hgt, hgt, title, pngfile)
-    
+
     else:
         fit_hgt = 0  ## for plot deframp
-    
+
     if deg_ramp:
         ramp = (fit-fit_hgt)*mask
-        
+
         ## Output comparison image of deramp
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [_cum_org*mask, ramp, _cum_org*mask-ramp]]
         pngfile = os.path.join(filtcumdir, imdates[i]+'_deramp.png')
         deramp_title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{})'.format(deg_ramp), 'After deramp ({}pi/cycle)'.format(cycle*2)]
         plot_lib.make_3im_png(data3, pngfile, cmap_wrap, deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
- 
+
     return _cum, model
- 
-    
+
+
 #%%
 def deramp_wrapper2(args):
     ## Only for output increment png files
     i, _cum_org, _cum_org_last = args
-   
+
     if hgt_linearflag and i != 0: ## first image has no increment
         ## fit_hgt, model
         fit_hgt = hgt*models[i][-1]*mask  ## extract only hgt-linear component
         fit_hgt1 = hgt*models[i-1][-1]*mask ## last one
         inc = (cum[i, :, :]-cum[i-1, :, :])*mask
-        
+
         ## Output comparison image of hgt_linear for increment
         std_before = np.nanstd(inc+fit_hgt-fit_hgt1)
         std_after = np.nanstd(inc)
@@ -645,7 +654,7 @@ def deramp_wrapper2(args):
         pngfile = os.path.join(filtincdir, '{}_{}_hgt_corr.png'.format(imdates[i-1], imdates[i]))
         title = '{}_{} ({:.1f}mm/km, based on {}<=hgt<={})'.format(imdates[i-1], imdates[i], (models[i][-1]-models[i-1][-1])*1000, hgt_min, hgt_max)
         plot_lib.plot_hgt_corr(inc+fit_hgt-fit_hgt1, fit_hgt-fit_hgt1, hgt, title, pngfile)
-            
+
     else:
         fit_hgt = 0  ## for plot deframp
         fit_hgt1 = 0
@@ -663,32 +672,32 @@ def deramp_wrapper2(args):
         plot_lib.make_3im_png(data3, pngfile, cmap_wrap, deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
 
-#%% 
+#%%
 def filter_wrapper(i):
     n_im, length, width = cum.shape
     if np.mod(i, 10) == 0:
         print("  {0:3}/{1:3}th image...".format(i, n_im), flush=True)
 
-    
+
     ### Second, HP in time
     if filtwidth_yr == 0.0:
         cum_hpt = cum[i, :, :] ## No temporal filter
     else:
         time_diff_sq = (dt_cum[i]-dt_cum)**2
-        
+
         ## Limit reading data within filtwidth_yr**8
         ixs = time_diff_sq < filtwidth_yr*8
 
         weight_factor = np.tile(np.exp(-time_diff_sq[ixs]/2/filtwidth_yr**2)[:, np.newaxis, np.newaxis], (1, length, width)) #len(ixs), length, width
-        
+
         ## Take into account nan in cum
         weight_factor = weight_factor*(~np.isnan(cum[ixs, :, :]))
-        
+
         ## Normalize weight
         with warnings.catch_warnings(): ## To silence warning by zero division
             warnings.simplefilter('ignore', RuntimeWarning)
             weight_factor = weight_factor/np.sum(weight_factor, axis=0)
-        
+
         cum_lpt = np.nansum(cum[ixs, :, :]*weight_factor, axis=0);
 
         cum_hpt = cum[i, :, :] - cum_lpt
@@ -706,7 +715,7 @@ def filter_wrapper(i):
             kernel = Gaussian2DKernel(x_stddev, y_stddev)
             cum_hptlps = convolve_fft(cum_hpt*mask, kernel, fill_value=np.nan, allow_huge=True) ## fill edge 0 for interpolation
             cum_hptlps[cum_hptlps == 0] = np.nan ## fill 0 with nan
-        
+
         _cum_filt = cum[i, :, :] - cum_hptlps
 
 
@@ -715,7 +724,7 @@ def filter_wrapper(i):
     title3 = ['Before filter ({}pi/cycle)'.format(cycle*2), 'Filter phase ({}pi/cycle)'.format(cycle*2), 'After filter ({}pi/cycle)'.format(cycle*2)]
     pngfile = os.path.join(filtcumdir, imdates[i]+'_filt.png')
     plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
-    
+
     return _cum_filt
 
 
@@ -725,7 +734,7 @@ def filter_wrapper2(args):
     i, dcum_filt = args
     dcum = cum[i, :, :]-cum[i-1, :, :]
     dcum_hptlps = dcum-dcum_filt
-    
+
     ### Output comparison image for increment
     data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [dcum*mask, dcum_hptlps, dcum_filt*mask]]
     title3 = ['Before filter ({}pi/cycle)'.format(cycle*2),
@@ -734,7 +743,7 @@ def filter_wrapper2(args):
     pngfile = os.path.join(filtincdir, '{}_{}_filt.png'.format(imdates[i-1], imdates[i]))
     plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
-    
+
 #%% main
 if __name__ == "__main__":
     sys.exit(main())
