@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5.0 20210305 Yu Morishita, GSI
+v1.5.1 20210309 Yu Morishita, GSI
 
 This script inverts the SB network of unw to obtain the time series and velocity
 using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
@@ -55,7 +55,7 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
    LS :       NSBAS Least Square with no weight
    WLS:       NSBAS Weighted Least Square (not well tested)
               Weight (variance) is calculated by (1-coh**2)/(2*coh**2)
- --mem_size   Max memory size for each patch in MB. (Default: 4000)
+ --mem_size   Max memory size for each patch in MB. (Default: 8000)
  --gamma      Gamma value for NSBAS inversion (Default: 0.0001)
  --n_para     Number of parallel processing (Default: # of usable CPU)
  --n_unw_r_thre
@@ -70,6 +70,9 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.5.1 20210309 Yu Morishita, GSI
+ - Change default --mem_size to 8000
+ - Speed up by reading cum data on memory
 v1.5 20210305 Yu Morishita, GSI
  - Add GPU option
  - Speed up by activating n_para_inv and OMP_NUM_THREADS=1
@@ -140,7 +143,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.5"; date=20210305; author="Y. Morishita"
+    ver="1.5.1"; date=20210309; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -165,7 +168,7 @@ def main(argv=None):
     # Because np.linalg.lstsq use full CPU but not much faster than 1CPU.
     # Instead parallelize by multiprocessing
 
-    memory_size = 4000
+    memory_size = 8000
     gamma = 0.0001
     n_unw_r_thre = []
     keep_incfile = False
@@ -285,14 +288,6 @@ def main(argv=None):
     refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
 
 
-    #%% Check RAM
-    mem_avail = (psutil.virtual_memory().available)/2**20 #MB
-    if memory_size > mem_avail/2:
-        print('\nNot enough memory available compared to mem_size ({} MB).'.format(memory_size))
-        print('Reduce mem_size automatically to {} MB.'.format(int(mem_avail/2)))
-        memory_size = int(mem_avail/2)
-
-
     #%% Read data information
     ### Get size
     mlipar = os.path.join(ifgdir, 'slc.mli.par')
@@ -396,13 +391,30 @@ def main(argv=None):
 
 
     #%% Get patch row number
+    ### Check RAM
+    mem_avail = (psutil.virtual_memory().available)/2**20 #MB
+    if memory_size > mem_avail/2:
+        print('\nNot enough memory available compared to mem_size ({} MB).'.format(memory_size))
+        print('Reduce mem_size automatically to {} MB.'.format(int(mem_avail/2)))
+        memory_size = int(mem_avail/2)
+
+    ### Determine if read cum on memory (fast) or hdf5 (slow)
+    cum_size = int(n_im*length*width*4/2**20) #MB
+    if memory_size > cum_size*2:
+        print('Read cum data on memory (fast but need memory).')
+        save_mem = False # read on memory
+        memory_size_patch = memory_size - cum_size
+    else:
+        print('Read cum data in HDF5 (save memory but slow).')
+        save_mem = True # read on hdf5
+        memory_size_patch = memory_size
+
     if inv_alg == 'WLS':
         n_store_data = n_ifg*3+n_im*2+n_im*0.3 #
     else:
         n_store_data = n_ifg*2+n_im*2+n_im*0.3 #not sure
 
-
-    n_patch, patchrow = tools_lib.get_patchrow(width, length, n_store_data, memory_size)
+    n_patch, patchrow = tools_lib.get_patchrow(width, length, n_store_data, memory_size_patch)
 
 
     #%% Display and output settings & parameters
@@ -470,10 +482,19 @@ def main(argv=None):
     cumh5.create_dataset('imdates', data=[np.int32(imd) for imd in imdates])
     if not np.all(np.abs(np.array(bperp))<=1):# if not dummy
         cumh5.create_dataset('bperp', data=bperp)
-    cum = cumh5.require_dataset('cum', (n_im, length, width), dtype=np.float32, compression=compress)
-    vel = cumh5.require_dataset('vel', (length, width), dtype=np.float32, compression=compress)
-    vconst = cumh5.require_dataset('vintercept', (length, width), dtype=np.float32, compression=compress)
-    gap = cumh5.require_dataset('gap', (n_im-1, length, width), dtype=np.int8, compression=compress)
+    gap = cumh5.require_dataset('gap', (n_im-1, length, width),
+                                dtype=np.int8, compression=compress)
+    if save_mem:
+        cum = cumh5.require_dataset('cum', (n_im, length, width),
+                                    dtype=np.float32, compression=compress)
+        vel = cumh5.require_dataset('vel', (length, width),
+                                    dtype=np.float32, compression=compress)
+        vconst = cumh5.require_dataset('vintercept', (length, width),
+                                       dtype=np.float32, compression=compress)
+    else:
+        cum = np.zeros((n_im, length, width), dtype=np.float32)
+        vel = np.zeros((length, width), dtype=np.float32)
+        vconst = np.zeros((length, width), dtype=np.float32)
 
     if width == width_geo and length == length_geo: ## if geocoded
         cumh5.create_dataset('corner_lat', data=lat1)
@@ -781,7 +802,14 @@ def main(argv=None):
         io_lib.make_point_kml(reflat, reflon, os.path.join(infodir, '13ref.kml'))
 
 
+
     #%% Close h5 file
+    if not save_mem:
+        print('Writing to HDF5 file...')
+        cumh5.create_dataset('cum', data=cum, compression=compress)
+        cumh5.create_dataset('vel', data=vel, compression=compress)
+        cumh5.create_dataset('vconst', data=vconst, compression=compress)
+
     cumh5.close()
 
 
