@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.5.1 20210309 Yu Morishita, GSI
+ - Add GPU option into calc_velstd_withnan and calc_stc
 v1.5 20210305 Yu Morishita, GSI
  - Add GPU option into invert_nsbas
 v1.4.2 20201118 Yu Morishita, GSI
@@ -360,7 +362,7 @@ def calc_velsin(cum, dt_cum, imd0):
 
 
 #%%
-def calc_velstd_withnan(cum, dt_cum):
+def calc_velstd_withnan(cum, dt_cum, gpu=False):
     """
     Calculate std of velocity by bootstrap for each point which may include nan.
 
@@ -368,6 +370,7 @@ def calc_velstd_withnan(cum, dt_cum):
       cum    : Cumulative phase block for each point (n_pt, n_im)
                Can include nan.
       dt_cum : Cumulative days for each image (n_im)
+      gpu    : GPU flag
 
     Returns:
       vstd   : Std of Velocity for each point (n_pt)
@@ -385,7 +388,8 @@ def calc_velstd_withnan(cum, dt_cum):
     mask = (~np.isnan(data))
     data[np.isnan(data)] = 0
 
-    velinv = lambda x : censored_lstsq2(G[x, :], data[x, :], mask[x, :])[1]
+    velinv = lambda x : censored_lstsq2(G[x, :], data[x, :], mask[x, :],
+                                        gpu=gpu)[1]
 
     with NumpyRNGContext(1):
         bootresult = bootstrap(ixs_day, bootnum, bootfunc=velinv)
@@ -397,47 +401,75 @@ def calc_velstd_withnan(cum, dt_cum):
     return vstd
 
 
-def censored_lstsq2(A, B, M):
+def censored_lstsq2(A, B, M, gpu=False):
     ## http://alexhwilliams.info/itsneuronalblog/2018/02/26/censored-lstsq/
     global bootcount, bootnum
+    if gpu:
+        import cupy as xp
+        A = xp.asarray(A)
+        B = xp.asarray(B)
+        M = xp.asarray(M)
+    else:
+        xp = np
+
     print('\r  Running {0:3}/{1:3}th bootstrap...'.format(bootcount, bootnum), end='', flush=True)
+    Bshape1 = B.shape[1]
     bootcount = bootcount+1
 
     # if B is a vector, simply drop out corresponding rows in A
-    if B.ndim == 1 or B.shape[1] == 1:
-        return np.linalg.leastsq(A[M], B[M])[0]
+    if B.ndim == 1 or Bshape1 == 1:
+        sol = xp.linalg.leastsq(A[M], B[M])[0]
+        if gpu:
+            sol = xp.asnumpy(sol)
+            del A, B, M
+        return sol
 
     # else solve via tensor representation
-    rhs = np.dot(A.T, M * B).T[:,:,None] # n x r x 1 tensor
-    T = np.matmul(A.T[None,:,:], M.T[:,:,None] * A[None,:,:]) # n x r x r tensor
+    rhs = xp.dot(A.T, M * B).T[:,:,None] # n x r x 1 tensor
+    T = xp.matmul(A.T[None,:,:], M.T[:,:,None] * A[None,:,:]) # n x r x r tensor
+
+    # Not use gpu for solve because it is quite slow
+    if gpu:
+        T = xp.asnumpy(T)
+        rhs = xp.asnumpy(rhs)
+        del A, B, M
+
     try:
         X = np.squeeze(np.linalg.solve(T, rhs)).T # transpose to get r x n
     except: ## In case Singular matrix
-        X = np.zeros((B.shape[1]), dtype=np.float32)*np.nan
+        X = np.zeros((Bshape1), dtype=np.float32)*np.nan
 
     return X
 
 
 #%%
-def calc_stc(cum):
+def calc_stc(cum, gpu=False):
     """
-    Calculate STC (spatio-temporal consistensy; Hanssen et al., 2008, Terrafirma) of time series of displacement.
+    Calculate STC (spatio-temporal consistensy; Hanssen et al., 2008,
+    Terrafirma) of time series of displacement.
     Note that isolated pixels (which have no surrounding pixel) have nan of STC.
 
     Input:
       cum  : Cumulative displacement (n_im, length, width)
+      gpu  : GPU flag
 
     Return:
       stc  : STC (length, width)
     """
+    if gpu:
+        import cupy as xp
+        cum = xp.asarray(cum)
+    else:
+        xp = np
+
     n_im, length, width = cum.shape
 
     ### Add 1 pixel margin to cum data filled with nan
-    cum1 = np.ones((n_im, length+2, width+2), dtype=np.float32)*np.nan
+    cum1 = xp.ones((n_im, length+2, width+2), dtype=xp.float32)*xp.nan
     cum1[:, 1:length+1, 1:width+1] = cum
 
     ### Calc STC for surrounding 8 pixels
-    _stc = np.ones((length, width, 8), dtype=np.float32)*np.nan
+    _stc = xp.ones((length, width, 8), dtype=xp.float32)*xp.nan
     pixels = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 2], [2, 0], [2, 1], [2, 2]]
     ## Left Top = [0, 0], Rigth Bottmon = [2, 2], Center = [1, 1]
 
@@ -449,19 +481,23 @@ def calc_stc(cum):
         dd_cum = d_cum[:-1,:,:]-d_cum[1:,:,:]
 
         ### STC (i.e., RMS of DD)
-        sumsq_dd_cum = np.nansum(dd_cum**2, axis=0)
-        n_dd_cum = np.float32(np.sum(~np.isnan(dd_cum), axis=0)) #nof non-nan
-        n_dd_cum[n_dd_cum==0] = np.nan #to avoid 0 division
-        _stc[:, :, i] = np.sqrt(sumsq_dd_cum/n_dd_cum)
+        sumsq_dd_cum = xp.nansum(dd_cum**2, axis=0)
+        n_dd_cum = (xp.sum(~xp.isnan(dd_cum), axis=0)).astype(xp.float32) #nof non-nan
+        n_dd_cum[n_dd_cum==0] = xp.nan #to avoid 0 division
+        _stc[:, :, i] = xp.sqrt(sumsq_dd_cum/n_dd_cum)
 
     ### Strange but some adjacent pixels can have identical time series,
     ### resulting in 0 of stc. To avoid this, replace 0 with nan.
-    _stc[_stc==0] = np.nan
+    _stc[_stc==0] = xp.nan
 
     ### Identify minimum value as final STC
     with warnings.catch_warnings(): ## To silence warning by All-Nan slice
         warnings.simplefilter('ignore', RuntimeWarning)
-        stc = np.nanmin(_stc, axis=2)
+        stc = xp.nanmin(_stc, axis=2)
+
+    if gpu:
+        stc = xp.asnumpy(stc)
+        del cum, cum1, _stc, d_cum, dd_cum, sumsq_dd_cum, n_dd_cum
 
     return stc
 

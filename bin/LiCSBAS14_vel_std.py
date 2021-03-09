@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
+v1.2 20210309 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
@@ -12,7 +12,7 @@ Input & output files
 ===============
 Inputs in TS_GEOCml*/ :
  - cum.h5 : Cumulative displacement (time-series) in mm
- 
+
 Outputs in TS_GEOCml*/results/ :
  - vstd[.png] : Std of velocity in mm/yr
  - stc[.png]  : Spatio-temporal consistency in mm
@@ -20,14 +20,17 @@ Outputs in TS_GEOCml*/results/ :
 =====
 Usage
 =====
-LiCSBAS14_vel_std.py -t tsadir [--mem_size float]
+LiCSBAS14_vel_std.py -t tsadir [--mem_size float] [--gpu]
 
  -t  Path to the TS_GEOCml* dir.
  --mem_size   Max memory size for each patch in MB. (Default: 4000)
+ --gpu        Use GPU (Need cupy module)
 
 """
 #%% Change log
 '''
+v1.2 20210309 Yu Morishita, GSI
+ - Add GPU option
 v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
  - Bag fix of stc calculation with overlapping
 v1.0 20190725 Yu Morishita, Uni of Leeds and GSI
@@ -56,13 +59,13 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver=1.1; date=20190805; author="Y. Morishita"
+    ver=1.2; date=20210309; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -70,13 +73,15 @@ def main(argv=None):
     #%% Set default
     tsadir = []
     memory_size = 4000
+    gpu = False
 
     cmap_noise_r = 'viridis_r'
-    
+
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:", ["help", "mem_size="])
+            opts, args = getopt.getopt(argv[1:], "ht:",
+                                       ["help", "mem_size=", "gpu"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -87,28 +92,33 @@ def main(argv=None):
                 tsadir = a
             elif o == '--mem_size':
                 memory_size = float(a)
+            elif o == '--gpu':
+                gpu = True
 
 
         if not tsadir:
             raise Usage('No tsa directory given, -d is not optional!')
         elif not os.path.isdir(tsadir):
             raise Usage('No {} dir exists!'.format(tsadir))
+        if gpu:
+            print("\nGPU option is activated. Need cupy module.\n")
+            import cupy as cp
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
         print("  "+str(err.msg), file=sys.stderr)
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         return 2
- 
+
 
     #%% Directory settings
     tsadir = os.path.abspath(tsadir)
     resultsdir = os.path.join(tsadir,'results')
 
-      
+
     #%% Read data information
     cumh5 = h5.File(os.path.join(tsadir,'cum.h5'), 'r')
-    
+
     imdates = cumh5['imdates'][()].astype(str).tolist()
     cum = cumh5['cum']
     n_im, length, width = cum.shape
@@ -119,7 +129,7 @@ def main(argv=None):
 
     #%% Get patch row number
     n_store_data = n_im*2.25+100 #3:cum,data,M(bool); 100:bootnum
-        
+
     n_patch, patchrow = tools_lib.get_patchrow(width, length, n_store_data, memory_size)
 
 
@@ -139,7 +149,7 @@ def main(argv=None):
         _cum = cum[:, rows[0]-row_ex1:rows[1]+row_ex2, :].reshape(n_im, lengththis+row_ex1+row_ex2, width)
 
         ### Calc STC
-        stc = inv_lib.calc_stc(_cum)[row_ex1:lengththis+row_ex1, :] ## original length
+        stc = inv_lib.calc_stc(_cum, gpu=gpu)[row_ex1:lengththis+row_ex1, :] ## original length
         del _cum
 
         ### Output data and image
@@ -149,7 +159,7 @@ def main(argv=None):
         with open(stcfile, openmode) as f:
             stc.tofile(f)
 
-        
+
         #%% Calc vstd
         ### Read data for vstd
         n_pt_all = lengththis*width
@@ -164,9 +174,10 @@ def main(argv=None):
 
         ### Calc vstd by bootstrap
         vstd = np.zeros((n_pt_all), dtype=np.float32)*np.nan
-       
+
         print('  Calculating std of velocity by bootstrap...', flush=True)
-        vstd[bool_unnan_pt] = inv_lib.calc_velstd_withnan(cum_patch, dt_cum)
+        vstd[bool_unnan_pt] = inv_lib.calc_velstd_withnan(cum_patch, dt_cum,
+                                                          gpu=gpu)
 
         ### Output data and image
         vstdfile = os.path.join(resultsdir, 'vstd')

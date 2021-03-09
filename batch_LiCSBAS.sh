@@ -22,6 +22,7 @@ end_step="16"	# 01-05, 11-16
 nlook="1"	# multilook factor, used in step02
 GEOCmldir="GEOCml${nlook}"	# If start from 11 or later after doing 03-05, use e.g., GEOCml${nlook}GACOSmaskclip
 n_para="" # Number of paralell processing in step 02-05,12,13,16. default: number of usable CPU
+gpu="n"	# y/n
 check_only="n" # y/n. If y, not run scripts and just show commands to be done
 
 logdir="log"
@@ -41,7 +42,6 @@ p05_clip_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 p11_unw_thre=""	# default: 0.3
 p11_coh_thre=""	# default: 0.05
 p12_loop_thre=""	# default: 1.5 rad
-p13_gpu="n"	# y/n. default: n
 p15_coh_thre=""	# default: 0.05
 p15_n_unw_r_thre=""	# default: 1.5
 p15_vstd_thre=""	# default: 100 mm/yr
@@ -286,7 +286,7 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   if [ ! -z $p13_n_para ];then p13_op="$p13_op --n_para $p13_n_para"; fi
   if [ ! -z $p13_n_unw_r_thre ];then p13_op="$p13_op --n_unw_r_thre $p13_n_unw_r_thre"; fi
   if [ $p13_keep_incfile == "y" ];then p13_op="$p13_op --keep_incfile"; fi
-  if [ $p13_gpu == "y" ];then p13_op="$p13_op --gpu"; fi
+  if [ $gpu == "y" ];then p13_op="$p13_op --gpu"; fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS13_sb_inv.py $p13_op"
@@ -301,6 +301,7 @@ if [ $start_step -le 14 -a $end_step -ge 14 ];then
   if [ ! -z $p14_TSdir ];then p14_op="$p14_op -t $p14_TSdir";
     else p14_op="$p14_op -t $TSdir"; fi
   if [ ! -z $p14_mem_size ];then p14_op="$p14_op --mem_size $p14_mem_size"; fi
+  if [ $gpu == "y" ];then p14_op="$p14_op --gpu"; fi
 
   if [ $check_only == "y" ];then
     echo "LiCSBAS14_vel_std.py $p14_op"
