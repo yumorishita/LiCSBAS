@@ -8,6 +8,8 @@ Python3 library of time series analysis tools for LiCSBAS.
 =========
 Changelog
 =========
+v1.8 20210309 Yu Morishita, GSI
+ - Add GPU option to fit2dh (but not recommended)
 v1.7 20210205 Yu Morishita, GSI
  - Add cm_insar, cm_isce, get_cmap
 v1.6.2 20201225 Yu Morishita, GSI
@@ -292,7 +294,7 @@ def fit2d(A,w=None,deg="1"):
 
 
 #%%
-def fit2dh(A, deg, hgt, hgt_min, hgt_max):
+def fit2dh(A, deg, hgt, hgt_min, hgt_max, gpu=False):
     """
     Estimate best fit 2d ramp and topography-correlated component simultaneously.
 
@@ -307,49 +309,72 @@ def fit2dh(A, deg, hgt, hgt_min, hgt_max):
               If blank, don*t estimate topo-corr component.
         hgt_min : Minimum hgt to take into account in hgt-linear
         hgt_max : Maximum hgt to take into account in hgt-linear
+        gpu     : GPU flag
 
     Returns:
         Afit : Best fit solution with the same demention as A
         m    : Set of parameters of best fit plain (a,b,c...)
 
+    Note: GPU option seems slow and may return error when the size is large.
+          Not recommended.
+
     """
-    import statsmodels.api as sm
+    if gpu:
+        import cupy as xp
+        A = xp.asarray(A)
+        hgt = xp.asarray(hgt)
+        hgt_min = xp.asarray(hgt_min)
+        hgt_max = xp.asarray(hgt_max)
+    else:
+        xp = np
 
     ### Make design matrix G
     length, width = A.shape
-    Xgrid, Ygrid = np.meshgrid(np.arange(width),np.arange(length))
-    Xgrid1 = Xgrid.ravel()
-    Ygrid1 = Ygrid.ravel()
 
     if not deg:
-        G = np.ones((length*width))
+        G = xp.ones((length*width))
     else:
+        Xgrid, Ygrid = xp.meshgrid(xp.arange(width), xp.arange(length))
+        Xgrid1 = Xgrid.ravel()
+        Ygrid1 = Ygrid.ravel()
+
         if str(deg) == "1":
-            G = np.stack((Xgrid1, Ygrid1)).T
+            G = xp.stack((Xgrid1, Ygrid1)).T
         elif str(deg) == "bl":
-            G = np.stack((Xgrid1, Ygrid1, Xgrid1*Ygrid1)).T
+            G = xp.stack((Xgrid1, Ygrid1, Xgrid1*Ygrid1)).T
         elif str(deg) == "2":
-            G = np.stack((Xgrid1, Ygrid1, Xgrid1*Ygrid1, Xgrid1**2, Ygrid1**2)).T
+            G = xp.stack((Xgrid1, Ygrid1, Xgrid1*Ygrid1,
+                          Xgrid1**2, Ygrid1**2)).T
         else:
             print('\nERROR: Not proper deg ({}) is used\n'.format(deg), file=sys.stderr)
             return False
-        G = sm.add_constant(G)
+        del Xgrid, Ygrid, Xgrid1, Ygrid1
+
+        G = xp.hstack([xp.ones((length*width, 1)), G])
 
     if len(hgt) > 0:
         _hgt = hgt.copy()  ## Not to overwrite hgt in main
-        _hgt[np.isnan(_hgt)] = 0
+        _hgt[xp.isnan(_hgt)] = 0
         _hgt[_hgt<hgt_min] = 0
         _hgt[_hgt>hgt_max] = 0
-        G2 = np.vstack((G.T, hgt.ravel())).T ## for Afit
-        G = np.vstack((G.T, _hgt.ravel())).T
+        G2 = xp.vstack((G.T, hgt.ravel())).T ## for Afit
+        G = xp.vstack((G.T, _hgt.ravel())).T
+        del _hgt
     else:
         G2 = G
 
-    ### Invert
-    results = sm.OLS(A.ravel(), G, missing='drop').fit()
-    m = results.params
+    G = G.astype(xp.int32)
 
-    Afit = np.float32((G2@m).reshape(((length,width))))
+    ### Invert
+    mask = xp.isnan(A.ravel())
+    m = xp.linalg.lstsq(G[~mask, :], A.ravel()[~mask], rcond=None)[0]
+
+    Afit = ((xp.matmul(G2, m)).reshape((length, width))).astype(xp.float32)
+
+    if gpu:
+        Afit = xp.asnumpy(Afit)
+        m = xp.asnumpy(m)
+        del A, hgt, hgt_min, hgt_max, length, width, G, G2, mask
 
     return Afit, m
 

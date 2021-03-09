@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.4.6 20210308 Yu Morishita, GSI
+v1.5 20210309 Yu Morishita, GSI
 
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
@@ -53,17 +53,26 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
  --hgt_max    Maximum hgt to take into account in hgt-linear (Default: 10000m, no effect)
  --nomask     Apply filter to unmasked data (Default: apply to masked)
  --n_para     Number of parallel processing (Default: # of usable CPU)
- --range       Range used in deramp and hgt_linear. Index starts from 0.
+ --range      Range used in deramp and hgt_linear. Index starts from 0.
               0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
- --range_geo   Range used in deramp and hgt_linear in geographical coordinates (deg).
- --ex_range    Range EXCLUDED in deramp and hgt_linear. Index starts from 0.
+ --range_geo  Range used in deramp and hgt_linear in geographical coordinates
+              (deg).
+ --ex_range   Range EXCLUDED in deramp and hgt_linear. Index starts from 0.
               0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  --ex_range_geo  Range EXCLUDED in deramp and hgt_linear in geographical
                  coordinates (deg).
 
+Note: Spatial filter consume large memory. If the processing is stacked, try
+ - --n_para 1
+ - Indicate small filtwidth_km for -s option
+ - Reduce data size in step02 or step05
+
 """
 #%% Change log
 '''
+v1.5 20210309 Yu Morishita, GSI
+ - Add GPU option but not recommended (hidden option)
+ - Speed up by not directry read/write from/to hdf5 file during process
 v1.4.6 20210308 Yu Morishita, GSI
  - Not use multiprocessing when n_para=1
 v1.4.5 20201124 Yu Morishita, GSI
@@ -126,7 +135,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.4.6"; date=20210308; author="Y. Morishita"
+    ver="1.5"; date=20210309; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -134,7 +143,7 @@ def main(argv=None):
     global cum, mask, deg_ramp, hgt_linearflag, hgt, hgt_min, hgt_max,\
     filtcumdir, filtincdir, imdates, cycle, coef_r2m, models, \
     filtwidth_yr, filtwidth_km, dt_cum, x_stddev, y_stddev, mask2, cmap_wrap
-    ## global cum_org from hdf5 contaminate in paralell warpper? So pass them by arg.
+    global cum_org, cum_filt, gpu
 
 
     #%% Set default
@@ -146,10 +155,16 @@ def main(argv=None):
     hgt_min = 200 ## meter
     hgt_max = 10000 ## meter
     maskflag = True
+    gpu = False
+
     try:
         n_para = len(os.sched_getaffinity(0))
     except:
         n_para = multi.cpu_count()
+
+    os.environ["OMP_NUM_THREADS"] = "1"
+    # Because np.linalg.lstsq use full CPU but not much faster than 1CPU.
+    # Instead parallelize by multiprocessing
 
     range_str = []
     range_geo_str = []
@@ -168,7 +183,10 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:s:y:r:", ["help", "hgt_linear", "hgt_min=", "hgt_max=", "nomask", "n_para=", "range=", "range_geo=", "ex_range=", "ex_range_geo="])
+            opts, args = getopt.getopt(argv[1:], "ht:s:y:r:",
+                           ["help", "hgt_linear", "hgt_min=", "hgt_max=",
+                            "nomask", "n_para=", "range=", "range_geo=",
+                            "ex_range=", "ex_range_geo=", "gpu"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -201,6 +219,8 @@ def main(argv=None):
                 ex_range_str = a
             elif o == '--ex_range_geo':
                 ex_range_geo_str = a
+            elif o == '--gpu':
+                gpu = True
 
         if not tsadir:
             raise Usage('No tsa directory given, -t is not optional!')
@@ -212,6 +232,9 @@ def main(argv=None):
             raise Usage('Both --range and --range_geo given, use either one not both!')
         if ex_range_str and ex_range_geo_str:
             raise Usage('Both --ex_range and --ex_range_geo given, use either one not both!')
+        if gpu:
+            print("\nGPU option is activated. Need cupy module.\n")
+            import cupy as cp
 
     except Usage as err:
         print("\nERROR:", file=sys.stderr, end='')
@@ -263,7 +286,7 @@ def main(argv=None):
 
     #%% Dates
     imdates = cumh5['imdates'][()].astype(str).tolist()
-    cum_org = cumh5['cum']
+    cum_org = cumh5['cum'][()]
     n_im, length, width = cum_org.shape
 
     if n_para > n_im:
@@ -392,8 +415,8 @@ def main(argv=None):
     #%% First, deramp and hgt-linear if indicated
     cum = np.zeros((cum_org.shape), dtype=np.float32)*np.nan
     if not deg_ramp and not hgt_linearflag:
-        cum = cum_org[()]
-
+        cum = cum_org
+        del cum_org
     else:
         if not deg_ramp:
             print('\nEstimate hgt-linear component,', flush=True)
@@ -402,16 +425,16 @@ def main(argv=None):
         else:
             print('\nDeramp ifgs with the degree of {} and hgt-linear,'.format(deg_ramp), flush=True)
 
-        if n_para == 1:
+        if n_para == 1 or gpu:
+            if gpu: print('With GPU')
             models = np.zeros(n_im, dtype=object)
             for i in range(n_im):
-                cum[i, :, :], models[i] = deramp_wrapper((i, cum_org[i, :, :]))
+                cum[i, :, :], models[i] = deramp_wrapper(i)
         else:
             print('with {} parallel processing...'.format(n_para), flush=True)
-            args = [(i, cum_org[i, :, :]) for i in range(n_im)]
             ### Parallel processing
             p = q.Pool(n_para)
-            _result = np.array(p.map(deramp_wrapper, args), dtype=object)
+            _result = np.array(p.map(deramp_wrapper, range(n_im)), dtype=object)
             p.close()
             del args
 
@@ -422,15 +445,14 @@ def main(argv=None):
 
         ### Only for output increment png files
         print('\nCreate png for increment with {} parallel processing...'.format(n_para), flush=True)
-        args = [(i, cum_org[i, :, :], cum_org[i-1, :, :]) for i in range(1, n_im)]
         p = q.Pool(n_para)
-        p.map(deramp_wrapper2, args)
+        p.map(deramp_wrapper2, range(1, n_im))
         p.close()
-        del args
+        del cum_org
 
 
     #%% Filter each image
-    cum_filt = cumfh5.require_dataset('cum', (n_im, length, width), dtype=np.float32, compression=compress)
+    cum_filt = np.zeros((n_im, length, width), dtype=np.float32)
 
     print('\nHP filter in time, LP filter in space,', flush=True)
 
@@ -447,11 +469,9 @@ def main(argv=None):
 
     ### Only for output increment png files
     print('\nCreate png for increment with {} parallel processing...'.format(n_para), flush=True)
-    args = [(i, cum_filt[i, :, :]-cum_filt[i-1, :, :]) for i in range(1, n_im)]
     p = q.Pool(n_para)
-    p.map(filter_wrapper2, args)
+    p.map(filter_wrapper2, range(1, n_im))
     p.close()
-    del args
 
 
     #%% Find stable ref point
@@ -479,6 +499,7 @@ def main(argv=None):
     ### Rerferencing cumulative displacement to new stable ref
     for i in range(n_im):
         cum_filt[i, :, :] = cum_filt[i, :, :] - cum[i, refy1s, refx1s]
+    del cum
 
     ### Save image
     rms_cum_wrt_med_file = os.path.join(infodir, '16rms_cum_wrt_med')
@@ -508,7 +529,7 @@ def main(argv=None):
     vel = np.zeros((length, width), dtype=np.float32)*np.nan
 
     bool_unnan = ~np.isnan(cum_filt[0, :, :]).reshape(length, width) ## not all nan
-    cum_pt = cum_filt[()].reshape(n_im, length*width)[:, bool_unnan.ravel()] #n_im x n_pt
+    cum_pt = cum_filt.reshape(n_im, length*width)[:, bool_unnan.ravel()] #n_im x n_pt
     n_pt_unnan = bool_unnan.sum()
     vconst_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
     vel_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
@@ -535,8 +556,10 @@ def main(argv=None):
         vconst_mskd.tofile(vconstfile+'.mskd')
         vel_mskd.tofile(velfile+'.mskd')
 
+    print('  Writing to HDF5 file...', flush=True)
     cumfh5.create_dataset('vel', data=vel.reshape(length, width), compression=compress)
     cumfh5.create_dataset('vintercept', data=vconst.reshape(length, width), compression=compress)
+    cumfh5.create_dataset('cum', data=cum_filt, compression=compress)
 
 
     #%% Add info and close
@@ -593,13 +616,13 @@ def main(argv=None):
 
 
 #%%
-def deramp_wrapper(args):
-    i, _cum_org = args
+def deramp_wrapper(i):
     if np.mod(i, 10) == 0:
         print("  {0:3}/{1:3}th image...".format(i, len(imdates)), flush=True)
 
-    fit, model = tools_lib.fit2dh(_cum_org*mask*mask2, deg_ramp, hgt, hgt_min, hgt_max)  ## fit is not masked
-    _cum = _cum_org-fit
+    fit, model = tools_lib.fit2dh(cum_org[i, :, :]*mask*mask2, deg_ramp, hgt,
+                                  hgt_min, hgt_max, gpu=gpu) ## fit is not masked
+    _cum = cum_org[i, :, :]-fit
 
     if hgt_linearflag:
         fit_hgt = hgt*model[-1]*mask  ## extract only hgt-linear component
@@ -624,7 +647,7 @@ def deramp_wrapper(args):
         ramp = (fit-fit_hgt)*mask
 
         ## Output comparison image of deramp
-        data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [_cum_org*mask, ramp, _cum_org*mask-ramp]]
+        data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum_org[i, :, :]*mask, ramp, cum_org[i, :, :]*mask-ramp]]
         pngfile = os.path.join(filtcumdir, imdates[i]+'_deramp.png')
         deramp_title3 = ['Before deramp ({}pi/cycle)'.format(cycle*2), 'ramp phase (deg:{})'.format(deg_ramp), 'After deramp ({}pi/cycle)'.format(cycle*2)]
         plot_lib.make_3im_png(data3, pngfile, cmap_wrap, deramp_title3, vmin=-np.pi, vmax=np.pi, cbar=False)
@@ -633,9 +656,8 @@ def deramp_wrapper(args):
 
 
 #%%
-def deramp_wrapper2(args):
+def deramp_wrapper2(i):
     ## Only for output increment png files
-    i, _cum_org, _cum_org_last = args
 
     if hgt_linearflag and i != 0: ## first image has no increment
         ## fit_hgt, model
@@ -661,9 +683,9 @@ def deramp_wrapper2(args):
 
     if deg_ramp and i != 0: ## first image has no increment
         ## ramp
-        ramp = (_cum_org-cum[i, :, :]-fit_hgt)*mask
-        ramp1 = (_cum_org_last-cum[i-1, :, :]-fit_hgt1)*mask
-        inc_org = (_cum_org-_cum_org_last)*mask
+        ramp = (cum_org[i, :, :]-cum[i, :, :]-fit_hgt)*mask
+        ramp1 = (cum_org[i-1, :, :]-cum[i-1, :, :]-fit_hgt1)*mask
+        inc_org = (cum_org[i, :, :]-cum_org[i-1, :, :])*mask
 
         ## Output comparison image of deramp for increment
         data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [inc_org, ramp-ramp1, inc_org-(ramp-ramp1)]]
@@ -729,9 +751,9 @@ def filter_wrapper(i):
 
 
 #%%
-def filter_wrapper2(args):
+def filter_wrapper2(i):
     ## Only for output increment png files
-    i, dcum_filt = args
+    dcum_filt = cum_filt[i, :, :]-cum_filt[i-1, :, :]
     dcum = cum[i, :, :]-cum[i-1, :, :]
     dcum_hptlps = dcum-dcum_filt
 
