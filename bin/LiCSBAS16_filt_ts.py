@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5 20210309 Yu Morishita, GSI
+v1.5.1 20210311 Yu Morishita, GSI
 
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
@@ -70,6 +70,8 @@ Note: Spatial filter consume large memory. If the processing is stacked, try
 """
 #%% Change log
 '''
+v1.5.1 20210311 Yu Morishita, GSI
+ - Include noise indices and LOS unit vector in cum.h5 file
 v1.5 20210309 Yu Morishita, GSI
  - Add GPU option but not recommended (hidden option)
  - Speed up by not directry read/write from/to hdf5 file during process
@@ -135,7 +137,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.5"; date=20210309; author="Y. Morishita"
+    ver="1.5.1"; date=20210311; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -556,7 +558,7 @@ def main(argv=None):
         vconst_mskd.tofile(vconstfile+'.mskd')
         vel_mskd.tofile(velfile+'.mskd')
 
-    print('  Writing to HDF5 file...', flush=True)
+    print('\nWriting to HDF5 file...', flush=True)
     cumfh5.create_dataset('vel', data=vel.reshape(length, width), compression=compress)
     cumfh5.create_dataset('vintercept', data=vconst.reshape(length, width), compression=compress)
     cumfh5.create_dataset('cum', data=cum_filt, compression=compress)
@@ -567,6 +569,24 @@ def main(argv=None):
     cumfh5.create_dataset('filtwidth_km', data=filtwidth_km)
     cumfh5.create_dataset('deramp_flag', data=deg_ramp)
     cumfh5.create_dataset('hgt_linear_flag', data=hgt_linearflag*1)
+
+    indices = ['coh_avg', 'hgt', 'n_loop_err', 'n_unw', 'slc.mli',
+               'maxTlen', 'n_gap', 'n_ifg_noloop', 'resid_rms',
+               'E.geo', 'N.geo', 'U.geo']
+    for index in indices:
+        if index in list(cumh5.keys()):
+            cumfh5.create_dataset(index, data=cumh5[index])
+        else:
+            print('  No {} field found in {}. Skip.'.format(index, cumname))
+
+    indices2 = ['mask', 'vstd', 'stc']
+    for index in indices2:
+        file = os.path.join(resultsdir, index)
+        if os.path.exists(file):
+            data = io_lib.read_img(file, length, width)
+            cumfh5.create_dataset(index, data=data, compression=compress)
+        else:
+            print('  {} not exist in results dir. Skip'.format(index))
 
     cumh5.close()
     cumfh5.close()

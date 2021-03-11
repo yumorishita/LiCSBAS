@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-v1.5.1 20210309 Yu Morishita, GSI
+v1.5.2 20210311 Yu Morishita, GSI
 
-This script inverts the SB network of unw to obtain the time series and velocity
-using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
-A stable reference point is determined after the inversion. RMS of the time series
-wrt median among all points is calculated for each point. Then the point with
-minimum RMS and minimum n_gap is selected as new stable reference point.
+This script inverts the SB network of unw to obtain the time series and
+velocity using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
+A stable reference point is determined after the inversion. RMS of the time
+series wrt median among all points is calculated for each point.
+Then the point with minimum RMS and minimum n_gap is selected as new stable
+reference point.
 
 ===============
 Input & output files
@@ -18,11 +19,19 @@ Inputs in GEOCml*/ :
  - EQA.dem_par
  - slc.mli.par
  - baselines (may be dummy)
+[- [ENU].geo]
 
-Inputs in TS_GEOCml*/info/ :
- - 11bad_ifg.txt
- - 12bad_ifg.txt
- - 12ref.txt
+Inputs in TS_GEOCml*/ :
+ - info/
+   - 11bad_ifg.txt
+   - 12bad_ifg.txt
+   - 12ref.txt
+[-results/]
+[  - coh_avg]
+[  - hgt]
+[  - n_loop_err]
+[  - n_unw]
+[  - slc.mli]
 
 Outputs in TS_GEOCml*/ :
  - cum.h5             : Cumulative displacement (time-seires) in mm
@@ -70,6 +79,8 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
 """
 #%% Change log
 '''
+v1.5.2 20210311 Yu Morishita, GSI
+ - Include noise indices and LOS unit vector in cum.h5 file
 v1.5.1 20210309 Yu Morishita, GSI
  - Change default --mem_size to 8000
  - Speed up by reading cum data on memory
@@ -143,7 +154,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.5.1"; date=20210309; author="Y. Morishita"
+    ver="1.5.2"; date=20210311; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -805,10 +816,29 @@ def main(argv=None):
 
     #%% Close h5 file
     if not save_mem:
-        print('Writing to HDF5 file...')
+        print('\nWriting to HDF5 file...')
         cumh5.create_dataset('cum', data=cum, compression=compress)
         cumh5.create_dataset('vel', data=vel, compression=compress)
-        cumh5.create_dataset('vconst', data=vconst, compression=compress)
+        cumh5.create_dataset('vintercept', data=vconst, compression=compress)
+
+    indices = ['coh_avg', 'hgt', 'n_loop_err', 'n_unw', 'slc.mli',
+               'maxTlen', 'n_gap', 'n_ifg_noloop', 'resid_rms']
+    for index in indices:
+        file = os.path.join(resultsdir, index)
+        if os.path.exists(file):
+            data = io_lib.read_img(file, length, width)
+            cumh5.create_dataset(index, data=data, compression=compress)
+        else:
+            print('  {} not exist in results dir. Skip'.format(index))
+
+    LOSvecs = ['E.geo', 'N.geo', 'U.geo']
+    for LOSvec in LOSvecs:
+        file = os.path.join(ifgdir, LOSvec)
+        if os.path.exists(file):
+            data = io_lib.read_img(file, length, width)
+            cumh5.create_dataset(LOSvec, data=data, compression=compress)
+        else:
+            print('  {} not exist in GEOCml dir. Skip'.format(LOSvec))
 
     cumh5.close()
 
