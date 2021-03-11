@@ -29,6 +29,7 @@ logdir="log"
 log="$logdir/$(date +%Y%m%d%H%M)$(basename $0 .sh)_${start_step}_${end_step}.log"
 
 ### Optional steps (03-05) ###
+order_op03_05="03 04 05"	# can change order e.g., 05 03 04
 do03op_GACOS="n"	# y/n
 do04op_mask="n"	# y/n
 do05op_clip="n"	# y/n
@@ -39,9 +40,14 @@ p05_clip_range=""	# e.g. 10:100/20:200 (ix start from 0)
 p05_clip_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 
 ### Frequently used options. If blank, use default. ###
+p01_start_date=""	# default: 20141001
+p01_end_date=""	# default: today
+p01_get_gacos="n" # y/n 
 p11_unw_thre=""	# default: 0.3
 p11_coh_thre=""	# default: 0.05
 p12_loop_thre=""	# default: 1.5 rad
+p12_multi_prime="n"	# y/n. default: n
+p12_rm_ifg_list=""	# List file containing ifgs to be manually removed
 p15_coh_thre=""	# default: 0.05
 p15_n_unw_r_thre=""	# default: 1.5
 p15_vstd_thre=""	# default: 100 mm/yr
@@ -55,6 +61,8 @@ p16_filtwidth_km=""	# default: 2 km
 p16_filtwidth_yr=""	# default: avg_interval*3 yr
 p16_deg_deramp=""	# 1, bl, or 2. default: no deramp
 p16_hgt_linear="n"	# y/n. default: n
+p16_hgt_min=""	# default: 200 (m)
+p16_hgt_max=""  # default: 10000 (m)
 p16_range=""	# e.g. 10:100/20:200 (ix start from 0)
 p16_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 p16_ex_range=""	# e.g. 10:100/20:200 (ix start from 0)
@@ -62,15 +70,11 @@ p16_ex_range_geo=""	# e.g. 130.11/131.12/34.34/34.6 (in deg)
 
 ### Less frequently used options. If blank, use default. ###
 p01_frame=""	# e.g. 021D_04972_131213 
-p01_start_date=""	# default: 20141001
-p01_end_date=""	# default: today
-p01_get_gacos="n" # y/n 
 p01_n_para=""	# default: 4
 p02_GEOCdir=""	# default: GEOC
 p02_GEOCmldir=""	# default: GEOCml$nlook
 p02_freq=""	# default: 5.405e9 Hz
 p02_n_para=""   # default: # of usable CPU
-order_op03_05="03 04 05"	# can change order e.g., 05 03 04
 p03_inGEOCmldir=""	# default: $GEOCmldir
 p03_outGEOCmldir_suffix="" # default: GACOS
 p03_fillhole="y"	# y/n. default: n
@@ -87,25 +91,22 @@ p11_TSdir=""	# default: TS_$GEOCmldir
 p12_GEOCmldir=""        # default: $GEOCmldir
 p12_TSdir=""    # default: TS_$GEOCmldir
 p12_n_para=""	# default: # of usable CPU
-p12_multi_prime="n"	# y/n. default: n
 p13_GEOCmldir=""        # default: $GEOCmldir
 p13_TSdir=""    # default: TS_$GEOCmldir
 p13_inv_alg=""	# LS (default) or WLS
-p13_mem_size=""	# default: 4000 (MB)
+p13_mem_size=""	# default: 8000 (MB)
 p13_gamma=""	# default: 0.0001
 p13_n_para=""	# default: # of usable CPU
 p13_n_unw_r_thre=""	# defualt: 1
 p13_keep_incfile="n"	# y/n. default: n
 p14_TSdir=""    # default: TS_$GEOCmldir
-p14_mem_size="" # default: 8000 (MB)
+p14_mem_size="" # default: 4000 (MB)
 p15_TSdir=""    # default: TS_$GEOCmldir
 p15_vmin=""	# default: auto (mm/yr)
 p15_vmax=""	# default: auto (mm/yr)
 p15_keep_isolated="n"	# y/n. default: n
 p15_noautoadjust="n" # y/n. default: n
 p16_TSdir=""    # default: TS_$GEOCmldir
-p16_hgt_min=""	# default: 200 (m)
-p16_hgt_max=""  # default: 10000 (m)
 p16_nomask="n"	# y/n. default: n
 p16_n_para=""   # default: # of usable CPU
 
@@ -262,6 +263,7 @@ if [ $start_step -le 12 -a $end_step -ge 12 ];then
   if [ ! -z $p12_TSdir ];then p12_op="$p12_op -t $p12_TSdir"; fi
   if [ ! -z $p12_loop_thre ];then p12_op="$p12_op -l $p12_loop_thre"; fi
   if [ $p12_multi_prime == "y" ];then p12_op="$p12_op --multi_prime"; fi
+  if [ ! -z $p12_rm_ifg_list ];then p12_op="$p12_op --rm_ifg_list $p12_rm_ifg_list"; fi
   if [ ! -z $p12_n_para ];then p12_op="$p12_op --n_para $p12_n_para";
   elif [ ! -z $n_para ];then p12_op="$p12_op --n_para $n_para";fi
 

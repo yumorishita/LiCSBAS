@@ -79,11 +79,11 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
     ver="1.3.2"; date=20201116; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
@@ -128,10 +128,10 @@ def main(argv=None):
         print("  "+str(err.msg), file=sys.stderr)
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         return 2
- 
+
     print("\ncoh_thre     : {}".format(coh_thre), flush=True)
     print("unw_cov_thre : {}".format(unw_cov_thre), flush=True)
-        
+
 
     #%% Directory setting
     ifgdir = os.path.abspath(ifgdir)
@@ -143,7 +143,7 @@ def main(argv=None):
 
     ifg_rasdir = os.path.join(tsadir, '11ifg_ras')
     bad_ifg_rasdir = os.path.join(tsadir, '11bad_ifg_ras')
-    
+
     if os.path.exists(ifg_rasdir): shutil.rmtree(ifg_rasdir)
     if os.path.exists(bad_ifg_rasdir): shutil.rmtree(bad_ifg_rasdir)
     os.mkdir(ifg_rasdir)
@@ -163,7 +163,7 @@ def main(argv=None):
     ### Get dates
     ifgdates = tools_lib.get_ifgdates(ifgdir)
     imdates = tools_lib.ifgdates2imdates(ifgdates)
-    
+
     n_ifg = len(ifgdates)
     n_im = len(imdates)
 
@@ -183,7 +183,7 @@ def main(argv=None):
             shutil.copy(os.path.join(ifgdir, file), resultsdir)
 
 
-    #%% Read data 
+    #%% Read data
     ### Allocate memory
     n_unw = np.zeros((length, width), dtype=np.float32)
     coh_avg_ifg = []
@@ -192,7 +192,7 @@ def main(argv=None):
     ### Read data and calculate
     print('\nReading unw and cc data...', flush=True)
     ## First, identify valid area (n_unw>im)
-    for ifgix, ifgd in enumerate(ifgdates): 
+    for ifgix, ifgd in enumerate(ifgdates):
         if np.mod(ifgix,100) == 0:
             print("  {0:3}/{1:3}th unw to identify valid area...".format(ifgix, n_ifg), flush=True)
         unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
@@ -205,8 +205,8 @@ def main(argv=None):
     bool_valid = (n_unw>=n_im)
     n_unw_valid = bool_valid.sum()
 
-    ## Read cc and unw data 
-    for ifgix, ifgd in enumerate(ifgdates): 
+    ## Read cc and unw data
+    for ifgix, ifgd in enumerate(ifgdates):
         if np.mod(ifgix,100) == 0:
             print("  {0:3}/{1:3}th cc and unw...".format(ifgix, n_ifg), flush=True)
         ## unw
@@ -236,13 +236,13 @@ def main(argv=None):
         bperp = io_lib.read_bperp_file(bperp_file, imdates)
     else: #dummy
         bperp = np.random.random(n_im).tolist()
-    
+
 
     #%% Identify bad ifgs, link ras and output stats information
     bad_ifgdates = []
     ixs_bad_ifgdates = []
 
-    ### Header of stats file 
+    ### Header of stats file
     ifg_statsfile = os.path.join(infodir, '11ifg_stats.txt')
     fstats = open(ifg_statsfile, 'w')
     print('# Size: {0}({1}x{2}), n_valid: {3}'.format(width*length, width, length, n_unw_valid), file=fstats)
@@ -265,12 +265,12 @@ def main(argv=None):
     for i, ifgd in enumerate(ifgdates):
         rasname = ifgdates[i]+'.unw'+suffix
         rasorg = os.path.join(ifgdir, ifgdates[i], rasname)
-        
+
         if not os.path.exists(rasorg):
             print('\nERROR: No browse image {} available!\n'
                   .format(rasorg), file=sys.stderr)
             return 2
-        
+
         ### Identify bad ifgs and link ras
         if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre:
             bad_ifgdates.append(ifgdates[i])
@@ -293,7 +293,7 @@ def main(argv=None):
 
     fstats.close()
 
-    ### Output list of bad ifg            
+    ### Output list of bad ifg
     print('\n{0}/{1} ifgs are discarded from further processing.'.format(len(bad_ifgdates), n_ifg))
     print('ifg dates        unw_cov coh_av')
     bad_ifgfile = os.path.join(infodir, '11bad_ifg.txt')
@@ -331,7 +331,7 @@ def main(argv=None):
 
     #%% Finish
     print('\nCheck network/*, 11bad_ifg_ras/* and 11ifg_ras/* in TS dir.')
-    print('If you want to change the bad ifgs to be discarded, re-run with different thresholds or edit bad_ifg11.txt before next step.')
+    print('If you want to change the bad ifgs to be discarded, re-run with different thresholds or make a ifg list and indicate it by --rm_ifg_list option in the next step.')
 
     elapsed_time = time.time()-start
     hour = int(elapsed_time/3600)
