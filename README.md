@@ -21,13 +21,13 @@ If you have found an issue or bug, please report it on the [issues page](https:/
 ## Sample Products and Tutorial
 
 - Frame ID: 124D_04854_171313 (Italy)
-- Time: 2016/09/09-2018/05/08 (~1.7 years, ~60 images, ~170 interferograms)
+- Time: 2016/09/09-2018/05/08 (~1.7 years, 67 epochs, ~217 interferograms)
 - Clipped around Campi Flegrei (14.03/14.22/40.78/40.90)
 
 - Tutorial: [LiCSBAS_sample_CF.pdf](https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/documents/LiCSBAS_sample_CF.pdf) (1.3MB)
 
-- Sample batch script: [batch_LiCSBAS_sample_CF.sh](https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/documents/batch_LiCSBAS_sample_CF.sh)
-- Sample results: [LiCSBAS_sample_CF.tar.gz](https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/sample/LiCSBAS_sample_CF.tar.gz) (37MB)
+- Sample batch script: [batch_LiCSBAS_sample_CF.sh](https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/documents/batch_LiCSBAS_sample_CF.sh) (2021/3/11 updated)
+- Sample results: [LiCSBAS_sample_CF.tar.gz](https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/sample/LiCSBAS_sample_CF.tar.gz) (63MB) (2021/3/11 updated)
 
 ## Citations
 
