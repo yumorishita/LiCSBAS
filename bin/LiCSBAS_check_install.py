@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-v1.1 20201124 Yu Morishita, GSI
+v1.1.1 20210319 Yu Morishita, GSI
 
 This script checks if LiCSBAS install is OK or not.
 
 """
 #%% Change log
 '''
+v1.1.1 20210319 Yu Morishita, GSI
+ - Add psutil
 v1.1 20201124 Yu Morishita, GSI
  - gdal must be >=2.4
 v1.0 20201009 Yu Morishita, GSI
@@ -29,11 +31,12 @@ if __name__ == "__main__":
                 'h5py',
                 'matplotlib',
                 'numpy',
+                'psutil',
                 'requests',
                 'statsmodels',
                ]
 
-    
+
     print('\nPython version: {}'.format(platform.python_version()))
     pyver = platform.python_version_tuple()
     if int(pyver[0]) < 3 or int(pyver[1]) < 6:
@@ -81,7 +84,7 @@ if __name__ == "__main__":
     else:
         print('  OK')
 
- 
+
     print('\nCheck LiCSBAS library')
     try:
          imported = import_module('LiCSBAS_io_lib')
@@ -98,4 +101,4 @@ if __name__ == "__main__":
     else:
         print('\nERROR: LiCSBAS install is NOT OK\n')
         sys.exit(1)
-        
+
