@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-v1.1.1 20210319 Yu Morishita, GSI
+v1.1.2 20210323 Yu Morishita, GSI
 
 This script checks if LiCSBAS install is OK or not.
 
 """
 #%% Change log
 '''
+v1.1.2 20210323 Yu Morishita, GSI
+ - Update how to import gdal
 v1.1.1 20210319 Yu Morishita, GSI
  - Add psutil
 v1.1 20201124 Yu Morishita, GSI
@@ -59,7 +61,7 @@ if __name__ == "__main__":
 
 
     try:
-        imported = import_module('gdal', 'osgeo')
+        imported = import_module('osgeo.gdal')
     except Exception as err:
         print('  ERROR: {}'.format(err))
         flag = False
