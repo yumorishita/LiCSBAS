@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.6 20210311 Yu Morishita, GSI
+v1.6.1 20210405 Yu Morishita, GSI
 
 ========
 Overview
@@ -65,6 +65,8 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
 """
 #%% Change log
 '''
+v1.6.1 20210405 Yu Morishita, GSI
+ - Bug fix when all pixels are nan in loop phase
 v1.6 20210311 Yu Morishita, GSI
  - Add --rm_ifg_list option
 v1.5.3 20201118 Yu Morishita, GSI
@@ -102,7 +104,6 @@ import glob
 import numpy as np
 import datetime as dt
 import multiprocessing as multi
-import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_loop_lib as loop_lib
 import LiCSBAS_tools_lib as tools_lib
@@ -124,7 +125,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.6"; date=20210311; author="Y. Morishita"
+    ver="1.6.1"; date=20210405; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -506,8 +507,8 @@ def main(argv=None):
     #%% Output loop info, move bad_loop_png
     loop_info_file = os.path.join(loopdir, 'loop_info.txt')
     f = open(loop_info_file, 'w')
-    print('# loop_thre: {} rad. *: Removed w/o ref, **: Removed w/ ref'.format(
-        loop_thre), file=f)
+    print('# loop_thre: {} rad'.format(loop_thre), file=f)
+    print('# *: Removed w/o ref, **: No ref, ***: Removed w/ ref', file=f)
     if rm_ifg_list:
         print('# +: Removed by manually indicating in {}'.format(rm_ifg_list),
               file=f)
@@ -539,8 +540,11 @@ def main(argv=None):
         elif ifgd12 in rm_ifg or ifgd23 in rm_ifg or ifgd13 in rm_ifg:
             badloopflag1 = '+'
             shutil.move(looppngfile, badlooppngfile)
-        elif ifgd12 in bad_ifg2 or ifgd23 in bad_ifg2 or ifgd13 in bad_ifg2:
+        elif ifgd12 in noref_ifg or ifgd23 in noref_ifg or ifgd13 in noref_ifg:
             badloopflag2 = '**'
+            shutil.move(looppngfile, badlooppngfile)
+        elif ifgd12 in bad_ifg2 or ifgd23 in bad_ifg2 or ifgd13 in bad_ifg2:
+            badloopflag2 = '***'
             shutil.move(looppngfile, badlooppngfile)
         elif ifgd12 in bad_ifg_cand_res or ifgd23 in bad_ifg_cand_res or ifgd13 in bad_ifg_cand_res:
             badloopflag1 = '/'
@@ -730,14 +734,19 @@ def loop_closure_1st_wrapper(i):
 
     ## Calculate loop phase and check n bias (2pi*n)
     loop_ph = unw12+unw23-unw13
-    loop_2pin = int(np.round(np.nanmedian(loop_ph)/(2*np.pi)))*2*np.pi
-    loop_ph = loop_ph-loop_2pin #unbias 2pi x n
 
-    if multi_prime:
-        bias = np.nanmedian(loop_ph)
-        loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+    if np.all(np.isnan(loop_ph)):
+        bias = np.nan
+        rms = np.inf
+    else:
+        loop_2pin = np.round(np.nanmedian(loop_ph)/(2*np.pi))*2*np.pi
+        loop_ph = loop_ph-loop_2pin #unbias 2pi x n
 
-    rms = np.sqrt(np.nanmean(loop_ph**2))
+        if multi_prime:
+            bias = np.nanmedian(loop_ph)
+            loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+
+        rms = np.sqrt(np.nanmean(loop_ph**2))
 
     ### Output png. If exist in old, move to save time
     imd1 = ifgd12[:8]
@@ -784,12 +793,14 @@ def loop_closure_2nd_wrapper(args):
 
         ## Calculate loop phase and rms at points
         loop_ph = unw12+unw23-unw13
-        loop_2pin = int(np.round(np.nanmedian(loop_ph)/(2*np.pi)))*2*np.pi
-        loop_ph = loop_ph-loop_2pin #unbias
 
-        if multi_prime:
-            bias = np.nanmedian(loop_ph)
-            loop_ph = loop_ph - bias # unbias inconsistent fraction phase
+        if not np.all(np.isnan(loop_ph)):
+            loop_2pin = np.round(np.nanmedian(loop_ph)/(2*np.pi))*2*np.pi
+            loop_ph = loop_ph-loop_2pin #unbias 2pi x n
+
+            if multi_prime:
+                bias = np.nanmedian(loop_ph)
+                loop_ph = loop_ph - bias # unbias inconsistent fraction phase
 
         ns_loop_ph1 = ns_loop_ph1 + ~np.isnan(loop_ph)
 
