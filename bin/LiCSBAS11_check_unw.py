@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3.2 20201116 Yu Morishita, GSI
+v1.3.3 20210402 Yu Morishita, GSI
 
 ========
 Overview
@@ -44,6 +44,9 @@ LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
 """
 #%% Change log
 '''
+v1.3.3 20210402 Yu Morioshita, GSI
+ - Treat all nan as bad ifg
+ - Raise error if all ifgs are bad
 v1.3.2 20201116 Yu Morioshita, GSI
  - Exit if suffix is not set
 v1.3.1 20200911 Yu Morioshita, GSI
@@ -85,7 +88,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.3.2"; date=20201116; author="Y. Morishita"
+    ver="1.3.3"; date=20210402; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -272,7 +275,8 @@ def main(argv=None):
             return 2
 
         ### Identify bad ifgs and link ras
-        if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre:
+        if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre or \
+           np.isnan(rate_cov[i]) or np.isnan(coh_avg_ifg[i]):
             bad_ifgdates.append(ifgdates[i])
             ixs_bad_ifgdates.append(i)
             rm_flag = '*'
@@ -301,6 +305,10 @@ def main(argv=None):
         for i, ifgd in enumerate(bad_ifgdates):
             print('{}'.format(ifgd), file=f)
             print('{}  {:5.3f}  {:5.3f}'.format(ifgd, rate_cov[ixs_bad_ifgdates[i]],  coh_avg_ifg[ixs_bad_ifgdates[i]]), flush=True)
+
+    ### Raise error if all ifgs are bad
+    if len(bad_ifgdates) == n_ifg:
+        raise ValueError('All ifgs are regarded as bad!\nChange the parameters or check the input ifgs.\n')
 
 
     #%% Identify removed image and output file
