@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.13.3 20210205 Yu Morishita, GSI
+v1.13.4 20210910 Yu Morishita, GSI
 
 ========
 Overview
@@ -53,6 +53,8 @@ LiCSBAS_plot_ts.py [-i cum[_filt].h5] [--i2 cum*.h5] [-m yyyymmdd] [-d results_d
 """
 #%% Change log
 '''
+v1.13.4 20210910 Yu Morishita, GSI
+ - Avoid error for refarea in bytes
 v1.13.3 20210205 Yu Morishita, GSI
  - More cmap available
 v1.13.2 20210126 Yu Morishita, GSI
@@ -170,7 +172,7 @@ def calc_model(dph, imdates_ordinal, xvalues, model):
 if __name__ == "__main__":
     argv = sys.argv
 
-    ver="1.13.3"; date=20210205; author="Y. Morishita"
+    ver="1.13.4"; date=20210910; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -358,6 +360,8 @@ if __name__ == "__main__":
             refx1, refx2, refy1, refy2 = tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon)
     else:
         refarea = cumh5['refarea'][()]
+        if type(refarea) is bytes:
+            refarea = refarea.decode('utf-8')
         refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
 
 

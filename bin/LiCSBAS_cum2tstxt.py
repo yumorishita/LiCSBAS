@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2 20200703 Yu Morishita, GSI
+v1.2.1 20210910 Yu Morishita, GSI
 
 ========
 Overview
@@ -28,6 +28,8 @@ LiCSBAS_cum2tstxt.py [-p x/y] [-g lon/lat] [-i cumfile] [-o tsfile] [-r x1:x2/y1
 """
 #%% Change log
 '''
+v1.2.1 20210910 Yu Morishita, GSI
+ - Avoid error for refarea in bytes
 v1.2 20200703 Yu Morishita, Uni of Leeds and GSI
  - Add --ref_geo option
 v1.1 20200227 Yu Morishita, Uni of Leeds and GSI
@@ -55,13 +57,13 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver=1.2; date=20200703; author="Y. Morishita"
+    ver="1.2.1"; date=20210910; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -129,7 +131,7 @@ def main(argv=None):
         dlon = float(cumh5['post_lon'][()])
     else:
         geocod_flag = False
-    
+
     if 'deramp_flag' in list(cumh5.keys()):
         deramp_flag = cumh5['deramp_flag'][()]
     else:
@@ -167,6 +169,8 @@ def main(argv=None):
             refx1, refx2, refy1, refy2 = tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon)
     else:
         refarea = cumh5['refarea'][()]
+        if type(refarea) is bytes:
+            refarea = refarea.decode('utf-8')
         refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
 
     if geocod_flag:
@@ -189,7 +193,7 @@ def main(argv=None):
             lat, lon = tools_lib.xy2bl(x, y, lat1, dlat, lon1, dlon)
         else:
             lat = lon = None
-        
+
     else: ## -g option
         if not geocod_flag:
             print('\nERROR: not geocoded, -g option unavailable\n', file=sys.stderr)
@@ -204,7 +208,7 @@ def main(argv=None):
         elif not lat2 <= lat <= lat1:
             print("\nERROR: {} is out of range ({}-{})".format(lat, lat2, lat1), file=sys.stderr)
             return 2
-        
+
         x, y = tools_lib.bl2xy(lon, lat, width, length, lat1, dlat, lon1, dlon)
         ## update latlon
         lat, lon = tools_lib.xy2bl(x, y, lat1, dlat, lon1, dlon)
@@ -230,12 +234,12 @@ def main(argv=None):
     if np.all(np.isnan(ts)):
         print('\nERROR: All cum data are Nan at {}/{}!\n'.format(x, y), file=sys.stderr)
         return 2
-        
+
     ts_ref = np.nanmean(cum[:, refy1:refy2, refx1:refx2]*mask[refy1:refy2, refx1:refx2], axis=(1, 2))
     if np.all(np.isnan(ts_ref)):
         print('\nERROR: Ref area has only NaN value!\n', file=sys.stderr)
         return 2
-    
+
     ts_dif = ts-ts_ref
     ts_dif = ts_dif-ts_dif[0] ## Make first date zero
 

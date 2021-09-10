@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.3.2 20210125 Yu Morishita, GSI
+v1.3.3 20210910 Yu Morishita, GSI
 
 ========
 Overview
@@ -30,6 +30,8 @@ LiCSBAS_cum2vel.py [-s yyyymmdd] [-e yyyymmdd] [-i infile] [-o outfile] [-r x1:x
 """
 #%% Change log
 '''
+v1.3.3 20210910 Yu Morishita, GSI
+ - Avoid error for refarea in bytes
 v1.3.2 20210125 Yu Morishita, GSI
  - Change cmap for vstd, amp, dt
 v1.3.1 20210107 Yu Morishita, GSI
@@ -73,7 +75,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.3.2"; date=20210125; author="Y. Morishita"
+    ver="1.3.3"; date=20210910; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -160,6 +162,8 @@ def main(argv=None):
             refx1, refx2, refy1, refy2 = tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon)
     else:
         refarea = cumh5['refarea'][()]
+        if type(refarea) is bytes:
+            refarea = refarea.decode('utf-8')
         refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
 
 

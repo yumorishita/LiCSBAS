@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.2.1 20210107 Yu Morishita, GSI
+v1.2.2 20210910 Yu Morishita, GSI
 
 ========
 Overview
@@ -11,7 +11,7 @@ This script outputs a float32 file of cumulative displacement from cum*.h5.
 Usage
 =====
 LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/y1:y2]
-     [--ref_geo lon1/lon2/lat1/lat2] [--mask maskfile] [--png] 
+     [--ref_geo lon1/lon2/lat1/lat2] [--mask maskfile] [--png]
 
  -d  Date to be output
  -i  Path to input cum file (Default: cum_filt.h5)
@@ -27,6 +27,8 @@ LiCSBAS_cum2flt.py -d yyyymmdd [-i infile] [-o outfile] [-m yyyymmdd] [-r x1:x2/
 """
 #%% Change log
 '''
+v1.2.2 20210910 Yu Morishita, GSI
+ - Avoid error for refarea in bytes
 v1.2.1 20210107 Yu Morishita, GSI
  - Replace jet with SCM.roma_r
 v1.2 20200703 Yu Morishita, GSI
@@ -58,13 +60,13 @@ class Usage(Exception):
 
 #%% Main
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
-    ver="1.2.1"; date=20210107; author="Y. Morishita"
+    ver="1.2.2"; date=20210910; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -146,19 +148,21 @@ def main(argv=None):
             refx1, refx2, refy1, refy2 = tools_lib.read_range_geo(refarea_geo, width, length, lat1, dlat, lon1, dlon)
     else:
         refarea = cumh5['refarea'][()]
+        if type(refarea) is bytes:
+            refarea = refarea.decode('utf-8')
         refx1, refx2, refy1, refy2 = [int(s) for s in re.split('[:/]', refarea)]
-    
+
     ### Master (reference) date
     if not imd_m:
         imd_m = imdates[0]
-        
+
     ### mask
     if maskfile:
         mask = io_lib.read_img(maskfile, length, width)
         mask[mask==0] = np.nan
     else:
         mask = np.ones((length, width), dtype=np.float32)
-        
+
     ### Check date
     if not imd_s in imdates:
         print('\nERROR: No date of {} exist in {}!'.format(imd_s, cumfile), file=sys.stderr)
@@ -169,7 +173,7 @@ def main(argv=None):
 
     ix_s = imdates.index(imd_s)
     ix_m = imdates.index(imd_m)
-    
+
     ### Outfile
     if not outfile:
         outfile = '{}_{}.cum'.format(imd_m, imd_s)
@@ -182,16 +186,16 @@ def main(argv=None):
     cum_dif = cum_s-cum_m
     cum_dif = cum_dif-np.nanmean(cum_dif[refy1:refy2, refx1:refx2])
     cum_dif = cum_dif*mask
-        
+
     cum_dif.tofile(outfile)
 
-       
+
     #%% Make png if specified
     if pngflag:
         pngfile = outfile+'.png'
         title = '{} (Ref X/Y {}:{}/{}:{})'.format(outfile, refx1, refx2, refy1, refy2)
         plot_lib.make_im_png(cum_dif, pngfile, cmap, title)
-    
+
 
     #%% Finish
     elapsed_time = time.time()-start
