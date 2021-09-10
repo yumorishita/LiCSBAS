@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.1.2 20210209 Yu Morishita, GSI
+v1.1.3 20210802 Yu Morishita, GSI
 
 This script decomposes 2 (or more) LOS displacement data to EW and UD components assuming no NS displacement (neglecting NS). Positive values in the decomposed data mean eastward and upward displacement. The multiple LOS input data can have different coverage and resolution as they are resampled to the common area and resolution during the processing.
 
@@ -31,6 +31,8 @@ LiCSBAS_decomposeLOS.py -f files.txt [-o outfile] [-r resampleAlg] [--out_stats]
 """
 #%% Change log
 '''
+v1.1.3 20210802 Yu Morishita, GSI
+ - Bug fix for identifying LOS direction
 v1.1.2 20210209 Yu Morishita, GSI
  - Move make_geotiff to library
 v1.1 20200608 Yu Morishita, GSI
@@ -63,7 +65,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver='1.1.2'; date=20210209; author="Y. Morishita"
+    ver='1.1.3'; date=20210802; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -143,8 +145,11 @@ def main(argv=None):
         lon_e1 = lon_w1 + dlon1*width1
         lat_s1 = lat_n1 + dlat1*length1
 
+        LOSe1_data = LOSe1.ReadAsArray()
+        LOSe1_data[LOSe1_data==0] = np.nan
+
         ### Identify whether from E or W from LOSe data
-        if np.nanmedian(LOSe1.ReadAsArray()) > 0: ## LOSe > 0 -> From East
+        if np.nanmedian(LOSe1_data) > 0: ## LOSe > 0 -> From East
             EW = 'East'
         else:
             EW = 'West'
@@ -207,6 +212,9 @@ def main(argv=None):
         _LOSu[np.iscomplex(_LOSu)] = 0
         LOSu_list.append(_LOSu)
         del _LOSn, _LOSu
+        data_list[i][data_list[i]==0] = np.nan
+        LOSe_list[i][LOSe_list[i]==0] = np.nan
+        LOSu_list[i][LOSu_list[i]==0] = np.nan
 
     print('')
 
