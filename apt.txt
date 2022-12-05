@@ -1,0 +1,3 @@
+p7zip
+p7zip-full
+wget

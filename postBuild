@@ -1,0 +1,8 @@
+#!/bin/bash
+
+cd tutorial
+wget https://gitlab.com/comet_licsar/licsbas/-/raw/50255b48440479c35f5ffe65bbbf93795af25f73/tutorial/022D_04826_121209_ml2gacosclip.7z
+#wget https://gitlab.com/comet_licsar/licsbas/-/raw/50255b48440479c35f5ffe65bbbf93795af25f73/tutorial/022D_04826_121209_TS_result.7z
+7za x 022D_04826_121209_ml2gacosclip.7z
+cd ..; chmod -R 777 *
+

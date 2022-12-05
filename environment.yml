@@ -1,0 +1,27 @@
+name: licsbas
+channels:
+  - pyviz
+  - conda-forge
+dependencies:
+  - python=3.8
+  - astropy
+  - beautifulsoup4
+  - gdal>=2.4
+  - h5py
+  - matplotlib
+  - numpy
+  - psutil
+  - requests
+  - shapely
+  - statsmodels
+  - xarray
+  - rioxarray
+  - lapack
+  - geoviews
+  - cartopy
+  - panel
+  - holoviews
+  - netCDF4
+  - bottleneck
+  - scikit-learn
+  - dask
