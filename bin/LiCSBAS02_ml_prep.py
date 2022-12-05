@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+v1.7.4b 202111111 Milan Lazecky, UniLeeds
 v1.7.4 202011119 Yu Morishita, GSI
 
 This script converts GeoTIFF files of unw and cc to float32 and uint8 format, respectively, for further time series analysis, and also downsamples (multilooks) data if specified. Existing files are not re-created to save time, i.e., only the newly available data will be processed.
@@ -45,6 +46,8 @@ LiCSBAS02_ml_prep.py -i GEOCdir [-o GEOCmldir] [-n nlook] [--freq float] [--n_pa
 """
 #%% Change log
 '''
+v1.7.4b 20211111 Milan Lazecky, UniLeeds
+ - fix for rerunning
 v1.7.4 20201119 Yu Morishita, GSI
  - Change default cmap for wrapped phase from insar to SCM.romaO
 v1.7.3 20201118 Yu Morishita, GSI
@@ -277,7 +280,8 @@ def main(argv=None):
     n_ifg2 = len(ifgdates2)
     if n_ifg-n_ifg2 > 0:
         print("  {0:3}/{1:3} unw and cc already exist. Skip".format(n_ifg-n_ifg2, n_ifg), flush=True)
-
+    
+    width = None
     if n_ifg2 > 0:
         if n_para > n_ifg2:
             n_para = n_ifg2
@@ -314,13 +318,24 @@ def main(argv=None):
                 length = int(length/nlook)
                 dlon = dlon*nlook
                 dlat = dlat*nlook
-
-
+    # 2021-11-11 fix for case where all is done except of par files..
+    if not width:
+        tif = glob.glob(os.path.join(geocdir,'*.tif'))[0]
+        geotiff = gdal.Open(tif)
+        width = geotiff.RasterXSize
+        length = geotiff.RasterYSize
+        lon_w_p, dlon, _, lat_n_p, _, dlat = geotiff.GetGeoTransform()
+        lon_w_g = lon_w_p + dlon/2
+        lat_n_g = lat_n_p + dlat/2
+        if nlook != 1:
+            width = int(width/nlook)
+            length = int(length/nlook)
+            dlon = dlon*nlook
+            dlat = dlat*nlook
     #%% EQA.dem_par, slc.mli.par
     if not os.path.exists(mlipar):
         print('\nCreate slc.mli.par', flush=True)
 #        radar_freq = 5.405e9 ## fixed for Sentnel-1
-
         with open(mlipar, 'w') as f:
             print('range_samples:   {}'.format(width), file=f)
             print('azimuth_lines:   {}'.format(length), file=f)

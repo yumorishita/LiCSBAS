@@ -52,6 +52,7 @@ LiCSBAS16_filt_ts.py -t tsadir [-s filtwidth_km] [-y filtwidth_yr] [-r deg]
  --hgt_min    Minumum hgt to take into account in hgt-linear (Default: 200m)
  --hgt_max    Maximum hgt to take into account in hgt-linear (Default: 10000m, no effect)
  --nomask     Apply filter to unmasked data (Default: apply to masked)
+ --nofilter   Do not perform neither spatial nor temporal filtering
  --n_para     Number of parallel processing (Default: # of usable CPU)
  --range      Range used in deramp and hgt_linear. Index starts from 0.
               0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
@@ -70,6 +71,8 @@ Note: Spatial filter consume large memory. If the processing is stacked, try
 """
 #%% Change log
 '''
+v1.5.2 20211122 Milan Lazecky, Leeds Uni
+ - include no_filter parameter
 v1.5.1 20210311 Yu Morishita, GSI
  - Include noise indices and LOS unit vector in cum.h5 file
 v1.5 20210309 Yu Morishita, GSI
@@ -157,6 +160,7 @@ def main(argv=None):
     hgt_min = 200 ## meter
     hgt_max = 10000 ## meter
     maskflag = True
+    filterflag = True
     gpu = False
 
     try:
@@ -187,7 +191,7 @@ def main(argv=None):
         try:
             opts, args = getopt.getopt(argv[1:], "ht:s:y:r:",
                            ["help", "hgt_linear", "hgt_min=", "hgt_max=",
-                            "nomask", "n_para=", "range=", "range_geo=",
+                            "nomask", "nofilter", "n_para=", "range=", "range_geo=",
                             "ex_range=", "ex_range_geo=", "gpu"])
         except getopt.error as msg:
             raise Usage(msg)
@@ -211,6 +215,8 @@ def main(argv=None):
                 hgt_max = int(a)
             elif o == '--nomask':
                 maskflag = False
+            elif o == '--nofilter':
+                filterflag = False
             elif o == '--n_para':
                 n_para = int(a)
             elif o == '--range':
@@ -452,29 +458,31 @@ def main(argv=None):
         p.close()
         del cum_org
 
+    if filterflag:
+        #%% Filter each image
+        cum_filt = np.zeros((n_im, length, width), dtype=np.float32)
 
-    #%% Filter each image
-    cum_filt = np.zeros((n_im, length, width), dtype=np.float32)
+        print('\nHP filter in time, LP filter in space,', flush=True)
 
-    print('\nHP filter in time, LP filter in space,', flush=True)
+        if n_para == 1:
+            for i in range(n_im):
+                cum_filt[i, :, :] = np.float32(filter_wrapper(i))
+        else:
+            print('with {} parallel processing...'.format(n_para), flush=True)
+            ### Parallel processing
+            p = q.Pool(n_para)
+            cum_filt[:, :, :] = np.array(p.map(filter_wrapper, range(n_im)), dtype=np.float32)
+            p.close()
 
-    if n_para == 1:
-        for i in range(n_im):
-            cum_filt[i, :, :] = np.float32(filter_wrapper(i))
-    else:
-        print('with {} parallel processing...'.format(n_para), flush=True)
-        ### Parallel processing
+
+        ### Only for output increment png files
+        print('\nCreate png for increment with {} parallel processing...'.format(n_para), flush=True)
         p = q.Pool(n_para)
-        cum_filt[:, :, :] = np.array(p.map(filter_wrapper, range(n_im)), dtype=np.float32)
+        p.map(filter_wrapper2, range(1, n_im))
         p.close()
-
-
-    ### Only for output increment png files
-    print('\nCreate png for increment with {} parallel processing...'.format(n_para), flush=True)
-    p = q.Pool(n_para)
-    p.map(filter_wrapper2, range(1, n_im))
-    p.close()
-
+    else:
+        # not filtering
+        cum_filt = cum
 
     #%% Find stable ref point
     print('\nFind stable reference point...', flush=True)

@@ -158,7 +158,7 @@ def main(argv=None):
     if not os.path.exists(outdir): os.mkdir(outdir)
     os.chdir(outdir)
 
-    LiCSARweb = 'http://gws-access.ceda.ac.uk/public/nceo_geohazards/LiCSAR_products/'
+    LiCSARweb = 'http://gws-access.jasmin.ac.uk/public/nceo_geohazards/LiCSAR_products/'
 
 
     #%% ENU and hgt

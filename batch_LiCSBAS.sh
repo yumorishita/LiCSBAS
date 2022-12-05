@@ -19,6 +19,7 @@
 start_step="01"	# 01-05, 11-16
 end_step="16"	# 01-05, 11-16
 
+cometdev='1'
 nlook="1"	# multilook factor, used in step02
 GEOCmldir="GEOCml${nlook}"	# If start from 11 or later after doing 03-05, use e.g., GEOCml${nlook}GACOSmaskclip
 n_para="" # Number of paralell processing in step 02-05,12,13,16. default: number of usable CPU
@@ -270,7 +271,12 @@ if [ $start_step -le 12 -a $end_step -ge 12 ];then
   if [ $check_only == "y" ];then
     echo "LiCSBAS12_loop_closure.py $p12_op"
   else
-    LiCSBAS12_loop_closure.py $p12_op 2>&1 | tee -a $log
+    if [ $cometdev -eq 1 ]; then
+     extra='--nullify'
+    else
+     extra=''
+    fi
+    LiCSBAS12_loop_closure.py $extra $p12_op 2>&1 | tee -a $log
     if [ ${PIPESTATUS[0]} -ne 0 ];then exit 1; fi
   fi
 fi
@@ -293,7 +299,13 @@ if [ $start_step -le 13 -a $end_step -ge 13 ];then
   if [ $check_only == "y" ];then
     echo "LiCSBAS13_sb_inv.py $p13_op"
   else
-    LiCSBAS13_sb_inv.py $p13_op 2>&1 | tee -a $log
+    if [ $cometdev -eq 1 ]; then
+     extra='--nopngs'
+     #extra='--singular --nopngs'
+    else
+     extra=''
+    fi
+    LiCSBAS13_sb_inv.py $extra $p13_op 2>&1 | tee -a $log
     if [ ${PIPESTATUS[0]} -ne 0 ];then exit 1; fi
   fi
 fi

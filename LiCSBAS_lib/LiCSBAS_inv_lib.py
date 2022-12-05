@@ -8,6 +8,8 @@ Python3 library of time series inversion functions for LiCSBAS.
 =========
 Changelog
 =========
+v1.5.2 20211122 Milan Lazecky, Uni Leeds
+ - use bit more economic computations (for tutorial purposes)
 v1.5.1 20210309 Yu Morishita, GSI
  - Add GPU option into calc_velstd_withnan and calc_stc
 v1.5 20210305 Yu Morishita, GSI
@@ -16,16 +18,16 @@ v1.4.2 20201118 Yu Morishita, GSI
  - Again Bug fix of multiprocessing
 v1.4.1 20201116 Yu Morishita, GSI
  - Bug fix of multiprocessing in Mac python>=3.8
-v1.4 20200703 Yu Morioshita, GSI
+v1.4 20200703 Yu Morishita, GSI
  - Replace problematic terms
-v1.3 20200103 Yu Morioshita, Uni of Leeds and GSI
+v1.3 20200103 Yu Morishita, Uni of Leeds and GSI
  - Bag fix in calc_stc (return nonzero even if two adjacent pixels have identical ts)
-v1.2 20190823 Yu Morioshita, Uni of Leeds and GSI
+v1.2 20190823 Yu Morishita, Uni of Leeds and GSI
  - Bag fix in calc_velstd_withnan
  - Remove calc_velstd
-v1.1 20190807 Yu Morioshita, Uni of Leeds and GSI
+v1.1 20190807 Yu Morishita, Uni of Leeds and GSI
  - Add calc_velsin
-v1.0 20190730 Yu Morioshita, Uni of Leeds and GSI
+v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
  - Original implementation
 """
 
@@ -36,6 +38,7 @@ import multiprocessing as multi
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 import LiCSBAS_tools_lib as tools_lib
+from sklearn.linear_model import RANSACRegressor
 
 
 #%%
@@ -84,7 +87,7 @@ def make_sb_matrix2(ifgdates):
 
 
 #%%
-def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu):
+def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu, singular=False, only_sb=False):
     """
     Calculate increment displacement difference by NSBAS inversion. Points with all unw data are solved by simple SB inversion firstly at a time.
 
@@ -104,70 +107,165 @@ def invert_nsbas(unw, G, dt_cum, gamma, n_core, gpu):
     """
     if n_core != 1:
         global Gall, unw_tmp, mask ## for para_wrapper
+        # is multicore, let's not use any simplifications
+        only_sb = False
+        singular = False
+    
+    if gpu:
+        only_sb = False
+        singular = False
 
     ### Settings
     n_pt, n_ifg = unw.shape
     n_im = G.shape[1]+1
 
-    result = np.zeros((n_im+1, n_pt), dtype=np.float32)*np.nan #[inc, vel, const]
+    # For computational needs, do either only SB or a singular-nsbas approach (ML, 11/2021)
+    # (note the singular-nsbas approach may be improved later)
+    # (note 2: using G or Gall for full unw data leads to EXACTLY SAME result. but perhaps G is a tiny bit faster..)
+    if only_sb or singular:
+        result = np.zeros((G.shape[1], n_pt), dtype=np.float32)*np.nan
 
-    ### Set matrix of NSBAS part (bottom)
-    Gbl = np.tril(np.ones((n_im, n_im-1), dtype=np.float32), k=-1) #lower tri matrix without diag
-    Gbr = -np.ones((n_im, 2), dtype=np.float32)
-    Gbr[:, 0] = -dt_cum
-    Gb = np.concatenate((Gbl, Gbr), axis=1)*gamma
-    Gt = np.concatenate((G, np.zeros((n_ifg, 2), dtype=np.float32)), axis=1)
-    Gall = np.float32(np.concatenate((Gt, Gb)))
+    else:
+        # do the original NSBAS inversion
+        result = np.zeros((n_im+1, n_pt), dtype=np.float32)*np.nan #[inc, vel, const]
+
+        ### Set matrix of NSBAS part (bottom)
+        Gbl = np.tril(np.ones((n_im, n_im-1), dtype=np.float32), k=-1) #lower tri matrix without diag
+        Gbr = -np.ones((n_im, 2), dtype=np.float32)
+        Gbr[:, 0] = -dt_cum
+        Gb = np.concatenate((Gbl, Gbr), axis=1)*gamma
+        Gt = np.concatenate((G, np.zeros((n_ifg, 2), dtype=np.float32)), axis=1)
+        Gall = np.float32(np.concatenate((Gt, Gb)))
 
     ### Solve points with full unw data at a time. Very fast.
     bool_pt_full = np.all(~np.isnan(unw), axis=1)
     n_pt_full = bool_pt_full.sum()
 
+
     if n_pt_full!=0:
         print('  Solving {0:6}/{1:6}th points with full unw at a time...'.format(n_pt_full, n_pt), flush=True)
-
-        ## Sovle
-        unw_tmp = np.concatenate((unw[bool_pt_full, :], np.zeros((n_pt_full, n_im), dtype=np.float32)), axis=1).transpose()
-
-        if gpu:
-            print('  Using GPU')
-            import cupy as cp
-            unw_tmp_cp = cp.asarray(unw_tmp)
-            Gall_cp = cp.asarray(Gall)
-            _sol = cp.linalg.lstsq(Gall_cp, unw_tmp_cp, rcond=None)[0]
-            result[:, bool_pt_full] = cp.asnumpy(_sol)
-            del unw_tmp_cp, Gall_cp, _sol
+        if only_sb or singular:
+            result[:, bool_pt_full] = np.linalg.lstsq(G, unw[bool_pt_full, :].transpose(), rcond=None)[0]
         else:
-            result[:, bool_pt_full] = np.linalg.lstsq(Gall, unw_tmp, rcond=None)[0]
+            ## Solve
+            unw_tmp = np.concatenate((unw[bool_pt_full, :], np.zeros((n_pt_full, n_im), dtype=np.float32)), axis=1).transpose()
+            if gpu:
+                print('  Using GPU')
+                import cupy as cp
+                unw_tmp_cp = cp.asarray(unw_tmp)
+                Gall_cp = cp.asarray(Gall)
+                _sol = cp.linalg.lstsq(Gall_cp, unw_tmp_cp, rcond=None)[0]
+                result[:, bool_pt_full] = cp.asnumpy(_sol)
+                del unw_tmp_cp, Gall_cp, _sol
+            else:
+                result[:, bool_pt_full] = np.linalg.lstsq(Gall, unw_tmp, rcond=None)[0]
 
-    ### Solve other points with nan point by point.
-    ## Not use GPU because lstsq with small matrix is slower than CPU
-    unw_tmp = np.concatenate((unw[~bool_pt_full, :], np.zeros((n_pt-n_pt_full, n_im), dtype=np.float32)), axis=1).transpose()
-    mask = (~np.isnan(unw_tmp))
-    unw_tmp[np.isnan(unw_tmp)] = 0
-    print('  Next, solve {0} points including nan point-by-point...'.format(n_pt-n_pt_full), flush=True)
 
-    if n_core == 1:
-        result[:, ~bool_pt_full] = censored_lstsq_slow(Gall, unw_tmp, mask) #(n_im+1, n_pt)
+    if only_sb:
+        print('skipping nan points, only SB inversion is performed')
     else:
-        print('  {} parallel processing'.format(n_core), flush=True)
+        print('  Next, solve {0} points including nan point-by-point...'.format(n_pt-n_pt_full), flush=True)
+        if not singular:
+            ### Solve other points with nan point by point.
+            ## Not use GPU because lstsq with small matrix is slower than CPU
+            unw_tmp = np.concatenate((unw[~bool_pt_full, :], np.zeros((n_pt-n_pt_full, n_im), dtype=np.float32)), axis=1).transpose()
+            mask = (~np.isnan(unw_tmp))
+            unw_tmp[np.isnan(unw_tmp)] = 0
+    
+        if n_core == 1:
+            if not singular:
+                result[:, ~bool_pt_full] = censored_lstsq_slow(Gall, unw_tmp, mask) #(n_im+1, n_pt)
+            else:
+                print('using low precision approach (but much faster)')
+                d = unw[~bool_pt_full, :].transpose()
+                m = result[:, ~bool_pt_full]
+                result[:, ~bool_pt_full] = singular_nsbas(d,G,m,dt_cum)
+            
+        else:
+            print('  {} parallel processing'.format(n_core), flush=True)
 
-        args = [i for i in range(n_pt-n_pt_full)]
-        q = multi.get_context('fork')
-        p = q.Pool(n_core)
-        _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
-        result[:, ~bool_pt_full] = np.array(_result).T
-
-    inc = result[:n_im-1, :]
-    vel = result[n_im-1, :]
-    vconst = result[n_im, :]
+            args = [i for i in range(n_pt-n_pt_full)]
+            q = multi.get_context('fork')
+            p = q.Pool(n_core)
+            _result = p.map(censored_lstsq_slow_para_wrapper, args) #list[n_pt][length]
+            result[:, ~bool_pt_full] = np.array(_result).T
+            #
+    if only_sb or singular:
+        # SB/singular-NSBAS result matrix: based on G only, need to calculate vel, setting vconst=0
+        inc = result
+        vel = result.sum(axis=0)/dt_cum[-1]
+        vconst = np.zeros_like(vel)
+    else:
+        # NSBAS result matrix: last 2 rows are vel and vconst
+        inc = result[:n_im-1, :]
+        vel = result[n_im-1, :]
+        vconst = result[n_im, :]
 
     return inc, vel, vconst
 
 
+# orig solution by ML, just instead of full large matrix of increment rows, use only sum and minmax - much faster,
+# making the computation linear, out of matrix solution. This may be source of some delays, but gives good opportunity
+# to improve e.g. by ... some original thoughts
+def singular_nsbas(d,G,m,dt_cum):
+    # per each point
+    #from scipy.optimize import curve_fit
+    #def func_vel(x, a):
+    #    return a * x
+
+    for px in range(m.shape[1]):
+        if np.mod(px, 100) == 0:
+            print('\r  Running {0:6}/{1:6}th point...'.format(px, m.shape[1]), end='', flush=True)
+        dpx = d[:,px]
+        mpx = m[:,px]
+        # first, work only with values without nans. check if it doesn't remove increments, if so, estimate the inc
+        okpx = ~np.isnan(dpx)
+        Gpx_ok = G[okpx,:]
+        dpx_ok = dpx[okpx]
+        badincs = np.sum(Gpx_ok,axis=0)==0
+
+        if not max(badincs):
+            # if actually all are fine, just run LS:
+            mpx = np.linalg.lstsq(Gpx_ok, dpx_ok, rcond=None)[0]
+        else:
+            # if there is at least one im with no related ifg:
+            mpx[~badincs] = np.linalg.lstsq(Gpx_ok[:,~badincs], dpx_ok, rcond=None)[0]
+            badinc_index = np.where(badincs)[0]
+            bi_prev = 0
+            s = []
+            t = []
+
+            # ensure the algorithm goes towards the end of the mpx line
+            for bi in np.append(badinc_index,len(mpx)):
+                group_mpx = mpx[bi_prev:bi]
+                #use at least 2 ifgs for the vel estimate
+                if group_mpx.size > 0:
+                    group_time = dt_cum[bi_prev:bi+1]
+                    s.append(group_mpx.sum())
+                    t.append(group_time[-1] - group_time[0])
+                bi_prev = bi+1
+            s = np.array(s)
+            t = np.array(t)
+            # is only one value ok? maybe increase the threshold here:
+            if len(s)>0:
+                velpx = s.sum()/t.sum()
+            else:
+                velpx = np.nan # not sure what will happen. putting 0 may be safer
+            #if len(s) == 1:
+            #    velpx = s[0]/t[0]
+            #else:
+            #    velpx = curve_fit(func_vel, t, s)[0][0]
+            mpx[badincs] = (dt_cum[badinc_index+1]-dt_cum[badinc_index]) * velpx
+
+        m[:,px] = mpx
+    
+    return m
+
+
+
 def censored_lstsq_slow_para_wrapper(i):
     ### Use global value
-    if np.mod(i, 1000) == 0:
+    if np.mod(i, 100) == 0:
         print('  Running {0:6}/{1:6}th point...'.format(i, unw_tmp.shape[1]), flush=True)
     m = mask[:,i] # drop rows where mask is zero
     try:
@@ -361,6 +459,47 @@ def calc_velsin(cum, dt_cum, imd0):
     return vel, vconst, amp, delta_t
 
 
+
+def get_vel_ransac(dt_cum, cumm, return_intercept=False):
+    """
+    Recalculate velocity (and intercept) using RANSAC algorithm to identify/skip use of outliers.
+    
+    Inputs:
+       dt_cum   : delta time values for the cumm. time series
+       cumm     : the cumm. time series values, array of shape (n_points, n_dates)
+    
+    Returns:
+       vel2     : recalculated velocity for each point
+    """
+    X=dt_cum.reshape(-1,1)  # single feature (time) of dt_cum.shape[0] samples
+    vel2 = np.zeros(cumm.shape[0])
+    if return_intercept:
+        intercept2 = np.zeros(cumm.shape[0])
+    
+    for i in range(cumm.shape[0]):
+        y=cumm[i]
+        mask = ~np.isnan(y)
+        if np.mod(i, 100) == 0:
+            print('\r  Running {0:6}/{1:6}th point...'.format(i, cumm.shape[0]), end='', flush=True)
+        if np.sum(mask) < 2:
+            # 'all' nan situation
+            vel2[i] = np.nan
+            if return_intercept:
+                intercept2[i] = np.nan
+        else:
+            reg = RANSACRegressor().fit(X[mask],y[mask])   # the implementation is fine, parameters should be quite robust
+            # yet, one may check parameters max_trials[=100]
+            vel2[i] = reg.estimator_.coef_[0]
+            if return_intercept:
+                intercept2[i] = reg.estimator_.intercept_ # if needed..
+    
+    print('')
+    if return_intercept:
+        return vel2 , intercept2
+    else:
+        return vel2
+
+
 #%%
 def calc_velstd_withnan(cum, dt_cum, gpu=False):
     """
@@ -536,6 +675,8 @@ def censored_lstsq(A, B, M):
     return np.squeeze(np.linalg.solve(T, rhs)).T # transpose to get r x n
 
 
+
+
 #%%
 def censored_lstsq_slow(A, B, M):
     ## http://alexhwilliams.info/itsneuronalblog/2018/02/26/censored-lstsq/
@@ -557,7 +698,7 @@ def censored_lstsq_slow(A, B, M):
 
     X = np.empty((A.shape[1], B.shape[1]))
     for i in range(B.shape[1]):
-        if np.mod(i, 1000) == 0:
+        if np.mod(i, 100) == 0:
              print('\r  Running {0:6}/{1:6}th point...'.format(i, B.shape[1]), end='', flush=True)
 
         m = M[:,i] # drop rows where mask is zero

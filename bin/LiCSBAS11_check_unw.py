@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-v1.3.3 20210402 Yu Morishita, GSI
-
 ========
 Overview
 ========
 This script checks quality of unw data and identifies bad interferograms based on average coherence and coverage of the unw data. This also prepares a time series working directory (overwrite if already exists).
+This script also identifies coregistration error, which looks like a ramp in azimuth, based on the absolute slope and R-squares obtained from a linear fit to the pixels in the middle column o the ifg
 
 ===============
 Input & output files
@@ -34,16 +33,22 @@ Inputs in GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre]
+LiCSBAS11_check_unw.py -d ifgdir [-t tsadir] [-c coh_thre] [-u unw_thre] [-s]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
  -c  Threshold of average coherence (Default: 0.05)
  -u  Threshold of coverage of unw data (Default: 0.3)
+ -s  Check for coregistration error in the form of a significant azimuthal ramp
 
 """
 #%% Change log
 '''
+v1.4 20221011 Qi Ou, Uni of Leeds
+ - Detect coregistration error as big azimuthal ramp in the middle (arbitrary) column
+ - Shortlist by slope > 30, R2 > 0.95, then expand based on repeated epochs in the shortlist, threshold with slopd > 20
+v1.3.4 20211129 Milan Lazecky, Uni of Leeds
+ - Extra check on file dimensions - happens if LiCSAR data is inconsistent - should be moved to previous step
 v1.3.3 20210402 Yu Morioshita, GSI
  - Treat all nan as bad ifg
  - Raise error if all ifgs are bad
@@ -73,6 +78,7 @@ import datetime as dt
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
+from scipy import stats
 
 class Usage(Exception):
     """Usage context manager"""
@@ -88,7 +94,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.3.3"; date=20210402; author="Y. Morishita"
+    ver="1.4"; date=20221020; author="Qi Ou"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -98,12 +104,12 @@ def main(argv=None):
     tsadir = []
     coh_thre = 0.05
     unw_cov_thre = 0.3
-
+    check_coreg_slope = False
 
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hd:t:c:u:", ["help"])
+            opts, args = getopt.getopt(argv[1:], "hd:t:c:u:s", ["help"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -118,6 +124,8 @@ def main(argv=None):
                 coh_thre = float(a)
             elif o == '-u':
                 unw_cov_thre = float(a)
+            elif o == '-s':
+                check_coreg_slope = True
 
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
@@ -162,19 +170,37 @@ def main(argv=None):
     if not os.path.exists(resultsdir): os.mkdir(resultsdir)
 
 
-    #%% Read date, network information and size
+    ### Get size
+    mlipar = os.path.join(ifgdir, 'slc.mli.par')
+    width = int(io_lib.get_param_par(mlipar, 'range_samples'))
+    length = int(io_lib.get_param_par(mlipar, 'azimuth_lines'))
+    print("\nSize         : {} x {}".format(width, length), flush=True)
+
+    ### Get resolution
+    dempar = os.path.join(ifgdir, 'EQA.dem_par')
+    lattitude_resolution = float(io_lib.get_param_par(dempar, 'post_lat'))
+
+    ### Check for corrupted or wrong size unws - remove from ifgdir
+    ifgdates = tools_lib.get_ifgdates(ifgdir)
+    n_ifg = len(ifgdates)
+    for ifgix, ifgd in enumerate(ifgdates):
+        if np.mod(ifgix,100) == 0:
+            print("  {0:3}/{1:3}th unw checked for dimension and readability".format(ifgix, n_ifg), flush=True)
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        try:
+            unw = io_lib.read_img(unwfile, length, width)
+        except:
+            print('probably dimension ERROR in '+ifgd+' unw file - source file inconsistent in LiCSAR frame. Deleting multilooked')
+            #we can directly delete it here, as we work with ml* data
+            shutil.rmtree(os.path.dirname(unwfile))
+
+    #%% Read date and network information
     ### Get dates
     ifgdates = tools_lib.get_ifgdates(ifgdir)
     imdates = tools_lib.ifgdates2imdates(ifgdates)
 
     n_ifg = len(ifgdates)
     n_im = len(imdates)
-
-    ### Get size
-    mlipar = os.path.join(ifgdir, 'slc.mli.par')
-    width = int(io_lib.get_param_par(mlipar, 'range_samples'))
-    length = int(io_lib.get_param_par(mlipar, 'azimuth_lines'))
-    print("\nSize         : {} x {}".format(width, length), flush=True)
 
     ### Copy dempar and mli[png|par]
     for file in ['slc.mli.par', 'EQA.dem_par']:
@@ -191,6 +217,8 @@ def main(argv=None):
     n_unw = np.zeros((length, width), dtype=np.float32)
     coh_avg_ifg = []
     n_unw_ifg = []
+    slope_ifg = []
+    r_square_ifg = []
 
     ### Read data and calculate
     print('\nReading unw and cc data...', flush=True)
@@ -207,6 +235,9 @@ def main(argv=None):
     ## Identify valid area and calc rate_cov
     bool_valid = (n_unw>=n_im)
     n_unw_valid = bool_valid.sum()
+
+    ## coregistration error shortlist
+    coreg_error_ifg = []
 
     ## Read cc and unw data
     for ifgix, ifgd in enumerate(ifgdates):
@@ -231,6 +262,49 @@ def main(argv=None):
 
         coh_avg_ifg.append(np.nanmean(coh[bool_valid])) # Use valid area only
 
+        if check_coreg_slope:
+            ## middle column slope
+            middle_column = unw[:, width // 2]
+            middle_column_latitudes = np.arange(length) * lattitude_resolution
+            non_nan_mask = ~np.isnan(middle_column)
+            if np.sum(non_nan_mask) > 1:
+                slope, intercept, r_value, p_value, std_err = stats.linregress(middle_column_latitudes[non_nan_mask], middle_column[non_nan_mask])
+                slope_ifg.append(abs(slope))
+                r_square_ifg.append(r_value**2)
+                if abs(slope) > 30 and r_value**2 > 0.95:
+                    coreg_error_ifg.append(ifgd)
+            else:
+                slope_ifg.append(0)
+                r_square_ifg.append(0)
+
+    if check_coreg_slope:
+        ## identify epochs with more than 1 coreg_errors captured by threshold:
+        primarylist = []
+        secondarylist = []
+        for pairs in coreg_error_ifg:
+            primarylist.append(pairs[:8])
+            secondarylist.append(pairs[-8:])
+        all_epochs = primarylist + secondarylist
+        all_epochs.sort()
+        coreg_error_epochs, counts = np.unique(all_epochs, return_counts=True)
+        coreg_error_epochs = coreg_error_epochs[counts>1]
+
+        ## grow the shortlist with repeated epochs in the shortlist
+        ifg_containing_coreg_error_epochs = np.zeros(len(ifgdates))
+        all_ifg_epoch1 = []
+        all_ifg_epoch2 = []
+        for pairs in ifgdates:
+            all_ifg_epoch1.append(pairs[:8])
+            all_ifg_epoch2.append(pairs[-8:])
+        for epoch in coreg_error_epochs:
+            ifg_containing_coreg_error_epochs += np.array(all_ifg_epoch1) == epoch
+            ifg_containing_coreg_error_epochs += np.array(all_ifg_epoch2) == epoch
+        ## threshold the expanded list with criteria slope_ifg => 20
+        ifg_containing_coreg_error_epochs[np.array(slope_ifg) < 20] = 0
+    else:
+        ifg_containing_coreg_error_epochs = np.zeros(len(ifgdates)) # dummy
+
+    ## convert unw pixels into percentage unw coverage
     rate_cov = np.array(n_unw_ifg)/n_unw_valid
 
     ## Read bperp data or dummy
@@ -249,8 +323,12 @@ def main(argv=None):
     ifg_statsfile = os.path.join(infodir, '11ifg_stats.txt')
     fstats = open(ifg_statsfile, 'w')
     print('# Size: {0}({1}x{2}), n_valid: {3}'.format(width*length, width, length, n_unw_valid), file=fstats)
-    print('# unw_cov_thre: {0}, coh_thre: {1}'.format(unw_cov_thre, coh_thre), file=fstats)
-    print('# ifg dates         bperp   dt unw_cov  coh_av', file=fstats)
+    if check_coreg_slope:
+        print('# unw_cov_thre: {0}, coh_thre: {1}, |slope|:30 & r^2: 0.95 => repeated epochs => |slope|:20'.format(unw_cov_thre, coh_thre), file=fstats)
+        print('# ifg dates         bperp   dt unw_cov  coh_av   |slope|   r^2', file=fstats)
+    else:
+        print('# unw_cov_thre: {0}, coh_thre: {1}'.format(unw_cov_thre, coh_thre), file=fstats)
+        print('# ifg dates         bperp   dt unw_cov  coh_av', file=fstats)
 
     ### Identify suffix of raster image (png, ras or bmp?)
     unwfile = os.path.join(ifgdir, ifgdates[0], ifgdates[0]+'.unw')
@@ -276,7 +354,7 @@ def main(argv=None):
 
         ### Identify bad ifgs and link ras
         if rate_cov[i] < unw_cov_thre or coh_avg_ifg[i] < coh_thre or \
-           np.isnan(rate_cov[i]) or np.isnan(coh_avg_ifg[i]):
+           np.isnan(rate_cov[i]) or np.isnan(coh_avg_ifg[i]) or ifg_containing_coreg_error_epochs[i] > 0:
             bad_ifgdates.append(ifgdates[i])
             ixs_bad_ifgdates.append(i)
             rm_flag = '*'
@@ -292,19 +370,27 @@ def main(argv=None):
         mday = dt.datetime.strptime(ifgd[:8], '%Y%m%d').toordinal()
         sday = dt.datetime.strptime(ifgd[-8:], '%Y%m%d').toordinal()
         dt_ifg = sday-mday
-
-        print('{0}  {1:6.1f}  {2:3}   {3:5.3f}   {4:5.3f} {5}'.format(ifgd, bperp_ifg, dt_ifg, rate_cov[i],  coh_avg_ifg[i], rm_flag), file=fstats)
+        if check_coreg_slope:
+            print('{0}  {1:6.1f}  {2:3}   {3:5.3f}   {4:5.3f}    {5:5.3f}    {6:5.3f}  {7}'.format(ifgd, bperp_ifg, dt_ifg, rate_cov[i],  coh_avg_ifg[i], slope_ifg[i], r_square_ifg[i], rm_flag), file=fstats)
+        else:
+            print('{0}  {1:6.1f}  {2:3}   {3:5.3f}   {4:5.3f}    {5}'.format(ifgd, bperp_ifg, dt_ifg, rate_cov[i], coh_avg_ifg[i], rm_flag), file=fstats)
 
     fstats.close()
 
     ### Output list of bad ifg
-    print('\n{0}/{1} ifgs are discarded from further processing.'.format(len(bad_ifgdates), n_ifg))
-    print('ifg dates        unw_cov coh_av')
     bad_ifgfile = os.path.join(infodir, '11bad_ifg.txt')
+    print('\n{0}/{1} ifgs are discarded from further processing.'.format(len(bad_ifgdates), n_ifg))
     with open(bad_ifgfile, 'w') as f:
-        for i, ifgd in enumerate(bad_ifgdates):
-            print('{}'.format(ifgd), file=f)
-            print('{}  {:5.3f}  {:5.3f}'.format(ifgd, rate_cov[ixs_bad_ifgdates[i]],  coh_avg_ifg[ixs_bad_ifgdates[i]]), flush=True)
+        if check_coreg_slope:
+            print('ifg dates        unw_cov coh_av  |slope|   R^2')
+            for i, ifgd in enumerate(bad_ifgdates):
+                print('{}'.format(ifgd), file=f)
+                print('{}  {:5.3f}  {:5.3f}   {:5.3f}   {:5.3f}'.format(ifgd, rate_cov[ixs_bad_ifgdates[i]],  coh_avg_ifg[ixs_bad_ifgdates[i]], slope_ifg[ixs_bad_ifgdates[i]], r_square_ifg[ixs_bad_ifgdates[i]]), flush=True)
+        else:
+            print('ifg dates        unw_cov coh_av')
+            for i, ifgd in enumerate(bad_ifgdates):
+                print('{}'.format(ifgd), file=f)
+                print('{}  {:5.3f}  {:5.3f}'.format(ifgd, rate_cov[ixs_bad_ifgdates[i]],  coh_avg_ifg[ixs_bad_ifgdates[i]]), flush=True)
 
     ### Raise error if all ifgs are bad
     if len(bad_ifgdates) == n_ifg:

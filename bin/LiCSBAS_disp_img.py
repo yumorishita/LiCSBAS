@@ -9,7 +9,7 @@ Usage
 =====
 LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
   [--cmax float] [--auto_crange float] [--n_color int] [--cycle float]
-  [--nodata float] [--bigendian] [--png pngname] [--kmz kmzname]
+  [--nodata float] [--bigendian] [--png pngname] [--kmz kmzname] [--title str]
 
  -i  Input image file in float32, uint8, GeoTIFF, or NetCDF
  -p  Parameter file containing width and length (e.g., EQA.dem_par or mli.par)
@@ -37,12 +37,14 @@ LiCSBAS_disp_img.py -i image_file -p par_file [-c cmap] [--cmin float]
  --bigendian    If input file is in big endian
  --png          Save png (pdf etc also available) instead of displaying
  --kmz          Save kmz (need EQA.dem_par for -p option)
-
+ --title        Title to be displayed on the image
 """
 
 
 #%% Change log
 '''
+v1.12 20221025 Qi Ou,Uni of Leeds
+ - Add a title option
 v1.11 20210205 Yu Morishita, GSI
  - More cmap available
  - Show colorbar for cyclic cmaps
@@ -147,7 +149,7 @@ if __name__ == "__main__":
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "n_color=", "cycle=", "nodata=", "bigendian", "png=", "kmz="])
+            opts, args = getopt.getopt(argv[1:], "hi:p:c:", ["help", "cmin=", "cmax=", "auto_crange=", "n_color=", "cycle=", "nodata=", "bigendian", "png=", "kmz=", "title="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -178,6 +180,8 @@ if __name__ == "__main__":
                 pngname = a
             elif o == '--kmz':
                 kmzname = a
+            elif o == '--title':
+                title = a
 
         if not infile:
             raise Usage('No image file given, -i is not optional!')
@@ -329,8 +333,11 @@ if __name__ == "__main__":
     figsize = (figsize_x, ((figsize_x-2)*length/width))
     plt.figure('{}'.format(infile), figsize)
     plt.imshow(data, clim=[cmin, cmax], cmap=cmap, interpolation=interp)
+    if title:
+        plt.title(title)
     if cyclic:
-        plt.title('{}*2pi/cycle'.format(cycle))
+        title = title+' {}*2pi/cycle'.format(cycle)
+        plt.title(title)
         cbar = plt.colorbar()
         cbar.set_ticks([])
     else:
@@ -344,4 +351,3 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         plt.show()
-

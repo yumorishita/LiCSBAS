@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
+v1.3 20221115 Milan Lazecky, Uni of Leeds
 v1.2 20210309 Yu Morishita, Uni of Leeds and GSI
 
 ========
 Overview
 ========
 This script calculates the standard deviation of the velocity by the bootstrap method and STC (spatio-temporal consistency; Hanssen et al., 2008).
-
+Optionally, it can improve velocity estimates using RANSAC algorithm
 ===============
 Input & output files
 ===============
@@ -16,19 +17,24 @@ Inputs in TS_GEOCml*/ :
 Outputs in TS_GEOCml*/results/ :
  - vstd[.png] : Std of velocity in mm/yr
  - stc[.png]  : Spatio-temporal consistency in mm
+ [- vel2[.png], intercept2: Velocity and intercept after RANSAC outlier-free regression]
 
 =====
 Usage
 =====
-LiCSBAS14_vel_std.py -t tsadir [--mem_size float] [--gpu]
+LiCSBAS14_vel_std.py -t tsadir [-i cumfile] [--mem_size float] [--gpu] [--ransac]
 
  -t  Path to the TS_GEOCml* dir.
+ -i  Path to cum file (Default: cum.h5)
  --mem_size   Max memory size for each patch in MB. (Default: 4000)
  --gpu        Use GPU (Need cupy module)
+ --ransac     Recalculate velocity free from outliers (use RANSAC algorithm)
 
 """
 #%% Change log
 '''
+v1.3 20221115 Milan Lazecky, Uni of Leeds
+ - Add RANSAC option
 v1.2 20210309 Yu Morishita, GSI
  - Add GPU option
 v1.1 20190805 Yu Morishita, Uni of Leeds and GSI
@@ -65,7 +71,8 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver=1.2; date=20210309; author="Y. Morishita"
+    #ver=1.2; date=20210309; author="Y. Morishita"
+    ver=1.3; date=20221115; author="M. Lazecky"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -74,14 +81,15 @@ def main(argv=None):
     tsadir = []
     memory_size = 4000
     gpu = False
-
+    ransac = False
     cmap_noise_r = 'viridis_r'
-
+    cumfile = False
+    
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ht:",
-                                       ["help", "mem_size=", "gpu"])
+            opts, args = getopt.getopt(argv[1:], "ht:i:",
+                                       ["help", "mem_size=", "gpu", "ransac"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -90,10 +98,14 @@ def main(argv=None):
                 return 0
             elif o == '-t':
                 tsadir = a
+            elif o == '-i':
+                cumfile = a
             elif o == '--mem_size':
                 memory_size = float(a)
             elif o == '--gpu':
                 gpu = True
+            elif o == '--ransac':
+                ransac = True
 
 
         if not tsadir:
@@ -117,7 +129,16 @@ def main(argv=None):
 
 
     #%% Read data information
-    cumh5 = h5.File(os.path.join(tsadir,'cum.h5'), 'r')
+    if not cumfile:
+        cumfile=os.path.join(tsadir,'cum.h5')
+        if ransac:
+            print('WARNING, using unmasked result (cum.h5) with RANSAC iterations - might take long (not parallel yet)')
+    else:
+        if not os.path.exists(cumfile):
+            print('Error reading specified input file, please fix')
+            return 2
+    
+    cumh5 = h5.File(cumfile, 'r')
 
     imdates = cumh5['imdates'][()].astype(str).tolist()
     cum = cumh5['cum']
@@ -186,6 +207,29 @@ def main(argv=None):
         with open(vstdfile, openmode) as f:
                 vstd.tofile(f)
 
+        if ransac:
+            vel2 = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            intercept2 = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            print('  Recalculating velocity using RANSAC algorithm...', flush=True)
+            '''
+            for the next release:
+            import dask
+            n_para = ...
+            get_vel_ransac_dask = dask.delayed(inv_lib.get_vel_ransac)
+            winsize=(100,dt_cum.shape[0])
+            cumda=da.from_array(cum_patch, chunks=winsize)
+            vel2int = get_vel_ransac2(dt_cum, cumda, True)
+            vel2[bool_unnan_pt], intercept2[bool_unnan_pt] = vel2int.compute(num_workers=n_para)
+            '''
+            vel2[bool_unnan_pt], intercept2[bool_unnan_pt] = inv_lib.get_vel_ransac(dt_cum, cum_patch, return_intercept=True)
+            
+            ### Output data and image
+            vel2file = os.path.join(resultsdir, 'vel2')
+            inter2file = os.path.join(resultsdir, 'intercept2')
+            with open(vel2file, openmode) as f:
+                vel2.tofile(f)
+            with open(inter2file, openmode) as f:
+                intercept2.tofile(f)
 
         #%% Finish patch
         elapsed_time2 = int(time.time()-start2)
@@ -212,6 +256,15 @@ def main(argv=None):
     cmin = np.nanpercentile(vstd, 1)
     cmax = np.nanpercentile(vstd, 99)
     plot_lib.make_im_png(vstd, pngfile, cmap_noise_r, title, cmin, cmax)
+    
+    if ransac:
+        vel2 = io_lib.read_img(vel2file, length, width)
+        pngfile = vel2file+'.png'
+        title = 'Outlier-free velocity (mm/yr)'
+        cmin = np.nanpercentile(vel2, 1)
+        cmax = np.nanpercentile(vel2, 99)
+        cmap_vel = SCM.roma.reversed()
+        plot_lib.make_im_png(vel2, pngfile, cmap_vel, title, cmin, cmax)
 
 
     #%% Finish

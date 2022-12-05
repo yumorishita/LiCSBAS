@@ -162,8 +162,9 @@ def read_bperp_file(bperp_file, imdates):
         if imd in bperp_dict:
             bperp.append(float(bperp_dict[imd]))
         else: ## If no key exists
-            print('ERROR: bperp for {} not found!'.format(imd), file=sys.stderr)
-            return False
+            print('ERROR: bperp for {} not found! using just zero'.format(imd), file=sys.stderr)
+            bperp.append(0)
+            #return False
 
     return bperp
 

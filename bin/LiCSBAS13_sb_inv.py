@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+v1.5.3 20211122 Milan Lazecky, Leeds Uni
 v1.5.2 20210311 Yu Morishita, GSI
 
 This script inverts the SB network of unw to obtain the time series and
@@ -56,7 +57,7 @@ Outputs in TS_GEOCml*/ :
 =====
 Usage
 =====
-LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile] [--gpu]
+LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile] [--gpu] [--singular] [--only_sb] [--nopngs]
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
@@ -75,10 +76,14 @@ LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] 
  --keep_incfile
      Not remove inc and resid files (Default: remove them)
  --gpu        Use GPU (Need cupy module)
-
+ --singular       Use more economic (unconstrained SBAS) computation (faster and less demanding solution, but considered less precise)
+ --only_sb    Perform only SB processing (skipping points with NaNs)
+ --nopngs     Avoid generating some (unnecessary) PNG previews of increment residuals etc.
 """
 #%% Change log
 '''
+v1.5.3 20211122 Milan Lazecky, Leeds Uni
+ - use singular and only_sb to help make processing computationally economic
 v1.5.2 20210311 Yu Morishita, GSI
  - Include noise indices and LOS unit vector in cum.h5 file
 v1.5.1 20210309 Yu Morishita, GSI
@@ -154,7 +159,8 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.5.2"; date=20210311; author="Y. Morishita"
+    ver="1.5.3"; date=20211122; author="M. Lazecky"
+    #ver="1.5.2"; date=20210311; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -169,6 +175,9 @@ def main(argv=None):
     tsadir = []
     inv_alg = 'LS'
     gpu = False
+    singular = False
+    only_sb = False
+    nopngs = False
 
     try:
         n_para = len(os.sched_getaffinity(0))
@@ -197,8 +206,8 @@ def main(argv=None):
         try:
             opts, args = getopt.getopt(argv[1:], "hd:t:",
                                        ["help",  "mem_size=", "gamma=",
-                                        "n_unw_r_thre=", "keep_incfile",
-                                        "inv_alg=", "n_para=", "gpu"])
+                                        "n_unw_r_thre=", "keep_incfile", "nopngs",
+                                        "inv_alg=", "n_para=", "gpu", "singular", "only_sb"])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -223,6 +232,12 @@ def main(argv=None):
                 n_para = int(a)
             elif o == '--gpu':
                 gpu = True
+            elif o == '--singular':
+                singular = True
+            elif o == '--only_sb':
+                only_sb = True
+            elif o == '--nopngs':
+                nopngs = True
 
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
@@ -258,7 +273,10 @@ def main(argv=None):
 
     bad_ifg11file = os.path.join(infodir, '11bad_ifg.txt')
     bad_ifg12file = os.path.join(infodir, '12bad_ifg.txt')
-    reffile = os.path.join(infodir, '12ref.txt')
+    # if ref point selected using LiCSBAS120:
+    reffile = os.path.join(infodir, '120ref.txt')
+    if not os.path.exists(reffile):
+        reffile = os.path.join(infodir, '12ref.txt')
     if not os.path.exists(reffile): ## for old LiCSBAS12 < v1.1
         reffile = os.path.join(infodir, 'ref.txt')
 
@@ -671,7 +689,7 @@ def main(argv=None):
                     unwpatch, varpatch, G, dt_cum, gamma, n_para_inv)
             else:
                 inc_tmp, vel_tmp, vconst_tmp = inv_lib.invert_nsbas(
-                    unwpatch, G, dt_cum, gamma, n_para_inv, gpu)
+                    unwpatch, G, dt_cum, gamma, n_para_inv, gpu, singular=singular, only_sb=only_sb)
 
             ### Set to valuables
             inc_patch = np.zeros((n_im-1, n_pt_all), dtype=np.float32)*np.nan
@@ -845,20 +863,23 @@ def main(argv=None):
 
     #%% Output png images
     ### Incremental displacement
-    _n_para = n_im-1 if n_para > n_im-1 else n_para
-    print('\nOutput increment png images with {} parallel processing...'.format(_n_para), flush=True)
-    p = q.Pool(_n_para)
-    p.map(inc_png_wrapper, range(n_im-1))
-    p.close()
+    if nopngs:
+        print('skipping generating additional png images of increments and residuals - as sometimes taking too long (tutorial purposes)')
+    else:
+        _n_para = n_im-1 if n_para > n_im-1 else n_para
+        print('\nOutput increment png images with {} parallel processing...'.format(_n_para), flush=True)
+        p = q.Pool(_n_para)
+        p.map(inc_png_wrapper, range(n_im-1))
+        p.close()
 
-    ### Residual for each ifg. png and txt.
-    with open(restxtfile, "w") as f:
-        print('# RMS of residual (mm)', file=f)
-    _n_para = n_ifg if n_para > n_ifg else n_para
-    print('\nOutput residual png images with {} parallel processing...'.format(_n_para), flush=True)
-    p = q.Pool(_n_para)
-    p.map(resid_png_wrapper, range(n_ifg))
-    p.close()
+        ### Residual for each ifg. png and txt.
+        with open(restxtfile, "w") as f:
+            print('# RMS of residual (mm)', file=f)
+        _n_para = n_ifg if n_para > n_ifg else n_para
+        print('\nOutput residual png images with {} parallel processing...'.format(_n_para), flush=True)
+        p = q.Pool(_n_para)
+        p.map(resid_png_wrapper, range(n_ifg))
+        p.close()
 
     ### Velocity and noise indices
     cmins = [None, None, None, None, None, None]
@@ -881,7 +902,6 @@ def main(argv=None):
         if cmins[i] == cmaxs[i]: cmins[i] = cmaxs[i]-1
 
         plot_lib.make_im_png(data, pngfile, cmaps[i], titles[i], cmins[i], cmaxs[i])
-
 
     #%% Finish
     elapsed_time = time.time()-start

@@ -54,6 +54,8 @@ LiCSBAS15_mask_ts.py -t tsadir [-c coh_thre] [-u n_unw_r_thre] [-v vstd_thre]
 """
 #%% Change log
 '''
+v1.8.2 20211129 Milan Lazecky, Uni of Leeds
+ - Change default -i as global number of no_loop_ifgs + 1
 v1.8.1 20200911 Yu Morishita, GSI
  - Change default to -i 50
 v1.8 20200902 Yu Morishita, GSI
@@ -217,9 +219,13 @@ def main(argv=None):
     n_im = int(io_lib.get_param_par(inparmfile, 'n_im'))
 
     
-    #%% Determine default thretholds depending on frequency band
+    #%% Determine default thresholds depending on frequency band
     if not 'maxTlen' in thre_dict: thre_dict['maxTlen'] = 1
-    if not 'n_ifg_noloop' in thre_dict: thre_dict['n_ifg_noloop'] = 50
+    if not 'n_ifg_noloop' in thre_dict:
+        try:
+            thre_dict['n_ifg_noloop'] = len(os.listdir(os.path.join(tsadir, '12no_loop_ifg_ras')))+1
+        except:
+            thre_dict['n_ifg_noloop'] = 50
 
     if wavelength > 0.2: ## L-band
         if not 'coh_avg' in thre_dict: thre_dict['coh_avg'] = 0.01
