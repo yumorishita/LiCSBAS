@@ -767,13 +767,11 @@ def filter_wrapper(i):
             cum_hptlps[cum_hptlps == 0] = np.nan ## fill 0 with nan
 
         _cum_filt = cum[i, :, :] - cum_hptlps
-
-
-    ### Output comparison image
-    data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum[i, :, :]*mask, cum_hptlps*mask, _cum_filt*mask]]
-    title3 = ['Before filter ({}pi/cycle)'.format(cycle*2), 'Filter phase ({}pi/cycle)'.format(cycle*2), 'After filter ({}pi/cycle)'.format(cycle*2)]
-    pngfile = os.path.join(filtcumdir, imdates[i]+'_filt.png')
-    plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
+        ### Output comparison image
+        data3 = [np.angle(np.exp(1j*(data/coef_r2m/cycle))*cycle) for data in [cum[i, :, :]*mask, cum_hptlps*mask, _cum_filt*mask]]
+        title3 = ['Before filter ({}pi/cycle)'.format(cycle*2), 'Filter phase ({}pi/cycle)'.format(cycle*2), 'After filter ({}pi/cycle)'.format(cycle*2)]
+        pngfile = os.path.join(filtcumdir, imdates[i]+'_filt.png')
+        plot_lib.make_3im_png(data3, pngfile, cmap_wrap, title3, vmin=-np.pi, vmax=np.pi, cbar=False)
 
     return _cum_filt
 
