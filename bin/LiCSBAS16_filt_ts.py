@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v1.5.1 20210311 Yu Morishita, GSI
+v1.5.3 20230602 Yu Morishita, GSI, M. Lazecky and Pedro E. Bedon, Uni of Leeds
 
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
@@ -12,6 +12,7 @@ Inputs in TS_GEOCml*/ :
  - results
    - mask
    - hgt (if --hgt_linear option is used)
+   [- U (if --hgt_linear option is used)]
  - info/13parameters.txt
 
 Outputs in TS_GEOCml*/ :
@@ -71,6 +72,8 @@ Note: Spatial filter consume large memory. If the processing is stacked, try
 """
 #%% Change log
 '''
+v1.5.3 20230602 M. Lazecky and Pedro E. Bedon, Uni of Leeds
+ - scale heights with inc. angle for hgt_linear
 v1.5.2 20211122 Milan Lazecky, Leeds Uni
  - include no_filter parameter
 v1.5.1 20210311 Yu Morishita, GSI
@@ -336,11 +339,15 @@ def main(argv=None):
             print('--hgt_linear option cannot be used.', file=sys.stderr)
             return 2
         hgt = io_lib.read_img(hgtfile, length, width)
+        Ufile = os.path.join(resultsdir, 'U')
+        if os.path.exists(Ufile):
+            print('scaling by incidence angle')
+            cosinc = io_lib.read_img(Ufile, length, width)
+            hgt = hgt / cosinc
         hgt[np.isnan(hgt)] = 0
     else:
         hgt = []
-
-
+    
     #%% --range[_geo] and --ex_range[_geo]
     if range_str: ## --range
         if not tools_lib.read_range(range_str, width, length):
