@@ -25,7 +25,7 @@ Inputs in GEOCml*/ :
    - slc.mli.par (copy)
  - results/
    - slc.mli[.png] (copy, if exist)
-   - hgt[.png] (copy, if exist)
+   - hgt[.png, U] (copy, if exist)
  - 11bad_ifg_ras/yyyymmdd_yyyymmdd.unw.png : png of bad ifgs
  - 11ifg_ras/yyyymmdd_yyyymmdd.unw.png     : png of good ifgs
  - network/network11*.png  : Figures of baseline configuration
@@ -207,7 +207,7 @@ def main(argv=None):
         if os.path.exists(os.path.join(ifgdir, file)):
             shutil.copy(os.path.join(ifgdir, file), infodir)
 
-    for file in ['slc.mli', 'slc.mli.png', 'hgt', 'hgt.png']:
+    for file in ['slc.mli', 'slc.mli.png', 'hgt', 'hgt.png', 'U']:
         if os.path.exists(os.path.join(ifgdir, file)):
             shutil.copy(os.path.join(ifgdir, file), resultsdir)
 
