@@ -14,7 +14,7 @@ from setuptools import find_packages, setup, Command
 
 # Package meta-data.
 NAME = 'LiCSBAS'
-DESCRIPTION = 'My short description for my project.'
+DESCRIPTION = 'An InSAR time series analysis tool based on NSBAS'
 URL = 'https://github.com/comet-licsar/LiCSBAS'
 EMAIL = 'espiritocz@gmail.com'
 AUTHOR = 'COMET Team'
@@ -107,7 +107,7 @@ setup(
     url=URL,
     #packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
-    py_modules=['LiCSBAS'],
+    py_modules=['LiCSBAS_lib', 'bin'],
 
     # entry_points={
     #     'console_scripts': ['mycli=mymodule:cli'],
