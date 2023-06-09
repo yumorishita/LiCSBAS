@@ -38,7 +38,10 @@ import multiprocessing as multi
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 import LiCSBAS_tools_lib as tools_lib
-from sklearn.linear_model import RANSACRegressor
+try:
+    from sklearn.linear_model import RANSACRegressor
+except:
+    print('not loading RANSAC (optional experimental function)')
 
 
 #%%
