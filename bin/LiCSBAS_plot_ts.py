@@ -583,7 +583,7 @@ if __name__ == "__main__":
         if lastevent:  ## Time series plot
             printcoords(lastevent)
 
-    RS = RectangleSelector(axv, line_select_callback, drawtype='box', useblit=True, button=[3], spancoords='pixels', interactive=False)
+    RS = RectangleSelector(axv, line_select_callback, useblit=True, button=[3], spancoords='pixels', interactive=False)
 
     plt.connect('key_press_event', RS)
 
