@@ -770,8 +770,8 @@ if __name__ == "__main__":
         else:
             lastevent = event  ## Update last event
 
-        ii = np.int(np.round(event.ydata))
-        jj = np.int(np.round(event.xdata))
+        ii = int(np.round(event.ydata))
+        jj = int(np.round(event.xdata))
 
         ### Plot on image window
         ii1h = ii-0.5; ii2h = ii+1-0.5 ## Shift half for plot
