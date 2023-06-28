@@ -13,3 +13,4 @@ dependencies:
   - requests
   - shapely
   - statsmodels
+  - colorcet
