@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
+v1.14.1 20230608 Milan Lazecky, UoL
 v1.6.3 20201207 Yu Morishita, GSI
 
 ========
 Overview
 ========
-This script downloads GeoTIFF files of unw (unwrapped interferogram) and cc (coherence) in the specified frame ID from COMET-LiCS web portal. The -f option is not necessary when the frame ID can be automatically identified from the name of the working directory. GACOS data can also be downloaded if available. Existing GeoTIFF files are not re-downloaded to save time, i.e., only the newly available data will be downloaded.
+This script downloads GeoTIFF files in the specified frame ID from COMET-LiCS web portal.
+By default, unw (unwrapped interferogram) and cc (coherence) files are downloaded
+The -f option is not necessary when the frame ID can be automatically identified from the name of the working directory.
+GACOS data can also be downloaded if available. Existing GeoTIFF files are not re-downloaded to save time, i.e., only the newly available data will be downloaded.
 
 ============
 Output files
@@ -14,6 +18,7 @@ Output files
    - yyyymmdd_yyyymmdd/
      - yyyymmdd_yyyymmdd.geo.unw.tif
      - yyyymmdd_yyyymmdd.geo.cc.tif
+    [- yyyymmdd_yyyymmdd.geo.diff_unfiltered_pha.tif] (if --get_pha is used)
   [- *.geo.mli.tif (using just one first epoch)]
    - *.geo.E.tif
    - *.geo.N.tif
@@ -23,21 +28,26 @@ Output files
    - metadata.txt
 [- GACOS/] (if --get_gacos is used and GACOS data available on COMET-LiCS web)
   [- yyyymmdd.sltd.geo.tif]
-
+[- GEOC.MLI/] (if --get_mli is used)
+  [- yyyymmdd.mli.geo.tif]
 =====
 Usage
 =====
-LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos] [--n_para int]
+LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos] [--get_mli] [--n_para int]
 
  -f  Frame ID (e.g., 021D_04972_131213). (Default: Read from directory name)
  -s  Start date (Default: 20141001)
  -e  End date (Default: Today)
+ --get_pha    Download also phase data (if available)
  --get_gacos  Download GACOS data as well if available
+ --get_mli  Download MLI (multilooked intensity) data as well if available
  --n_para  Number of parallel downloading (Default: 4)
 
 """
 #%% Change log
 '''
+v1.14.1 20230608 Milan Lazecky, UoL
+ - added download of phase (for reunw) and mli
 v1.6.3 20201207 Yu Morishita, GSI
  - Download network.png
  - Search latest epoch for mli to save times
@@ -92,7 +102,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver='1.6.3'; date=20201207; author="Y. Morishita"
+    ver='1.14.1'; date=20230628; author="Y. Morishita, M. Lazecky"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
@@ -102,6 +112,8 @@ def main(argv=None):
     startdate = 20141001
     enddate = int(dt.date.today().strftime("%Y%m%d"))
     get_gacos = False
+    get_mli = False
+    get_pha = False
     n_para = 4
 
     q = multi.get_context('fork')
@@ -110,7 +122,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hf:s:e:", ["help", "get_gacos", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hf:s:e:", ["help", "get_gacos", "get_mli", "get_pha", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -125,6 +137,10 @@ def main(argv=None):
                 enddate = int(a)
             elif o == '--get_gacos':
                 get_gacos = True
+            elif o == '--get_mli':
+                get_mli = True
+            elif o == '--get_pha':
+                get_pha = True
             elif o == '--n_para':
                 n_para = int(a)
 
@@ -158,7 +174,7 @@ def main(argv=None):
     if not os.path.exists(outdir): os.mkdir(outdir)
     os.chdir(outdir)
 
-    LiCSARweb = 'http://gws-access.jasmin.ac.uk/public/nceo_geohazards/LiCSAR_products/'
+    LiCSARweb = 'https://gws-access.jasmin.ac.uk/public/nceo_geohazards/LiCSAR_products/'
 
 
     #%% ENU and hgt
@@ -237,7 +253,7 @@ def main(argv=None):
     
         ### Download
         if imd1:
-            print('Donwnloading {}.geo.mli.tif as {}.geo.mli.tif...'.format(imd1, frameID), flush=True)
+            print('Downloading {}.geo.mli.tif as {}.geo.mli.tif...'.format(imd1, frameID), flush=True)
             url_mli = os.path.join(url, imd1, imd1+'.geo.mli.tif')
             tools_lib.download_data(url_mli, mlitif)
         else:
@@ -314,9 +330,9 @@ def main(argv=None):
     print('', flush=True)
 
 
-    #%% unw and cc
+    #%% InSAR data
     ### Get available dates
-    print('\nDownload geotiff of unw and cc', flush=True)
+    print('\nDownload geotiff of InSAR products', flush=True)
     url_ifgdir = os.path.join(LiCSARweb, trackID, frameID, 'interferograms')
     response = requests.get(url_ifgdir)
     
@@ -339,79 +355,113 @@ def main(argv=None):
     print('{} IFGs available from {} to {}'.format(n_ifg, imdates[0], imdates[-1]), flush=True)
 
     ### Check if both unw and cc already donwloaded, new, and same size
-    print('Checking existing unw and cc ({} parallel, may take time)...'.format(n_para), flush=True)
+    print('Checking and downloading ({} parallel, may take time)...'.format(n_para), flush=True)
+    if get_pha:
+        exts = ['unw', 'cc', 'diff_unfiltered_pha']
+    else:
+        exts = ['unw', 'cc']
+    print(ext+' data:')
+    for ext in exts:
+        args = [(i, n_ifg,
+                 os.path.join(url_ifgdir, ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext)),
+                 os.path.join(ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext))
+                 ) for i, ifgd in enumerate(ifgdates)]
 
-    ## unw
-    args = [(i, n_ifg,
-             os.path.join(url_ifgdir, ifgd, '{}.geo.unw.tif'.format(ifgd)),
-             os.path.join(ifgd, '{}.geo.unw.tif'.format(ifgd))
-             ) for i, ifgd in enumerate(ifgdates)]
-
-    p = q.Pool(n_para)
-    rc = p.map(check_exist_wrapper, args)
-    p.close()
-
-    n_unw_existing = 0
-    unwdates_dl = []
-    for i, rc1 in enumerate(rc):
-        if rc1 == 0:  ## No need to download
-            n_unw_existing = n_unw_existing + 1
-        if rc1 == 3 or rc1 == 5:  ## Can not download
-            print('  {}.geo.unw.tif not available.'.format(ifgdates[i]), flush=True)
-        elif rc1 == 1 or rc1 == 2  or rc1 == 4:  ## Need download
-            unwdates_dl.append(ifgdates[i])
-
-    ## cc
-    args = [(i, n_ifg,
-             os.path.join(url_ifgdir, ifgd, '{}.geo.cc.tif'.format(ifgd)),
-             os.path.join(ifgd, '{}.geo.cc.tif'.format(ifgd))
-             ) for i, ifgd in enumerate(ifgdates)]
-
-    p = q.Pool(n_para)
-    rc = p.map(check_exist_wrapper, args)
-    p.close()
-
-    n_cc_existing = 0
-    ccdates_dl = []
-    for i, rc1 in enumerate(rc):
-        if rc1 == 0:  ## No need to download
-            n_cc_existing = n_cc_existing + 1
-        if rc1 == 3 or rc1 == 5:  ## Can not download
-            print('  {}.geo.cc.tif not available.'.format(ifgdates[i]), flush=True)
-        elif rc1 == 1 or rc1 == 2  or rc1 == 4:  ## Need download
-            ccdates_dl.append(ifgdates[i])
-
-    n_unw_dl = len(unwdates_dl)
-    n_cc_dl = len(ccdates_dl)
-    print('{} unw already downloaded'.format(n_unw_existing), flush=True)
-    print('{} unw will be downloaded'.format(n_unw_dl), flush=True)
-    print('{} cc already downloaded'.format(n_cc_existing), flush=True)
-    print('{} cc will be downloaded'.format(n_cc_dl), flush=True)
-    
-    ### Download unw with parallel
-    if n_unw_dl != 0:
-        print('\nDownload unw ({} parallel)...'.format(n_para), flush=True)
-        args = [(i, ifgd, n_unw_dl,
-                 os.path.join(url_ifgdir, ifgd, '{}.geo.unw.tif'.format(ifgd)),
-                 os.path.join(ifgd, '{}.geo.unw.tif'.format(ifgd))
-                 ) for i, ifgd in enumerate(unwdates_dl)]
-        
         p = q.Pool(n_para)
-        p.map(download_wrapper, args)
+        rc = p.map(check_exist_wrapper, args)
         p.close()
-   
-    ### Download cc with parallel
-    if n_cc_dl != 0:
-        print('\nDownload cc ({} parallel)...'.format(n_para), flush=True)
-        args = [(i, ifgd, n_cc_dl,
-                 os.path.join(url_ifgdir, ifgd, '{}.geo.cc.tif'.format(ifgd)),
-                 os.path.join(ifgd, '{}.geo.cc.tif'.format(ifgd))
-                 ) for i, ifgd in enumerate(ccdates_dl)]
-        
+
+        n_existing = 0
+        dates_dl = []
+        for i, rc1 in enumerate(rc):
+            if rc1 == 0:  ## No need to download
+                n_existing = n_existing + 1
+            if rc1 == 3 or rc1 == 5:  ## Can not download
+                print('  {0}.geo.{1}.tif not available.'.format(str(ifgdates[i]), ext), flush=True)
+            elif rc1 == 1 or rc1 == 2  or rc1 == 4:  ## Need download
+                dates_dl.append(ifgdates[i])
+
+        n_dl = len(dates_dl)
+        print('{} already downloaded'.format(n_existing), flush=True)
+        ### Download with parallel
+        if n_dl != 0:
+            print('\nDownload {0} ({1} parallel)...'.format(ext, str(n_para)), flush=True)
+            args = [(i, ifgd, n_dl,
+                     os.path.join(url_ifgdir, ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext)),
+                     os.path.join(ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext))
+                     ) for i, ifgd in enumerate(unwdates_dl)]
+
+            p = q.Pool(n_para)
+            p.map(download_wrapper, args)
+            p.close()
+
+    # %% MLIs if specified
+    if get_gacos:
+        mlidir = os.path.join(wd, 'GEOC.MLI')
+        if not os.path.exists(mlidir): os.mkdir(mlidir)
+
+        ### Get available dates
+        print('\nDownload MLI data', flush=True)
+        url = os.path.join(LiCSARweb, trackID, frameID, 'epochs')
+        response = requests.get(url)
+        response.encoding = response.apparent_encoding  # avoid garble
+        html_doc = response.text
+        soup = BeautifulSoup(html_doc, "html.parser")
+        tags = soup.find_all(href=re.compile(r"\d{8}"))
+        imdates_all = [tag.get("href")[0:8] for tag in tags]
+        _imdates = np.int32(np.array(imdates_all))
+        _imdates = (_imdates[(_imdates >= startdate) * (_imdates <= enddate)]).astype('str').tolist()
+        print('  There are {} epochs from {} to {}'.format(len(_imdates),
+                                                           startdate, enddate), flush=True)
+
+        ### Extract available dates
+        print('  Searching available epochs ({} parallel)...'.format(n_para), flush=True)
+
+        args = [(i, len(_imdates),
+                 os.path.join(url, imd, '{}.mli.geo.tif'.format(imd)),
+                 os.path.join(mlidir, imd + '.mli.geo.tif')
+                 ) for i, imd in enumerate(_imdates)]
+
+        # will use the same for gacos
         p = q.Pool(n_para)
-        p.map(download_wrapper, args)
+        rc = p.map(check_gacos_wrapper, args)
         p.close()
-   
+
+        n_im_existing = 0
+        n_im_unavailable = 0
+        imdates_dl = []
+        for i, rc1 in enumerate(rc):
+            if rc1 == 0:  ## No need to download
+                n_im_existing = n_im_existing + 1
+            if rc1 == 3 or rc1 == 5:  ## Can not download
+                n_im_unavailable = n_im_unavailable + 1
+            elif rc1 == 1 or rc1 == 2 or rc1 == 4:  ## Need download
+                imdates_dl.append(_imdates[i])
+
+        n_im_dl = len(imdates_dl)
+
+        if n_im_existing > 0:
+            print('  {} MLI data already downloaded'.format(n_im_existing), flush=True)
+        if n_im_unavailable > 0:
+            print('  {} MLI data unavailable'.format(n_im_unavailable), flush=True)
+
+        ### Download
+        if n_im_dl > 0:
+            print('{} MLI data will be downloaded'.format(n_im_dl), flush=True)
+            print('Download MLI ({} parallel)...'.format(n_para), flush=True)
+            ### Download
+            args = [(i, imd, n_im_dl,
+                     os.path.join(url, imd, '{}.mli.geo.tif'.format(imd)),
+                     os.path.join(mlidir, '{}.mli.geo.tif'.format(imd))
+                     ) for i, imd in enumerate(imdates_dl)]
+
+            p = q.Pool(n_para)
+            p.map(download_wrapper, args)
+            p.close()
+        else:
+            print('No MLI data available from {} to {}'.format(startdate, enddate), flush=True)
+
+    print('', flush=True)
 
     #%% Finish
     elapsed_time = time.time()-start
