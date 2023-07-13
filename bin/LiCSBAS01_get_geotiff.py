@@ -18,6 +18,7 @@ Output files
    - yyyymmdd_yyyymmdd/
      - yyyymmdd_yyyymmdd.geo.unw.tif
      - yyyymmdd_yyyymmdd.geo.cc.tif
+    [- yyyymmdd_yyyymmdd.geo.diff_pha.tif] (if --get_pha is used)
     [- yyyymmdd_yyyymmdd.geo.diff_unfiltered_pha.tif] (if --get_pha is used)
   [- *.geo.mli.tif (using just one first epoch)]
    - *.geo.E.tif
@@ -38,7 +39,7 @@ LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos] 
  -f  Frame ID (e.g., 021D_04972_131213). (Default: Read from directory name)
  -s  Start date (Default: 20141001)
  -e  End date (Default: Today)
- --get_pha    Download also phase data (if available)
+ --get_pha    Download also wrapped phase data (if available)
  --get_gacos  Download GACOS data as well if available
  --get_mli  Download MLI (multilooked intensity) data as well if available
  --n_para  Number of parallel downloading (Default: 4)
@@ -357,7 +358,7 @@ def main(argv=None):
     ### Check if both unw and cc already donwloaded, new, and same size
     print('Checking and downloading ({} parallel, may take time)...'.format(n_para), flush=True)
     if get_pha:
-        exts = ['unw', 'cc', 'diff_unfiltered_pha']
+        exts = ['unw', 'cc', 'diff_pha', 'diff_unfiltered_pha'] # some ifgs do not have unfiltered version, so getting both
     else:
         exts = ['unw', 'cc']
     print(ext+' data:')
@@ -396,7 +397,7 @@ def main(argv=None):
             p.close()
 
     # %% MLIs if specified
-    if get_gacos:
+    if get_mli:
         mlidir = os.path.join(wd, 'GEOC.MLI')
         if not os.path.exists(mlidir): os.mkdir(mlidir)
 
