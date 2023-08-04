@@ -14,3 +14,4 @@ dependencies:
   - shapely
   - statsmodels
   - colorcet
+  - xarray
