@@ -55,7 +55,7 @@ Outputs in TS_GEOCml*/ :
 Usage
 =====
 LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
- [--rm_ifg_list file] [--n_para int] [--nullify] [--ref_approx lon/lat] [--skip_pngs]
+ [--rm_ifg_list file] [--n_para int] [--nullify] [--nullmask] [--null_both] [--ref_approx lon/lat] [--skip_pngs] [--treat_as_bad] [--backup_nulls]
 
  -d  Path to the GEOCml* dir containing stack of unw data.
  -t  Path to the output TS_GEOCml* dir. (Default: TS_GEOCml*)
@@ -64,12 +64,18 @@ LiCSBAS12_loop_closure.py -d ifgdir [-t tsadir] [-l loop_thre] [--multi_prime]
  --rm_ifg_list  Manually remove ifgs listed in a file
  --n_para  Number of parallel processing (Default: # of usable CPU)
  --nullify Nullify unw values causing loop residuals >pi, per-pixel
+ --nullmask Save null mask
+ --null_both Run a normal LiCSBAS12, but also output conservatively and aggressively nulled data (can't be run will nullify or nullmask)
  --ref_approx  Approximate geographic coordinates for reference area (lon/lat)
  --skip_pngs Do not generate png previews of loop closures (often takes long)
+ --treat_as_bad When nullifying, nullify unless ALL loops are GOOD (default: Only nullify if ALL loops are bad)
+ --backup_nulls Create a backup of nulled data
 """
 #%% Change log
 '''
-v1.6.3 20220330 Milan Lazecky
+v1.6.4 20230803 Jack McGrath
+ - Add in aggressive nullification and null_both option (for usie with LPC inversion)
+v1.6.3 20211102 Milan Lazecky
  - better choice of reference point - distance from centre (or given prelim ref point), and considering coherence
 v1.6.2 20211102 Milan Lazecky
  - nullify unw pixels with loop phase > pi
@@ -118,6 +124,7 @@ import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_plot_lib as plot_lib
 import xarray as xr
+import SCM
 
 class Usage(Exception):
     """Usage context manager"""
@@ -137,8 +144,9 @@ def main(argv=None):
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
-    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, \
-        multi_prime, bad_ifg, noref_ifg, bad_ifg_all, refy1, refy2, refx1, refx2 ## for parallel processing
+    global Aloop, ifgdates, ifgdir, length, width, loop_pngdir, cycle, n_ifg, da,\
+        multi_prime, bad_ifg, noref_ifg, bad_ifg_all, refy1, refy2, refx1, refx2, cmap_wrap, \
+        treat_as_bad, aggro, conserve, backup_nulls  ## for parallel processing
 
     #%% Set default
     ifgdir = []
@@ -149,6 +157,10 @@ def main(argv=None):
     nullify = False
     ref_approx = False
     do_pngs = True
+    treat_as_bad = False
+    nullmask = False
+    null_both = False
+    backup_nulls = False
 
     try:
         n_para = len(os.sched_getaffinity(0))
@@ -165,8 +177,8 @@ def main(argv=None):
     try:
         try:
             opts, args = getopt.getopt(argv[1:], "hd:t:l:",
-                                       ["help", "multi_prime", "nullify", "skip_pngs",
-                                        "rm_ifg_list=", "n_para=", "ref_approx="])
+                                       ["help", "multi_prime", "nullify", "nullmask", "skip_pngs", "treat_as_bad", "null_both",
+                                        "backup_nulls", "rm_ifg_list=", "n_para=", "ref_approx="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -187,16 +199,29 @@ def main(argv=None):
                 n_para = int(a)
             elif o == '--nullify':
                 nullify = True
+            elif o == '--nullmask':
+                nullmask = True
             elif o == '--skip_pngs':
                 do_pngs = False
             elif o == '--ref_approx':
                 ref_approx = a
+            elif o == '--treat_as_bad':
+                treat_as_bad = True
+            elif o == '--null_both':
+                null_both = True
+            elif o == '--backup_nulls':
+                backup_nulls = True
+
         if not ifgdir:
             raise Usage('No data directory given, -d is not optional!')
         elif not os.path.isdir(ifgdir):
             raise Usage('No {} dir exists!'.format(ifgdir))
         elif not os.path.exists(os.path.join(ifgdir, 'slc.mli.par')):
                 raise Usage('No slc.mli.par file exists in {}!'.format(ifgdir))
+        elif nullify and null_both:
+            raise Usage('--nullify and --null_both selected. Pick only one option')
+        elif nullmask and null_both:
+            raise Usage('--nullmask and --null_both selected. Pick only one option')
         if rm_ifg_list and not os.path.exists(rm_ifg_list):
             raise Usage('No {} exists!'.format(rm_ifg_list))
 
@@ -206,8 +231,12 @@ def main(argv=None):
         print("\nFor help, use -h or --help.\n", file=sys.stderr)
         return 2
 
+    if nullmask:
+        print('Producing nullmasks')
+
     print("\nloop_thre : {} rad".format(loop_thre), flush=True)
 
+    cmap_wrap = SCM.romaO
 
     #%% Directory setting
     ifgdir = os.path.abspath(ifgdir)
@@ -322,7 +351,7 @@ def main(argv=None):
         ifgd12 = ifgdates[ix_ifg12]
         ifgd23 = ifgdates[ix_ifg23]
         ifgd13 = ifgdates[ix_ifg13]
-        
+
         ### List as good or bad candidate
         if loop_ph_rms_ifg[i] >= loop_thre: #Bad loop including bad ifg.
             bad_ifg_cand.extend([ifgd12, ifgd23, ifgd13])
@@ -335,6 +364,8 @@ def main(argv=None):
 
     #%% Identify bad ifgs and output text
     bad_ifg1 = loop_lib.identify_bad_ifg(bad_ifg_cand, good_ifg)
+    print('Not Classifing any IFGS as bad after Loop Check 1 as this may be fixed by multi-prime')
+    bad_ifg1 = []
 
     bad_ifgfile = os.path.join(loopdir, 'bad_ifg_loop.txt')
     with open(bad_ifgfile, 'w') as f:
@@ -389,7 +420,7 @@ def main(argv=None):
     loop_ph_rms_points = np.sum(res[:, 2, :, :,], axis=0)
     #loop_ph_rms_points = np.sqrt(loop_ph_rms_points/ns_loop_ph)
     loop_ph_rms_points = np.sqrt(loop_ph_rms_points**2/ns_loop_ph)
-    
+
     ### Find stable ref area which have all n_unw and minimum ns_bad_loop and loop_ph_rms_points
     mask1 = (n_unw==np.nanmax(n_unw))
     min_ns_bad_loop = np.nanmin(ns_bad_loop)
@@ -479,18 +510,16 @@ def main(argv=None):
         refx1 = int(np.imag(refyxs[refpoint]))
         print('selected ref point is '+str(distref[refpoint])+' px from desired location')
     except:
-        #print('error - seems no proper points below '+str(percentile)+'% percentile of loop errors: '+str(percthres)+'. reverting to original licsbas approach')
-        #print('error - seems no proper points below '+str(percentile)+'% percentile of avg coh: '+str(percthres)+'. 
         print('error in updated refpoint selection approach. reverting to original licsbas approach')
         #loop_ph_rms_points_masked = realphrms
         refyx = np.where(loop_ph_rms_points_masked==np.nanmin(loop_ph_rms_points_masked))
         refy1 = refyx[0][0] # start from 0, not 1
         refx1 = refyx[1][0]
-    
+
     refy2 = refy1+1
     refx2 = refx1+1
     #loop_ph_rms_points_masked = realphrms
-    
+
     ### Save 12ref.txt
     reffile = os.path.join(infodir, '12ref.txt')
     with open(reffile, 'w') as f:
@@ -595,36 +624,106 @@ def main(argv=None):
 
 
     #%% 4th loop to be used to calc n_loop_err and n_ifg_noloop
-    print('\n4th loop to compute statistics and remove pixels with loop errors...', flush=True)
-    print('with {} parallel processing...'.format(_n_para2), flush=True)
+    if null_both:
+        print('\n4th loop to compute stats and run both types of nullification')
+        # create 3D cube - True means presumed error in loop
+        a = np.full((length,width,len(ifgdates)), True)
+        aggro = xr.DataArray(
+            data=a,
+            dims=[ "y", "x", "ifgd"],
+            coords=dict(y=np.arange(length),x=np.arange(width),ifgd=ifgdates))
+        
+        a = np.full((length,width,len(ifgdates)), False)
+        conserve = xr.DataArray(
+            data=a,
+            dims=[ "y", "x", "ifgd"],
+            coords=dict(y=np.arange(length),x=np.arange(width),ifgd=ifgdates))
 
+        ns_loop_err, aggro, conserve = loop_closure_4th_both([0, len(Aloop)], aggro, conserve)
 
-    # create 3D cube - False means presumed error in the loop
-    a = np.full((length,width,len(ifgdates)), False) #, dtype=bool)
-    da = xr.DataArray(
-        data=a,
-        dims=[ "y", "x", "ifgd"],
-        coords=dict(y=np.arange(length),x=np.arange(width),ifgd=ifgdates))
+        print('\nNullify Pixels identified. Nullifying Aggressively and Conservatively')
+        if _n_para > 1:
+                print('with {} parallel processing...'.format(_n_para), flush=True)
+                p = q.Pool(_n_para)
+                p.map(nullify_both, range(len(ifgdates)))
+                p.close()
+        else:
+            print('with no parallel processing...', flush=True)
+            for ix, ifgd in enumerate(ifgdates):
+                # this will use only unws with mask having both True and False, i.e. all points False = unw not used in any loop, to check
+                if not np.min(mask) and np.max(mask):
+                    nullify_both(ix)
+            
+    elif nullify or nullmask:
+        print('\n4th loop to compute statistics and remove pixels with loop errors...', flush=True)
+        print('dataarray is not updated through parallel processing. avoiding parallelisation now', flush=True)
 
-    ### Parallel processing
-    #p = q.Pool(_n_para2)
-    #p = q.Pool(1)  # 2021-11-02: updated nullifying unw pixels with loop phase - to avoid multiple write, no parallelism
-    #res = np.array(p.map(loop_closure_4th_wrapper, args), dtype=np.int16)
-    #p.close()
-    # dataarray is not updated through parallel processing. avoiding parallelisation now
-    ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
-    #ns_loop_err = np.sum(res[:, :, :,], axis=0)
+        # create 3D cube - True means presumed error in loop
+        a = np.full((length,width,len(ifgdates)), treat_as_bad)
+        da = xr.DataArray(
+            data=a,
+            dims=[ "y", "x", "ifgd"],
+            coords=dict(y=np.arange(length),x=np.arange(width),ifgd=ifgdates))
 
-    if nullify:
-        print('nullifying unws with loop errors - not parallel now')
-        for ifgd in ifgdates:
-            mask = da.loc[:,:,ifgd].values
-            # this will use only unws with mask having both True and False, i.e. all points False = unw not used in any loop, to check
-            if not np.min(mask) and np.max(mask):
-                nullify_unw(ifgd, mask)
+        ns_loop_err, da = loop_closure_4th([0, len(Aloop)], da)
+
+        print('Loop Closure 4th Complete')
+
+        if nullify:
+            if treat_as_bad:
+                print('Aggressive Nullification: Nullifying all unws associated with a loop error')
+            else:
+                print('Conservative Nullification: Only Nullifying unws where all loops are errors')
+            
+            if _n_para > 1:
+                print('with {} parallel processing...'.format(_n_para), flush=True)
+                p = q.Pool(_n_para)
+                p.map(nullify_unw, range(len(ifgdates)))
+                p.close()
+            else:
+                print('with no parallel processing...', flush=True)
+                for ix, ifgd in enumerate(ifgdates):
+                    # this will use only unws with mask having both True and False, i.e. all points False = unw not used in any loop, to check
+                    if not np.min(mask) and np.max(mask):
+                        nullify_unw(ix)
+
+            da = xr.DataArray(
+                data=a,
+                dims=[ "y", "x", "ifgd"],
+                coords=dict(y=np.arange(length),x=np.arange(width),ifgd=ifgdates))
+
+            print('\nRecalculating n_loop_err statistics')
+            # ns_loop_err_null, da = loop_closure_4th([0, len(Aloop)], da)
+            ### Parallel processing given we're only calculating stats
+            p = q.Pool(_n_para)
+            res = np.array(p.map(loop_closure_4th_wrapper, args), dtype=np.int16)
+            p.close()
+
+            ns_loop_err_null = np.sum(res[:, :, :,], axis=0)
+            print('n_loop_err counted')
+
+        if nullmask:
+            print('saving nullify mask - not parallel now')
+            print('ifgdir = {}'.format(ifgdir))
+            for ifgd in ifgdates:
+                mask = da.loc[:, :, ifgd].values
+                # this will use only unws with mask having both True and False, i.e. all points False = unw not used in any loop, to check
+                if not np.min(mask) and np.max(mask):
+                    nullify_mask(ifgd, mask)
+    else:
+        print('\n4th loop to compute statistics without nullifying pixels with loop errors...', flush=True)
+        print('with {} parallel processing...'.format(_n_para2), flush=True)
+
+        ### Parallel processing
+        p = q.Pool(_n_para2)
+        res = np.array(p.map(loop_closure_4th_wrapper, args), dtype=np.int16)
+        p.close()
+
+        print('Loop Closure 4th Complete')
+        ns_loop_err = np.sum(res[:, :, :,], axis=0)
 
     # generate loop pngs:
-    if do_pngs:
+    if do_pngs and not null_both:
         ### Parallel processing
         p = q.Pool(_n_para)
         p.map(generate_pngs, range(n_loop))
@@ -698,6 +797,12 @@ def main(argv=None):
     n_coh = np.zeros((length, width), dtype=np.int16)
     n_unw = np.zeros((length, width), dtype=np.int16)
     for ifgd in ifgdates_good:
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        unw = io_lib.read_img(unwfile, length, width)
+
+        unw[unw == 0] = np.nan # Fill 0 with nan
+        n_unw += ~np.isnan(unw) # Summing number of unnan unw
+
         ccfile = os.path.join(ifgdir, ifgd, ifgd+'.cc')
         if os.path.getsize(ccfile) == length*width:
             coh = io_lib.read_img(ccfile, length, width, np.uint8)
@@ -706,14 +811,12 @@ def main(argv=None):
             coh = io_lib.read_img(ccfile, length, width)
             coh[np.isnan(coh)] = 0 # Fill nan with 0
 
+        if nullify:
+            coh[np.where(np.isnan(unw))] = 0
+
         coh_avg += coh
         n_coh += (coh!=0)
 
-        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
-        unw = io_lib.read_img(unwfile, length, width)
-
-        unw[unw == 0] = np.nan # Fill 0 with nan
-        n_unw += ~np.isnan(unw) # Summing number of unnan unw
 
     coh_avg[n_coh==0] = np.nan
     n_coh[n_coh==0] = 1 #to avoid zero division
@@ -726,8 +829,17 @@ def main(argv=None):
     coh_avgfile = os.path.join(resultsdir, 'coh_avg')
     coh_avg.tofile(coh_avgfile)
 
-    n_loop_errfile = os.path.join(resultsdir, 'n_loop_err')
-    np.float32(ns_loop_err).tofile(n_loop_errfile)
+
+    if nullify:
+        n_loop_errfile_null = os.path.join(resultsdir, 'n_loop_err')
+        np.float32(ns_loop_err_null).tofile(n_loop_errfile_null)
+
+        n_loop_errfile_orig = os.path.join(resultsdir, 'n_loop_err_prenull')
+        np.float32(ns_loop_err).tofile(n_loop_errfile_orig)
+
+    else:
+        n_loop_errfile = os.path.join(resultsdir, 'n_loop_err')
+        np.float32(ns_loop_err).tofile(n_loop_errfile)
 
 
     ### Save png
@@ -736,9 +848,15 @@ def main(argv=None):
     title = 'Number of used unw data'
     plot_lib.make_im_png(n_unw, n_unwfile+'.png', cmap_noise, title, n_im)
 
-    title = 'Number of unclosed loops'
-    plot_lib.make_im_png(ns_loop_err, n_loop_errfile+'.png', cmap_noise_r, title)
+    if nullify:
+        if treat_as_bad:
+            title = 'Number of unclosed loops after aggressive nullifying'
+        else:
+            title = 'Number of unclosed loops after conservative nullifying'
+        plot_lib.make_im_png(ns_loop_err_null, n_loop_errfile_null+'.png', cmap_noise_r, title)
 
+        title = 'Number of unclosed loops before nullifying'
+        plot_lib.make_im_png(ns_loop_err, n_loop_errfile_orig+'.png', cmap_noise_r, title)
 
     #%% Link ras
     ### First, identify suffix of raster image (ras, bmp, or png?)
@@ -1083,12 +1201,14 @@ def loop_closure_4th_wrapper(args):
         #da.loc[:,:,ifgd23] = da.loc[:,:,ifgd23]+is_error
         #da.loc[:,:,ifgd13] = da.loc[:,:,ifgd13]+is_error
         ns_loop_err1 = ns_loop_err1+is_error #suspected unw error
+
     return ns_loop_err1
 
 
 # for now, without parallelism
 def loop_closure_4th(args, da):
-    nullify_threshold=np.pi
+    nullify_threshold = np.pi
+
     i0, i1 = args
     n_loop = Aloop.shape[0]
     ns_loop_err1 = np.zeros((length, width), dtype=np.int16)
@@ -1110,22 +1230,164 @@ def loop_closure_4th(args, da):
         ## Count number of loops with suspected unwrap error (>pi)
         loop_ph[np.isnan(loop_ph)] = 0 #to avoid warning
         is_ok = np.abs(loop_ph)<nullify_threshold
-        da.loc[:,:,ifgd12] = np.logical_or(da.loc[:,:,ifgd12],is_ok)
-        da.loc[:,:,ifgd23] = np.logical_or(da.loc[:,:,ifgd23],is_ok)
-        da.loc[:,:,ifgd13] = np.logical_or(da.loc[:,:,ifgd13],is_ok)
+        if treat_as_bad:
+            # Jack edit - change from logical_or so that only pixels that are perfect throughout are saved
+            da.loc[:,:,ifgd12] = np.logical_and(da.loc[:,:,ifgd12],is_ok)
+            da.loc[:,:,ifgd23] = np.logical_and(da.loc[:,:,ifgd23],is_ok)
+            da.loc[:,:,ifgd13] = np.logical_and(da.loc[:,:,ifgd13],is_ok)
+        else:
+            da.loc[:,:,ifgd12] = np.logical_or(da.loc[:,:,ifgd12],is_ok)
+            da.loc[:,:,ifgd23] = np.logical_or(da.loc[:,:,ifgd23],is_ok)
+            da.loc[:,:,ifgd13] = np.logical_or(da.loc[:,:,ifgd13],is_ok)
         ns_loop_err1 = ns_loop_err1 + ~is_ok #suspected unw error
     ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
+
     return ns_loop_err1, da
 
+def loop_closure_4th_both(args, aggro, conserve):
+    nullify_threshold = np.pi
 
-def nullify_unw(ifgd, mask):
-    unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
-    if os.path.exists(unwfile):
-        unw = io_lib.read_img(unwfile, length, width)
+    i0, i1 = args
+    n_loop = Aloop.shape[0]
+    ns_loop_err1 = np.zeros((length, width), dtype=np.int16)
+    for i in range(i0, i1):
+        if np.mod(i, 100) == 0:
+            print("  {0:3}/{1:3}th loop...".format(i, n_loop), flush=True)
+        ### Read unw
+        unw12, unw23, unw13, ifgd12, ifgd23, ifgd13 = loop_lib.read_unw_loop_ph(Aloop[i, :], ifgdates, ifgdir, length, width)
+        ### Skip if bad ifg is included
+        if ifgd12 in bad_ifg_all or ifgd23 in bad_ifg_all or ifgd13 in bad_ifg_all:
+            #print('skipping '+ifgd13)
+            continue
+        ## Compute ref
+        ref_unw12 = np.nanmean(unw12[refy1:refy2, refx1:refx2])
+        ref_unw23 = np.nanmean(unw23[refy1:refy2, refx1:refx2])
+        ref_unw13 = np.nanmean(unw13[refy1:refy2, refx1:refx2])
+        ## Calculate loop phase taking into account ref phase
+        loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
+        ## Count number of loops with suspected unwrap error (>pi)
+        loop_ph[np.isnan(loop_ph)] = 0 #to avoid warning
+        is_ok = np.abs(loop_ph)<nullify_threshold
+        aggro.loc[:,:,ifgd12] = np.logical_and(aggro.loc[:,:,ifgd12],is_ok)
+        aggro.loc[:,:,ifgd23] = np.logical_and(aggro.loc[:,:,ifgd23],is_ok)
+        aggro.loc[:,:,ifgd13] = np.logical_and(aggro.loc[:,:,ifgd13],is_ok)
+
+        conserve.loc[:,:,ifgd12] = np.logical_or(conserve.loc[:,:,ifgd12],is_ok)
+        conserve.loc[:,:,ifgd23] = np.logical_or(conserve.loc[:,:,ifgd23],is_ok)
+        conserve.loc[:,:,ifgd13] = np.logical_or(conserve.loc[:,:,ifgd13],is_ok)
+        ns_loop_err1 = ns_loop_err1 + ~is_ok #suspected unw error
+    ns_loop_err1 = np.array(ns_loop_err1, dtype=np.int16)
+
+    return ns_loop_err1, aggro, conserve
+
+
+def nullify_unw(ix):
+    ifgd = ifgdates[ix]
+    mask = da.loc[:,:,ifgd].values
+
+    # this will use only unws with mask having both True and False, i.e. all points False = unw not used in any loop, to check
+    if not np.min(mask) and np.max(mask):
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        origfile = unwfile
+        if backup_nulls:
+            # Check for backed up files. THIS ASSUMES ALL DATA HAS BEEN NULLED THE SAME WAY
+            trueorigfile = os.path.join(ifgdir, ifgd, ifgd + '_orig.unw')
+            # If no trueorigfile exists, data is truely untouched
+            if not os.path.exists(trueorigfile):
+                shutil.move(unwfile, trueorigfile)
+                origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig12.unw')
+                # Softlink (used for checking if null has already occurred for LiCSBAS13, softlink to save space)
+                os.symlink(trueorigfile, origfile)
+            else:
+                # True orig exists - check if it is because no loop nullification has occurred
+                origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig13.unw')
+                if os.path.exists(origfile):
+                    # orig12 exists - backup unw as orig1213
+                    origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig1312.unw')
+                    shutil.move(unwfile, origfile)
+                else:
+                    # orig12 doesn't exist. There should therefore be orig13 so no need to backup
+                    origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig12.unw')
+                    shutil.move(unwfile, origfile)
+
+        if np.mod(ix, 100) == 0:
+            print('  {}/{} IFG....'.format(ix, n_ifg))
+
+        # Read in preserved data, nullify, and write to .unw file
+        unw = io_lib.read_img(origfile, length, width) # Read in preserved un-looperr-nullified data
         #unw[mask==False]=0  # should be ok but it appears as 0 in preview...
         unw[mask == False] = np.nan
         unw.tofile(unwfile)
 
+        cycle = 3
+        if treat_as_bad:
+            pngfile = os.path.join(ifgdir, ifgd, ifgd+'_aggro_null.png')
+        else:
+            pngfile = os.path.join(ifgdir, ifgd, ifgd+'_conservative_null.png')
+        plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, cmap_wrap, ifgd+'.unw', vmin=-np.pi, vmax=np.pi, cbar=False)
+
+def nullify_both(ix):
+    ifgd = ifgdates[ix]
+    maskagg = aggro.loc[:,:,ifgd].values
+    maskcon = conserve.loc[:,:,ifgd].values
+    # this will use only unws with mask having both True and False, i.e. all points False = unw not used in any loop, to check
+    if not np.min(maskagg) and np.max(maskagg):
+        unwfile = os.path.join(ifgdir, ifgd, ifgd+'.unw')
+        if backup_nulls:
+            # Check for backed up files. THIS ASSUMES ALL DATA HAS BEEN NULLED THE SAME WAY
+            trueorigfile = os.path.join(ifgdir, ifgd, ifgd + '_orig.unw')
+            # If no trueorigfile exists, data is truely untouched
+            if not os.path.exists(trueorigfile):
+                shutil.move(unwfile, trueorigfile)
+                origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig12.unw')
+                # Softlink (used for checking if null has already occurred for LiCSBAS13, softlink to save space)
+                os.symlink(trueorigfile, origfile)
+            else:
+                # True orig exists - check if it is because no loop nullification has occurred
+                origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig13.unw')
+                if os.path.exists(origfile):
+                    # orig12 exists - backup unw as orig1213
+                    origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig1312.unw')
+                    shutil.move(unwfile, origfile)
+                else:
+                    # orig12 doesn't exist. There should therefore be orig13 so no need to backup
+                    origfile = os.path.join(ifgdir, ifgd, ifgd + '_orig12.unw')
+                    shutil.move(unwfile, origfile)
+
+        if np.mod(ix, 100) == 0:
+            print('  {}/{} IFG....'.format(ix, n_ifg))
+
+        unwaggfile = os.path.join(ifgdir, ifgd, ifgd+'_agg.unw')
+        unwconfile = os.path.join(ifgdir, ifgd, ifgd+'_con.unw')
+        # Read in preserved data, nullify, and write to .unw file
+        unw = io_lib.read_img(origfile, length, width) # Read in preserved un-looperr-nullified data
+        ref_unw = np.nanmean(unw[refy1:refy2, refx1:refx2])
+        unw = unw - ref_unw
+        #unw[mask==False]=0  # should be ok but it appears as 0 in preview...
+        unwagg = unw.copy()
+        unwcon = unwagg.copy()
+        unwagg[maskagg == False] = np.nan
+        unwcon[maskcon == False] = np.nan
+
+        unw.tofile(unwfile)
+        unwagg.tofile(unwaggfile)
+        unwcon.tofile(unwconfile)
+
+        # cycle = 3
+        # if treat_as_bad:
+        #     pngfile = os.path.join(ifgdir, ifgd, ifgd+'_aggro_null.png')
+        # else:
+        #     pngfile = os.path.join(ifgdir, ifgd, ifgd+'_conservative_null.png')
+        # plot_lib.make_im_png(np.angle(np.exp(1j*unw/cycle)*cycle), pngfile, cmap_wrap, ifgd+'.unw', vmin=-np.pi, vmax=np.pi, cbar=False)
+
+
+def nullify_mask(ifgd, mask):
+    maskfile = os.path.join(ifgdir, ifgd, ifgd + '.nullify.mask')
+    if os.path.exists(maskfile):
+        os.remove(maskfile)
+    # Save nullify mask, where 0 = masked pixel, 1 = good pixel
+    mask.astype(np.int16).tofile(maskfile)
+    plot_lib.make_im_png(mask.astype(np.int16), maskfile + '.png', 'viridis', ifgd, 0, 1)
 
 #%% main
 if __name__ == "__main__":
