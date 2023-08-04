@@ -45,6 +45,7 @@ import numpy as np
 import warnings
 from matplotlib.colors import LinearSegmentedColormap as LSC
 from matplotlib import pyplot as plt
+import matplotlib.path as path
 
 
 #%%
@@ -595,6 +596,33 @@ def read_range_geo(range_str, width, length, lat1, postlat, lon1, postlon):
 
     return [x1, x2, y1, y2]
 
+
+#%%
+def poly_mask(poly_str, lon, lat, radius=0):
+    """
+    lat lon values are in grid registration
+    poly coords in long lat
+    radius = 0 for input polygons
+    radius > 0 for lines (search width in pixels for containing points)
+    """
+
+    # read coord string and split into numpy arrays
+    coord_str = [float(s) for s in re.split('[,]', poly_str)]
+    lon_poly, lat_poly = np.asarray(coord_str[::2]), np.asarray(coord_str[1::2])
+    if radius > 0:
+        lon_poly = np.concatenate([lon_poly, np.flip(lon_poly)])
+        lat_poly = np.concatenate([lat_poly, np.flip(lat_poly)])
+        pix = np.sqrt((lon[1] - lon[0]) ** 2 + (lat[1] - lat[0]) ** 2)
+        radius = pix * radius
+
+    # generate coordinate mesh
+    lon_grid, lat_grid = np.meshgrid(lon, lat)
+
+    # create poly from coords and return points within polygon
+    poly = path.Path(np.vstack((lon_poly, lat_poly)).T)
+    poly_mask = poly.contains_points(np.transpose([lon_grid.flatten(), lat_grid.flatten()]), radius=radius).reshape(np.shape(lon_grid))
+
+    return poly_mask
 
 #%%
 def read_range_line_geo(range_str, width, length, lat_n, postlat, lon_w, postlon):

@@ -14,7 +14,7 @@ Inputs in GEOCml*/ :
  - slc.mli[.par|.png]
  - EQA.dem.par
  - Others (baselines, [E|N|U].geo, hgt[.png])
- 
+
 Outputs in GEOCml*clip/ :
  - yyyymmdd_yyyymmdd/
    - yyyymmdd_yyyymmdd.unw[.png] (clipped)
@@ -27,18 +27,21 @@ Outputs in GEOCml*clip/ :
 =====
 Usage
 =====
-LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1/lat2] [--n_para int]
+LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1/lat2] [-p polyfile.txt] [--n_para int]
 
  -i  Path to the GEOCml* dir containing stack of unw data.
  -o  Path to the output dir.
  -r  Range to be clipped. Index starts from 0.
      0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  -g  Range to be clipped in geographical coordinates (deg).
+ -p  Text file containing polygon coords to be masked (x1,y1,x2,y2,x3,y3....), 1 line per clip
  --n_para  Number of parallel processing (Default: # of usable CPU)
 
 """
 #%% Change log
 '''
+v1.2.6 20230804 Jack McGrath, Uni of Leeds
+ - Add poly clipping
 v1.2.5 20210105 Yu Morishita, GSI
  - Fill 0 by nan in unw
 v1.2.4 20201119 Yu Morishita, GSI
@@ -81,18 +84,18 @@ class Usage(Exception):
 
 #%%
 def main(argv=None):
-   
+
     #%% Check argv
     if argv == None:
         argv = sys.argv
-        
+
     start = time.time()
     ver="1.2.5"; date=20210105; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 
     ### For parallel processing
-    global ifgdates2, in_dir, out_dir, length, width, x1, x2, y1, y2,cycle, cmap_wrap
+    global ifgdates2, in_dir, out_dir, length, width, x1, x2, y1, y2, cycle, cmap_wrap, bool_mask
 
 
     #%% Set default
@@ -100,6 +103,7 @@ def main(argv=None):
     out_dir = []
     range_str = []
     range_geo_str = []
+    poly_file = []
     try:
         n_para = len(os.sched_getaffinity(0))
     except:
@@ -112,7 +116,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hi:o:r:g:", ["help", "n_para="])
+            opts, args = getopt.getopt(argv[1:], "hi:o:r:g:p:", ["help", "n_para="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -127,6 +131,8 @@ def main(argv=None):
                 range_str = a
             elif o == '-g':
                 range_geo_str = a
+            elif o == '-p':
+                poly_file = a
             elif o == '--n_para':
                 n_para = int(a)
 
@@ -189,14 +195,35 @@ def main(argv=None):
             return 1
         else:
             x1, x2, y1, y2 = tools_lib.read_range(range_str, width, length)
-    else: ## -g
+    elif range_geo_str: ## -g
         if not tools_lib.read_range_geo(range_geo_str, width, length, lat1, postlat, lon1, postlon):
             print('\nERROR in {}\n'.format(range_geo_str), file=sys.stderr)
             return 1
         else:
             x1, x2, y1, y2 = tools_lib.read_range_geo(range_geo_str, width, length, lat1, postlat, lon1, postlon)
             range_str = '{}:{}/{}:{}'.format(x1, x2, y1, y2)
+    else: ## -p
+        print('Clipping using polygon file') 
+        bool_mask = np.zeros((length, width), dtype=bool)
+        with open(poly_file) as f:
+            poly_strings_all = f.readlines()
+
+        dempar = os.path.join(in_dir, 'EQA.dem_par')
+        lat1 = float(io_lib.get_param_par(dempar, 'corner_lat')) # north
+        lon1 = float(io_lib.get_param_par(dempar, 'corner_lon')) # west
+        postlat = float(io_lib.get_param_par(dempar, 'post_lat')) # negative
+        postlon = float(io_lib.get_param_par(dempar, 'post_lon')) # positive
+        lat2 = lat1+postlat*(length-1) # south
+        lon2 = lon1+postlon*(width-1) # east
+        #lon, lat = np.arange(lon1, lon2+postlon, postlon), np.arange(lat1, lat2+postlat, postlat)
+        lon, lat = np.linspace(lon1, lon2, width), np.linspace(lat1, lat2, length)
+        for poly_str in poly_strings_all:
+            bool_mask = bool_mask + tools_lib.poly_mask(poly_str, lon, lat)
         
+        clip_area = np.where(bool_mask)
+        bool_mask = bool_mask
+        x1, x2, y1, y2 = min(clip_area[1]), max(clip_area[1]), min(clip_area[0]), max(clip_area[0])
+
     ### Calc clipped  info
     width_c = x2-x1
     length_c = y2-y1
@@ -219,7 +246,7 @@ def main(argv=None):
     #%% Make clipped par files
     mlipar_c = os.path.join(out_dir, 'slc.mli.par')
     dempar_c = os.path.join(out_dir, 'EQA.dem_par')
-    
+
     ### slc.mli.par
     with open(mlipar, 'r') as f: file = f.read()
     file = re.sub(r'range_samples:\s*{}'.format(width), 'range_samples: {}'.format(width_c), file)
@@ -241,7 +268,7 @@ def main(argv=None):
         if os.path.isdir(file):
             continue  #not copy directory
         elif file==mlipar or file==dempar:
-            continue  #not copy 
+            continue  #not copy
         elif os.path.getsize(file) == width*length*4: ##float file
             print('Clip {}'.format(os.path.basename(file)), flush=True)
             data = io_lib.read_img(file, length, width)
@@ -270,10 +297,11 @@ def main(argv=None):
     print('\nClip unw and cc', flush=True)
     ### First, check if already exist
     ifgdates2 = []
-    for ifgix, ifgd in enumerate(ifgdates): 
+    for ifgix, ifgd in enumerate(ifgdates):
         out_dir1 = os.path.join(out_dir, ifgd)
         unwfile_c = os.path.join(out_dir1, ifgd+'.unw')
         ccfile_c = os.path.join(out_dir1, ifgd+'.cc')
+        compfile_c = os.path.join(out_dir1, ifgd+'.conncomp')
         if not (os.path.exists(unwfile_c) and os.path.exists(ccfile_c)):
             ifgdates2.append(ifgd)
 
@@ -285,7 +313,7 @@ def main(argv=None):
         ### Clip with parallel processing
         if n_para > n_ifg2:
             n_para = n_ifg2
-            
+
         print('  {} parallel processing...'.format(n_para), flush=True)
         p = q.Pool(n_para)
         p.map(clip_wrapper, range(n_ifg2))
@@ -311,7 +339,8 @@ def clip_wrapper(ifgix):
     ifgd = ifgdates2[ifgix]
     unwfile = os.path.join(in_dir, ifgd, ifgd+'.unw')
     ccfile = os.path.join(in_dir, ifgd, ifgd+'.cc')
-    
+    compfile = os.path.join(in_dir, ifgd, ifgd + '.conncomp')
+
     unw = io_lib.read_img(unwfile, length, width)
     unw[unw==0] = np.nan
     if os.path.getsize(ccfile) == length*width:
@@ -324,15 +353,27 @@ def clip_wrapper(ifgix):
     coh = io_lib.read_img(ccfile, length, width, dtype=ccformat)
 
     ### Clip
-    unw = unw[y1:y2, x1:x2]
-    coh = coh[y1:y2, x1:x2]
+    try:
+        unw[bool_mask] = np.nan
+        coh[bool_mask] = np.nan
+    finally:
+        unw = unw[y1:y2, x1:x2]
+        coh = coh[y1:y2, x1:x2]
 
     ### Output
     out_dir1 = os.path.join(out_dir, ifgd)
     if not os.path.exists(out_dir1): os.mkdir(out_dir1)
-    
+
     unw.tofile(os.path.join(out_dir1, ifgd+'.unw'))
     coh.tofile(os.path.join(out_dir1, ifgd+'.cc'))
+
+    if os.path.exists(compfile):
+        comp = io_lib.read_img(compfile, length, width, dtype=ccformat)
+        try:
+            comp[bool_mask] = np.nan
+        finally:
+            comp = comp[y1:y2, x1:x2]
+        comp.tofile(os.path.join(out_dir1, ifgd + '.conncomp'))
 
     ## Output png for corrected unw
     pngfile = os.path.join(out_dir1, ifgd+'.unw.png')
