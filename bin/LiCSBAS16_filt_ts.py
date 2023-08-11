@@ -428,7 +428,7 @@ def main(argv=None):
 
 
     #%% First, deramp and hgt-linear if indicated
-    cum = np.zeros((cum_org.shape), dtype=np.float32)*np.nan
+    cum = np.zeros(cum_org.shape, dtype=np.float32)*np.nan
     if not deg_ramp and not hgt_linearflag:
         cum = cum_org
         del cum_org
@@ -548,8 +548,8 @@ def main(argv=None):
     bool_unnan = ~np.isnan(cum_filt[0, :, :]).reshape(length, width) ## not all nan
     cum_pt = cum_filt.reshape(n_im, length*width)[:, bool_unnan.ravel()] #n_im x n_pt
     n_pt_unnan = bool_unnan.sum()
-    vconst_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
-    vel_tmp = np.zeros((n_pt_unnan), dtype=np.float32)*np.nan
+    vconst_tmp = np.zeros(n_pt_unnan, dtype=np.float32)*np.nan
+    vel_tmp = np.zeros(n_pt_unnan, dtype=np.float32)*np.nan
 
     bool_nonan_pt = np.all(~np.isnan(cum_pt), axis=0)
 
@@ -755,7 +755,7 @@ def filter_wrapper(i):
             warnings.simplefilter('ignore', RuntimeWarning)
             weight_factor = weight_factor/np.sum(weight_factor, axis=0)
 
-        cum_lpt = np.nansum(cum[ixs, :, :]*weight_factor, axis=0);
+        cum_lpt = np.nansum(cum[ixs, :, :]*weight_factor, axis=0)
 
         cum_hpt = cum[i, :, :] - cum_lpt
 

@@ -510,8 +510,10 @@ if __name__ == "__main__":
         vmax = vmax_auto - refvalue_vel
     else:
         vlimauto = False
-        if vmin is None: vmin_auto - refvalue_vel
-        if vmax is None: vmax_auto - refvalue_vel
+        if vmin is None:
+            vmin = vmin_auto - refvalue_vel
+        if vmax is None:
+            vmax = vmax_auto - refvalue_vel
 
 
     #%% Plot figure of cumulative displacement and velocity
@@ -886,8 +888,9 @@ if __name__ == "__main__":
     event.inaxes = axv
     event.button = 1
     event.dblclick = True
-    lastevent = event
-    printcoords(lastevent)
+    #lastevent = event
+    #printcoords(lastevent)
+    printcoords(event)
 
     #%%
     if ts_pngfile:

@@ -162,14 +162,23 @@ def main():
 
     ### Set n_unw_r_thre and cycle depending on L- or C-band
     if wavelength > 0.2: ## L-band
-        if args.n_unw_r_thre is None: n_unw_r_thre = 0.5
-        else: n_unw_r_thre = args.n_unw_r_thre
+        if args.n_unw_r_thre is None:
+            n_unw_r_thre = 0.5
+        else:
+            n_unw_r_thre = args.n_unw_r_thre
         cycle = 1.5 # 2pi/cycle for comparison png
     elif wavelength <= 0.2: ## C-band
-        if args.n_unw_r_thre is None: n_unw_r_thre = 1.0
-        else: n_unw_r_thre = args.n_unw_r_thre
+        if args.n_unw_r_thre is None:
+            n_unw_r_thre = 1.0
+        else:
+            n_unw_r_thre = args.n_unw_r_thre
         cycle = 3 # 3*2pi/cycle for comparison png
-
+    else: # any other
+        if args.n_unw_r_thre is None:
+            n_unw_r_thre = 1.0
+        else:
+            n_unw_r_thre = args.n_unw_r_thre
+        cycle = 3 # 3*2pi/cycle for comparison png
     #%% Read date and network information
     ### Get all ifgdates in ifgdir
     if args.ifg_list:
@@ -241,6 +250,9 @@ def main():
     print('Allowed memory size    : {} MB'.format(memory_size))
     print('Number of patches      : {}'.format(n_patch))
 
+    # names for layers to be stored/pngs generated
+    names = ['n_gap', 'n_ifg_noloop', 'maxTlen']
+
     #%% For each patch
     for i_patch, rows in enumerate(patchrow):
         print('\nProcess {0}/{1}th line ({2}/{3}th patch)...'.format(rows[1], patchrow[-1][-1], i_patch+1, n_patch), flush=True)
@@ -257,9 +269,9 @@ def main():
         countf = width*rows[0]
         countl = width*lengththis
         for i, ifgd in enumerate(ifgdates):
+            suffix = '.unw'
             if i_patch == 0:
                 unwfile = os.path.join(ifgdir, ifgd, ifgd + '.unw')
-                suffix = '.unw'
                 if args.nullify and args.backup:
                     ## Check for backed up data. THIS ASSUMES ALL DATA HAS BEEN NULLED THE SAME WAY
                     trueorigfile = os.path.join(ifgdir, ifgd, ifgd + '_orig.unw')
@@ -359,6 +371,7 @@ def main():
             ns_gap_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
             ns_ifg_noloop_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
             maxTlen_patch = np.zeros((n_pt_all), dtype=np.float32)*np.nan
+            null_patch = np.zeros((n_ifg, n_pt_all), dtype=np.float32) * np.nan
 
 
         #%% Output data and image
@@ -376,7 +389,7 @@ def main():
                     null_patch[i, :].astype(np.float32).tofile(f)
 
         ## velocity and noise indicies in results dir
-        names = ['n_gap', 'n_ifg_noloop', 'maxTlen']
+        # names = ['n_gap', 'n_ifg_noloop', 'maxTlen'] # had to be defined earlier
         data = [ns_gap_patch, ns_ifg_noloop_patch, maxTlen_patch]
         for i in range(len(names)):
             file = os.path.join(resultsdir, '{}_preNullNoLoop'.format(names[i]))

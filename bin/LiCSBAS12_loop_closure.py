@@ -1167,7 +1167,7 @@ def loop_closure_3rd_wrapper(i):
 
     ## Calculate loop phase taking into account ref phase
     loop_ph = unw12+unw23-unw13-(ref_unw12+ref_unw23-ref_unw13)
-    return np.sqrt(np.nanmean((loop_ph)**2))
+    return np.sqrt(np.nanmean(loop_ph**2))
 
 
 #%%

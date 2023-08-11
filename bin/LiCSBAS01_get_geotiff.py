@@ -361,8 +361,8 @@ def main(argv=None):
         exts = ['unw', 'cc', 'diff_pha', 'diff_unfiltered_pha'] # some ifgs do not have unfiltered version, so getting both
     else:
         exts = ['unw', 'cc']
-    print(ext+' data:')
     for ext in exts:
+        print(ext + ' data:')
         args = [(i, n_ifg,
                  os.path.join(url_ifgdir, ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext)),
                  os.path.join(ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext))

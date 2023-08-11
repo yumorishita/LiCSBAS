@@ -53,6 +53,9 @@ def make_geotiff(data, latn_p, lonw_p, dlat, dlon, outfile, compress_option, nod
         dtype = gdal.GDT_Float32
     elif data.dtype == np.uint8:
         dtype = gdal.GDT_Byte
+    else:
+        print('error with the data format - neither float nor int')
+        return
 
     driver = gdal.GetDriverByName('GTiff')
     outRaster = driver.Create(outfile, width, length, 1, dtype, options=compress_option)

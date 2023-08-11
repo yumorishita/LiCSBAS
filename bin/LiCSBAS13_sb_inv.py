@@ -249,7 +249,7 @@ def main(argv=None):
             elif o == '--no_storepatches':
                 store_patches = False
             elif o == '--load_patches':
-	        load_patches = True
+                load_patches = True
 	      
 
         if not ifgdir:

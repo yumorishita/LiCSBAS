@@ -144,7 +144,7 @@ def plot_gacos_info(gacos_infofile, pngfile):
     with open(gacos_infofile, "r") as f:
         info = f.readlines()[1:]
 
-    std_bf, std_af, rate = [], [], []; 
+    std_bf, std_af, rate = [], [], []
     
     for line in info:
         date, std_bf1, std_af1, rate1 = line.split()

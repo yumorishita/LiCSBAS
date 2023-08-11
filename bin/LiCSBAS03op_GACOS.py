@@ -452,8 +452,8 @@ def convert_wrapper(ix_im):
             _ztd.tofile(ztdfile)
 
         ### Cut and resapmle ztd to geo
-        ztd_geo = gdal.Warp("", bilfile, format='MEM', outputBounds=outputBounds,\
-            width=width_geo, height=length_geo, \
+        ztd_geo = gdal.Warp("", bilfile, format='MEM', outputBounds=outputBounds,
+            width=width_geo, height=length_geo,
             resampleAlg=resampleAlg, srcNodata=0).ReadAsArray()
         os.remove(hdrfile)
         os.remove(bilfile)

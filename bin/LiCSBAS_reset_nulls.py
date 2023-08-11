@@ -133,7 +133,7 @@ def reset_all():
             else:
                 print('CAUTION: {0} identified as a bad by step 11. No nulling occurred, so no {0}_orig.unw exists to backup from!'.format(ifgd))
         else:
-            print('WARNING: NO {0}.unw OR {0}_orig.unw EXISTS in {}!'.format(ifgd, os.path.dirname(ifgdir)))
+            print('WARNING: NO {0}.unw OR {0}_orig.unw EXISTS in {1}!'.format(ifgd, os.path.dirname(ifgdir)))
 
 def reset_null():
     if args.reset_LoopErr:
@@ -145,6 +145,8 @@ def reset_null():
         for ifg in noLoopList:
             ifgd = re.split('/', ifg)[-1]
             shutil.move(ifg, os.path.join(ifgdir, ifgd))
+    else:
+        resetcode = 999 # undefined
 
     ifglist = glob.glob(os.path.join(ifgdir, '20*'))
 
