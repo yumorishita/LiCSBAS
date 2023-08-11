@@ -8,7 +8,7 @@ v1.5.2 20210311 Yu Morishita, GSI
 This script will take the statistics options from LiCSBAS130_sb_inv.py, and identifies
 and removes pixels that are not associated with a loop closure. Aggressive nullification
 will produce more no_loop_pixels, so run this before that to remove/mask pixels that
-natively have no loops
+natively have no loops.
 
 ===============
 Input & output files
