@@ -558,7 +558,7 @@ def main(argv=None):
                 print('Data doesnt match. Restarting inversion')
                 processed_rows = 0
         else:
-            print('No previous patches found')
+            print('No previous patches found - this is either the first run or the previous run was successful!')
             processed_rows = 0
     else:
       processed_rows = 0
