@@ -34,7 +34,8 @@ LiCSBAS05op_clip_unw.py -i in_dir -o out_dir [-r x1:x2/y1:y2] [-g lon1/lon2/lat1
  -r  Range to be clipped. Index starts from 0.
      0 for x2/y2 means all. (i.e., 0:0/0:0 means whole area).
  -g  Range to be clipped in geographical coordinates (deg).
- -p  Text file containing polygon coords to be masked (x1,y1,x2,y2,x3,y3....), 1 line per clip
+ -p  Text file containing polygon coords to be clipped (x1,y1,x2,y2,x3,y3....), 1 line per clip
+     The whole image will be clipped to the extent of the polyclips unless -r or -g is selected
  --n_para  Number of parallel processing (Default: # of usable CPU)
 
 """
@@ -202,7 +203,7 @@ def main(argv=None):
         else:
             x1, x2, y1, y2 = tools_lib.read_range_geo(range_geo_str, width, length, lat1, postlat, lon1, postlon)
             range_str = '{}:{}/{}:{}'.format(x1, x2, y1, y2)
-    else: ## -p
+    if poly_file: ## -p
         print('Clipping using polygon file') 
         bool_mask = np.zeros((length, width), dtype=bool)
         with open(poly_file) as f:
@@ -221,8 +222,8 @@ def main(argv=None):
             bool_mask = bool_mask + tools_lib.poly_mask(poly_str, lon, lat)
         
         clip_area = np.where(bool_mask)
-        bool_mask = bool_mask
-        x1, x2, y1, y2 = min(clip_area[1]), max(clip_area[1]), min(clip_area[0]), max(clip_area[0])
+        if not range_str and not range_geo_str:
+            x1, x2, y1, y2 = min(clip_area[1]), max(clip_area[1]), min(clip_area[0]), max(clip_area[0])
 
     ### Calc clipped  info
     width_c = x2-x1
