@@ -357,12 +357,11 @@ def clip_wrapper(ifgix):
     coh = io_lib.read_img(ccfile, length, width, dtype=ccformat)
 
     ### Clip
-    try:
-        unw[bool_mask] = np.nan
-        coh[bool_mask] = 0 # Can't convert int coh to nan
-    finally:
-        unw = unw[y1:y2, x1:x2]
-        coh = coh[y1:y2, x1:x2]
+    unw[bool_mask] = np.nan
+    coh[bool_mask] = 0 # Can't convert int coh to nan
+    
+    unw = unw[y1:y2, x1:x2]
+    coh = coh[y1:y2, x1:x2]
 
     ### Output
     out_dir1 = os.path.join(out_dir, ifgd)
@@ -373,10 +372,8 @@ def clip_wrapper(ifgix):
 
     if os.path.exists(compfile):
         comp = io_lib.read_img(compfile, length, width, dtype=ccformat)
-        try:
-            comp[bool_mask] = np.nan
-        finally:
-            comp = comp[y1:y2, x1:x2]
+        comp[bool_mask] = np.nan
+        comp = comp[y1:y2, x1:x2]
         comp.tofile(os.path.join(out_dir1, ifgd + '.conncomp'))
 
     ## Output png for corrected unw
