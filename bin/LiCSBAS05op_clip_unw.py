@@ -141,8 +141,8 @@ def main(argv=None):
             raise Usage('No input directory given, -i is not optional!')
         if not out_dir:
             raise Usage('No output directory given, -o is not optional!')
-        if not range_str and not range_geo_str:
-            raise Usage('No clip area given, use either -r or -g!')
+        if not range_str and not range_geo_str and not poly_file:
+            raise Usage('No clip area given, use either -r, -g or -p!')
         if range_str and range_geo_str:
             raise Usage('Both -r and -g given, use either -r or -g not both!')
         elif not os.path.isdir(in_dir):
@@ -203,9 +203,10 @@ def main(argv=None):
         else:
             x1, x2, y1, y2 = tools_lib.read_range_geo(range_geo_str, width, length, lat1, postlat, lon1, postlon)
             range_str = '{}:{}/{}:{}'.format(x1, x2, y1, y2)
+
+    bool_mask = np.zeros((length, width), dtype=bool)
     if poly_file: ## -p
-        print('Clipping using polygon file') 
-        bool_mask = np.zeros((length, width), dtype=bool)
+        print('Clipping using polygon file: {}'.format(poly_file))
         with open(poly_file) as f:
             poly_strings_all = f.readlines()
 
@@ -222,8 +223,10 @@ def main(argv=None):
             bool_mask = bool_mask + tools_lib.poly_mask(poly_str, lon, lat)
         
         clip_area = np.where(bool_mask)
+        bool_mask = bool_mask == False # Invert bool mask, so True are areas to be dropped
         if not range_str and not range_geo_str:
             x1, x2, y1, y2 = min(clip_area[1]), max(clip_area[1]), min(clip_area[0]), max(clip_area[0])
+            range_str = '{}:{}/{}:{}'.format(x1, x2, y1, y2)
 
     ### Calc clipped  info
     width_c = x2-x1
@@ -356,7 +359,7 @@ def clip_wrapper(ifgix):
     ### Clip
     try:
         unw[bool_mask] = np.nan
-        coh[bool_mask] = np.nan
+        coh[bool_mask] = 0 # Can't convert int coh to nan
     finally:
         unw = unw[y1:y2, x1:x2]
         coh = coh[y1:y2, x1:x2]
