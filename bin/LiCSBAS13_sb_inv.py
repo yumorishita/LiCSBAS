@@ -523,8 +523,8 @@ def main(argv=None):
     #%% Open cum.h5 for output
     ### Decide here what to do re. cumh5file and reloading patches. Need to check that stored cumh5 file is the right size etc
     print('store_patches:', store_patches)
-    if load_patches:
-        cumfile = os.path.join(resultsdir, 'cum')
+    cumfile = os.path.join(resultsdir, 'cum')
+    if load_patches:    
         if os.path.exists(cumfile):
             try:
                 cum = np.fromfile(cumfile, dtype=np.float32).reshape((n_im, length, width))
