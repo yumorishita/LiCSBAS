@@ -357,10 +357,9 @@ def main(argv=None):
 
     ### Check if both unw and cc already donwloaded, new, and same size
     print('Checking and downloading ({} parallel, may take time)...'.format(n_para), flush=True)
+    exts = ['unw', 'cc']
     if get_pha:
-        exts = ['unw', 'cc', 'diff_pha', 'diff_unfiltered_pha'] # some ifgs do not have unfiltered version, so getting both
-    else:
-        exts = ['unw', 'cc']
+        exts = exts + ['diff_pha', 'diff_unfiltered_pha'] # some ifgs do not have unfiltered version, so getting both
     for ext in exts:
         print(ext + ' data:')
         args = [(i, n_ifg,
@@ -390,7 +389,7 @@ def main(argv=None):
             args = [(i, ifgd, n_dl,
                      os.path.join(url_ifgdir, ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext)),
                      os.path.join(ifgd, '{0}.geo.{1}.tif'.format(ifgd, ext))
-                     ) for i, ifgd in enumerate(unwdates_dl)]
+                     ) for i, ifgd in enumerate(dates_dl)]
 
             p = q.Pool(n_para)
             p.map(download_wrapper, args)
