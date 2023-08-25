@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.14.1 20230608 Milan Lazecky, UoL
 
 This script unwraps GeoTIFF files of wrapped interferograms, for further time series analysis.
 It replaces the original LiCSBAS steps 02-05 (except for 04), as these are done in one go.
@@ -49,7 +48,7 @@ LiCSBAS02to05_unwrap.py -i WORKdir [-M nlook] [--freq float] [--n_para int] [**u
 """
 #%% Change log
 '''
-v1.14.1 20230628 Milan Lazecky, UniLeeds
+v1.14.2 20230628 Milan Lazecky, UniLeeds
  - initial version using previously developed lics_unwrap functions
 '''
 
@@ -85,7 +84,7 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.14.1"; date=20230628; author="M. Lazecky"
+    ver="1.14.2"; date='2023-06-28'; author="M. Lazecky"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

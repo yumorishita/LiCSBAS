@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.7.4b 202111111 Milan Lazecky, UniLeeds
-v1.7.4 202011119 Yu Morishita, GSI
 
 This script converts GeoTIFF files of unw and cc to float32 and uint8 format, respectively, for further time series analysis, and also downsamples (multilooks) data if specified. Existing files are not re-created to save time, i.e., only the newly available data will be processed.
 
@@ -99,6 +97,7 @@ import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
+from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""
@@ -114,7 +113,6 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.7.4"; date=20201119; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

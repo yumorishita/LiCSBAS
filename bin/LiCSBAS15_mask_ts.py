@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.8.1 20200911 Yu Morishita, GSI
 
 ========
 Overview
@@ -89,6 +88,7 @@ import numpy as np
 import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_plot_lib as plot_lib
+from LiCSBAS_version import *
 
 import warnings
 import matplotlib
@@ -122,7 +122,6 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver="1.8.1"; date=20200911; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

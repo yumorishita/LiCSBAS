@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.2.5 20210105 Yu Morishita, GSI
 
 This script clips a specified rectangular area of interest from unw and cc data. The clipping can make the data size smaller and processing faster, and improve the result of Step 1-2 (loop closure). Existing files are not re-created to save time, i.e., only the newly available data will be processed. This step is optional.
 
@@ -76,6 +75,7 @@ import SCM
 import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_plot_lib as plot_lib
+from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""
@@ -91,7 +91,7 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.2.5"; date=20210105; author="Y. Morishita"
+    #ver='1.14.1'; date=20230804; author="Yu Morishita and COMET dev team"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 """
-v2.0.0 20220706 Jack McGrath, Leeds Uni
-v1.5.4 20221020 Qi Ou, Leeds Uni
-v1.5.3 20211122 Milan Lazecky, Leeds Uni
-v1.5.2 20210311 Yu Morishita, GSI
 
 This script will take the statistics options from LiCSBAS130_sb_inv.py, and identifies
 and removes pixels that are not associated with a loop closure. Aggressive nullification
@@ -45,9 +41,9 @@ LiCSBAS130_sb_inv.py -d ifgdir [--n_para int] [--n_unw_r_thre float] [--null_mas
 """
 #%% Change log
 '''
-v2.0.0 20230706 Jack McGrath, Uni of Leeds
+v1.14.2 20230706 Jack McGrath, Uni of Leeds
  - Re-edit for only nulling no-loop pixels
-v1.0 20190730 Yu Morishita, Uni of Leeds and GSI
+v1.0 20220929 Qi Ou, Uni of Leeds
  - Original implementation
 '''
 # - network/network13*.png : Figures of the network
@@ -108,7 +104,7 @@ def init_args():
 def main():
 
     start = time.time()
-    ver="1.0"; date=20220929; author="Q. Ou and Jack McGrath"
+    ver='1.14.2'; date=20230708; author="Qi Ou and COMET dev team"
     print("\n{} ver{} {} {}".format(os.path.basename(sys.argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(sys.argv[0]), ' '.join(sys.argv[1:])), flush=True)
 

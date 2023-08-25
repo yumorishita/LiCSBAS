@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.14.1 20230608 Milan Lazecky, UoL
-v1.6.3 20201207 Yu Morishita, GSI
 
 ========
 Overview
@@ -47,8 +45,8 @@ LiCSBAS01_get_geotiff.py [-f frameID] [-s yyyymmdd] [-e yyyymmdd] [--get_gacos] 
 """
 #%% Change log
 '''
-v1.14.1 20230608 Milan Lazecky, UoL
- - added download of phase (for reunw) and mli
+v1.14.2 20230608 Milan Lazecky, UoL
+ - Added (optional) download of phase (for reunw) and mli
 v1.6.3 20201207 Yu Morishita, GSI
  - Download network.png
  - Search latest epoch for mli to save times
@@ -88,6 +86,7 @@ import numpy as np
 import datetime as dt
 import multiprocessing as multi
 import LiCSBAS_tools_lib as tools_lib
+from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""
@@ -103,7 +102,6 @@ def main(argv=None):
         argv = sys.argv
         
     start = time.time()
-    ver='1.14.1'; date=20230628; author="Y. Morishita, M. Lazecky"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

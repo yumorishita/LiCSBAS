@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.6.3 20220330 Milan Lazecky, COMET
-v1.6.2 20211102 Milan Lazecky, COMET
-v1.6.1 20210405 Yu Morishita, GSI
 
 ========
 Overview
@@ -125,6 +122,7 @@ import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_plot_lib as plot_lib
 import xarray as xr
 import SCM
+from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""
@@ -140,7 +138,6 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.6.3"; date=20220330; author="M. Lazecky, Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

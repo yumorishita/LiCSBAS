@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.5.3 20230602 Yu Morishita, GSI, M. Lazecky and Pedro E. Bedon, Uni of Leeds
 
 This script applies spatio-temporal filter (HP in time and LP in space with gaussian kernel, same as StaMPS) to the time series of displacement. Deramping (1D, bilinear, or 2D polynomial) can also be applied if -r option is used. Topography-correlated components (linear with elevation) can also be subtracted with --hgt_linear option simultaneously with deramping before spatio-temporal filtering. The impact of filtering (deramp and linear elevation as well) can be visually checked by showing 16filt*/*png. A stable reference point is determined after the filtering as well as Step 1-3.
 
@@ -128,6 +127,7 @@ import LiCSBAS_io_lib as io_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_plot_lib as plot_lib
+from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""
@@ -143,7 +143,6 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.5.1"; date=20210311; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
 

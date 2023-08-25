@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 """
-v1.5.4 20230804 Jack McGrath, Leed Uni
-v1.5.3 20211122 Milan Lazecky, Leeds Uni
-v1.5.2 20210311 Yu Morishita, GSI
 
 This script inverts the SB network of unw to obtain the time series and
 velocity using NSBAS (López-Quiroz et al., 2009; Doin et al., 2011) approach.
@@ -59,7 +56,7 @@ Outputs in TS_GEOCml*/ :
 Usage
 =====
 LiCSBAS13_sb_inv.py -d ifgdir [-t tsadir] [--inv_alg LS|WLS] [--mem_size float] [--gamma float] [--n_para int] [--n_unw_r_thre float] [--keep_incfile] [--gpu] [--singular] [--only_sb] [--nopngs]
-			      [--no_storepatches] [--load_patches]
+                   [--no_storepatches] [--load_patches]
 
  -d  Path to the GEOCml* dir containing stack of unw data
  -t  Path to the output TS_GEOCml* dir.
@@ -150,6 +147,7 @@ import LiCSBAS_inv_lib as inv_lib
 import LiCSBAS_tools_lib as tools_lib
 import LiCSBAS_loop_lib as loop_lib
 import LiCSBAS_plot_lib as plot_lib
+from LiCSBAS_version import *
 
 class Usage(Exception):
     """Usage context manager"""
@@ -165,7 +163,6 @@ def main(argv=None):
         argv = sys.argv
 
     start = time.time()
-    ver="1.5.3"; date=20211122; author="M. Lazecky"
     #ver="1.5.2"; date=20210311; author="Y. Morishita"
     print("\n{} ver{} {} {}".format(os.path.basename(argv[0]), ver, date, author), flush=True)
     print("{} {}".format(os.path.basename(argv[0]), ' '.join(argv[1:])), flush=True)
