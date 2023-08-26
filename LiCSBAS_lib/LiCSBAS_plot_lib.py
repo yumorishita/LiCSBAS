@@ -8,6 +8,11 @@ Python3 library of plot functions for LiCSBAS.
 =========
 Changelog
 =========
+20230827 Qi Ou, UoL
+ - plot_strong_weak_cuts_network
+ - plot_coloured_network
+ - plot_corrected_network
+ - plot_network with user-defined labels for the blue ifgs
 20230623 Milan Lazecky, UoL
  - updated matplotlib grid
 v1.3.1 20200909 Yu Morishita, GSI
