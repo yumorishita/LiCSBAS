@@ -2,9 +2,10 @@
 
 LiCSBAS is an open-source package in Python and bash to carry out InSAR time series analysis using LiCSAR products (i.e., unwrapped interferograms and coherence) which are freely available on the [COMET-LiCS web portal](https://comet.nerc.ac.uk/COMET-LiCS-portal/).
 
-
-
 Users can easily derive the time series and velocity of the displacement if sufficient LiCSAR products are available in the area of interest. LiCSBAS also contains visualization tools to interactively display the time series of displacement to help investigation and interpretation of the results.
+
+Unfortunately, this LiCSBAS repository cannot be updated since 2022 for a reason. There are some known issues listed [here](https://github.com/yumorishita/LiCSBAS/issues/244). If you encounter an error, please see the [known issues](https://github.com/yumorishita/LiCSBAS/issues/244) or search [other issues](https://github.com/yumorishita/LiCSBAS/issues). You can also use [LiCSBAS2](https://github.com/yumorishita/LiCSBAS2) or [COMET-version LiCSBAS](https://github.com/comet-licsar/LiCSBAS) which are maintained.
+
 
 [<img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/comet-lics-web.png"  height="220">](https://comet.nerc.ac.uk/COMET-LiCS-portal/) <img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/sample_vel.png"  height="220">  <img src="https://raw.githubusercontent.com/wiki/yumorishita/LiCSBAS/images/sample_ts.png"  height="220">
 
@@ -16,7 +17,7 @@ THIS IS RESEARCH CODE PROVIDED TO YOU "AS IS" WITH NO WARRANTIES OF CORRECTNESS.
 
 See the [**wiki**](https://github.com/yumorishita/LiCSBAS/wiki) pages and [quick start](https://github.com/yumorishita/LiCSBAS/wiki/2_0_workflow#quick-start).
 
-If you have found an issue or bug, please report it on the [issues page](https://github.com/yumorishita/LiCSBAS/issues), rather than emailing me.
+If you have found an issue or bug, please report it on the [issues page](https://github.com/yumorishita/LiCSBAS/issues).
 
 ## Sample Products and Tutorial
 
@@ -36,6 +37,8 @@ Morishita, Y.; Lazecky, M.; Wright, T.J.; Weiss, J.R.; Elliott, J.R.; Hooper, A.
 Morishita, Y.: Nationwide urban ground deformation monitoring in Japan using Sentinel-1 LiCSAR products and LiCSBAS. *Prog. Earth Planet. Sci.* **2021**, *8*, 6,  https://doi.org/10.1186/s40645-020-00402-7.
 
 Lazecký, M.; Spaans, K.; González, P.J.; Maghsoudi, Y.; Morishita, Y.; Albino, F.; Elliott, J.; Greenall, N.; Hatton, E.; Hooper, A.; Juncu, D.; McDougall, A.; Walters, R.J.; Watson, C.S.; Weiss, J.R.; Wright, T.J. LiCSAR: An Automatic InSAR Tool for Measuring and Monitoring Tectonic and Volcanic Activity. *Remote Sens.* **2020**, *12*, 2430, https://doi.org/10.3390/rs12152430.
+
+Morishita, Y., Sugimoto, R., Nakamura, R. et al. Nationwide urban ground deformation in Japan for 15 years detected by ALOS and Sentinel-1. Prog Earth Planet Sci 10, 66 (2023). https://doi.org/10.1186/s40645-023-00597-5
 
 ## Acknowledgements
 
